@@ -43,6 +43,14 @@ class User extends Authenticatable
         return $this->belongsTo(Tenant::class);
     }
 
+    /**
+     * Get the current tenant for this user
+     */
+    public function currentTenant(): ?Tenant
+    {
+        return $this->tenant;
+    }
+
     public function getNameAttribute(): string
     {
         return $this->first_name . ' ' . $this->last_name;

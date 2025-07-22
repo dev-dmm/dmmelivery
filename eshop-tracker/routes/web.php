@@ -65,6 +65,30 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
     
+    // Order Import Routes
+    Route::prefix('orders')->group(function () {
+        Route::get('/import', [App\Http\Controllers\OrderImportController::class, 'index'])
+            ->name('orders.import.index');
+        Route::post('/import/upload', [App\Http\Controllers\OrderImportController::class, 'uploadFile'])
+            ->name('orders.import.upload');
+        Route::post('/import/api', [App\Http\Controllers\OrderImportController::class, 'importFromApi'])
+            ->name('orders.import.api');
+        Route::get('/import/{importId}/status', [App\Http\Controllers\OrderImportController::class, 'getStatus'])
+            ->name('orders.import.status');
+        Route::get('/import/{importId}/details', [App\Http\Controllers\OrderImportController::class, 'getDetails'])
+            ->name('orders.import.details');
+        Route::post('/import/{importId}/cancel', [App\Http\Controllers\OrderImportController::class, 'cancel'])
+            ->name('orders.import.cancel');
+        Route::post('/import/{importId}/retry', [App\Http\Controllers\OrderImportController::class, 'retry'])
+            ->name('orders.import.retry');
+        Route::delete('/import/{importId}', [App\Http\Controllers\OrderImportController::class, 'delete'])
+            ->name('orders.import.delete');
+        Route::get('/import/template/{format}', [App\Http\Controllers\OrderImportController::class, 'downloadTemplate'])
+            ->name('orders.import.template');
+        Route::post('/import/field-mapping', [App\Http\Controllers\OrderImportController::class, 'getFieldMapping'])
+            ->name('orders.import.field-mapping');
+    });
+    
     // Test routes for API integration
     Route::get('/test/courier-api', function() {
         // Get some sample tracking numbers for testing

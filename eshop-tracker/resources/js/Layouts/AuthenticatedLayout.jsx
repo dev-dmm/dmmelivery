@@ -36,6 +36,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                 Shipments Dashboard
                                 </NavLink>
+                                <NavLink
+                                    href={route('orders.import.index')}
+                                    active={route().current('orders.import.*')}
+                                >
+                                    📦 Order Import
+                                </NavLink>
                                                         <NavLink
                             href={route('test.courier-api')}
                             active={route().current('test.courier-api')}
@@ -158,6 +164,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             active={route().current('shipments.index')}
                         >
                         Shipments
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('orders.import.index')}
+                            active={route().current('orders.import.*')}
+                        >
+                            📦 Order Import
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             href={route('test.courier-api')}
