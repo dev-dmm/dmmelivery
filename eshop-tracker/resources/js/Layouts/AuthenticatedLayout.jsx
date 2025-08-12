@@ -31,6 +31,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                     Dashboard
                                 </NavLink>
                                 <NavLink
+                                    href={route('courier.performance')}
+                                    active={route().current('courier.performance')}
+                                >
+                                    📊 Απόδοση Courier
+                                </NavLink>
+                                <NavLink
                                 href={route('shipments.index')}
                                 active={route().current('shipments.index')}
                                 >
@@ -41,6 +47,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                     active={route().current('orders.import.*')}
                                 >
                                     📦 Order Import
+                                </NavLink>
+                                <NavLink
+                                    href={route('settings.index')}
+                                    active={route().current('settings.*')}
+                                >
+                                    ⚙️ Settings
                                 </NavLink>
                                                         <NavLink
                             href={route('test.courier-api')}
@@ -160,6 +172,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             Dashboard
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            href={route('courier.performance')}
+                            active={route().current('courier.performance')}
+                        >
+                            📊 Απόδοση Courier
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
                             href={route('shipments.index')}
                             active={route().current('shipments.index')}
                         >
@@ -170,6 +188,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             active={route().current('orders.import.*')}
                         >
                             📦 Order Import
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('settings.index')}
+                            active={route().current('settings.*')}
+                        >
+                            ⚙️ Settings
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             href={route('test.courier-api')}

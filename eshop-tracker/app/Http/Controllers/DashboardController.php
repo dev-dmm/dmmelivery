@@ -188,17 +188,204 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function courierPerformance(Request $request)
+    {
+        $selectedPeriod = $request->get('period', 'all');
+        $selectedArea = $request->get('area', 'all');
+        
+        $startDate = $this->getStartDateForPeriod($selectedPeriod);
+        
+        // Get overall shipment statistics
+        $stats = [
+            'delivered_shipments' => Shipment::where('status', 'delivered')
+                ->when($startDate, function ($query) use ($startDate) {
+                    return $query->where('created_at', '>=', $startDate);
+                })
+                ->when($selectedArea !== 'all', function ($query) use ($selectedArea) {
+                    return $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                })
+                ->count(),
+            'in_transit_shipments' => Shipment::where('status', 'in_transit')
+                ->when($startDate, function ($query) use ($startDate) {
+                    return $query->where('created_at', '>=', $startDate);
+                })
+                ->when($selectedArea !== 'all', function ($query) use ($selectedArea) {
+                    return $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                })
+                ->count(),
+            'pending_shipments' => Shipment::where('status', 'pending')
+                ->when($startDate, function ($query) use ($startDate) {
+                    return $query->where('created_at', '>=', $startDate);
+                })
+                ->when($selectedArea !== 'all', function ($query) use ($selectedArea) {
+                    return $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                })
+                ->count(),
+            'delayed_shipments' => Shipment::whereIn('status', ['failed', 'returned'])
+                ->when($startDate, function ($query) use ($startDate) {
+                    return $query->where('created_at', '>=', $startDate);
+                })
+                ->when($selectedArea !== 'all', function ($query) use ($selectedArea) {
+                    return $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                })
+                ->count(),
+        ];
+        
+        $totalShipments = array_sum($stats);
+        
+        // Calculate percentages
+        $stats['delivered_percentage'] = $totalShipments > 0 ? round(($stats['delivered_shipments'] / $totalShipments) * 100, 1) : 0;
+        $stats['in_transit_percentage'] = $totalShipments > 0 ? round(($stats['in_transit_shipments'] / $totalShipments) * 100, 1) : 0;
+        $stats['pending_percentage'] = $totalShipments > 0 ? round(($stats['pending_shipments'] / $totalShipments) * 100, 1) : 0;
+        $stats['delayed_percentage'] = $totalShipments > 0 ? round(($stats['delayed_shipments'] / $totalShipments) * 100, 1) : 0;
+        
+        // Get courier performance metrics
+        $courierStats = Courier::withCount([
+            'shipments as total_shipments' => function ($query) use ($startDate, $selectedArea) {
+                if ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                }
+                if ($selectedArea !== 'all') {
+                    $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                }
+            },
+            'shipments as delivered_count' => function ($query) use ($startDate, $selectedArea) {
+                $query->where('status', 'delivered');
+                if ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                }
+                if ($selectedArea !== 'all') {
+                    $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                }
+            },
+            'shipments as returned_count' => function ($query) use ($startDate, $selectedArea) {
+                $query->where('status', 'returned');
+                if ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                }
+                if ($selectedArea !== 'all') {
+                    $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                }
+            },
+            'shipments as failed_count' => function ($query) use ($startDate, $selectedArea) {
+                $query->where('status', 'failed');
+                if ($startDate) {
+                    $query->where('created_at', '>=', $startDate);
+                }
+                if ($selectedArea !== 'all') {
+                    $query->where('shipping_address', 'like', "%{$selectedArea}%");
+                }
+            }
+        ])->get();
+        
+
+        
+        $courierStats = $courierStats->filter(function ($courier) {
+            return $courier->total_shipments > 0;
+        })->map(function ($courier) {
+            $total = $courier->total_shipments;
+            $delivered = $courier->delivered_count;
+            $returned = $courier->returned_count;
+            $failed = $courier->failed_count;
+            
+            $deliveredPercentage = $total > 0 ? round(($delivered / $total) * 100, 1) : 0;
+            $returnedPercentage = $total > 0 ? round(($returned / $total) * 100, 1) : 0;
+            $otherPercentage = $total > 0 ? round((($total - $delivered - $returned) / $total) * 100, 1) : 0;
+            
+            // Calculate average delivery time
+            $avgDeliveryTime = Shipment::where('courier_id', $courier->id)
+                ->where('status', 'delivered')
+                ->whereNotNull('actual_delivery')
+                ->whereNotNull('created_at')
+                ->get()
+                ->avg(function ($shipment) {
+                    return $shipment->created_at->diffInDays($shipment->actual_delivery);
+                });
+            
+            // Calculate performance grade
+            $grade = $this->calculatePerformanceGrade($deliveredPercentage, $avgDeliveryTime);
+            
+            return [
+                'id' => $courier->id,
+                'name' => $courier->name,
+                'code' => $courier->code,
+                'total_shipments' => $total,
+                'delivered_count' => $delivered,
+                'returned_count' => $returned,
+                'failed_count' => $failed,
+                'delivered_percentage' => $deliveredPercentage,
+                'returned_percentage' => $returnedPercentage,
+                'other_percentage' => $otherPercentage,
+                'avg_delivery_time' => round($avgDeliveryTime, 1),
+                'grade' => $grade,
+            ];
+        })->sortByDesc('total_shipments');
+        
+        // Get available areas for filtering
+        $areas = Shipment::distinct()
+            ->whereNotNull('shipping_address')
+            ->pluck('shipping_address')
+            ->map(function ($address) {
+                // Extract city/area from address
+                $parts = explode(',', $address);
+                return trim($parts[0] ?? $address);
+            })
+            ->unique()
+            ->filter()
+            ->values();
+        
+
+        
+        $periodOptions = [
+            'all' => 'Όλη η ιστορία',
+            '7' => 'Τελευταία 7 ημέρες',
+            '30' => 'Τελευταία 30 ημέρες',
+            '90' => 'Τελευταία 90 ημέρες',
+            '365' => 'Τελευταία χρόνος',
+        ];
+        
+        return Inertia::render('CourierPerformance', [
+            'stats' => $stats,
+            'courierStats' => $courierStats,
+            'areas' => $areas,
+            'selectedPeriod' => $selectedPeriod,
+            'selectedArea' => $selectedArea,
+            'periodOptions' => $periodOptions,
+        ]);
+    }
+    
+    private function calculatePerformanceGrade($deliveredPercentage, $avgDeliveryTime)
+    {
+        if ($deliveredPercentage >= 95 && $avgDeliveryTime <= 2) {
+            return 'A+';
+        } elseif ($deliveredPercentage >= 90 && $avgDeliveryTime <= 3) {
+            return 'A';
+        } elseif ($deliveredPercentage >= 85 && $avgDeliveryTime <= 4) {
+            return 'B+';
+        } elseif ($deliveredPercentage >= 80 && $avgDeliveryTime <= 5) {
+            return 'B';
+        } elseif ($deliveredPercentage >= 75) {
+            return 'C+';
+        } else {
+            return 'C';
+        }
+    }
+
     private function getStartDateForPeriod($period): ?Carbon
     {
         switch ($period) {
             case '24_hours':
                 return Carbon::now()->subHours(24);
+            case '7':
             case '7_days':
                 return Carbon::now()->subDays(7);
+            case '30':
             case '30_days':
                 return Carbon::now()->subDays(30);
+            case '90':
             case '3_months':
                 return Carbon::now()->subMonths(3);
+            case '365':
             case '12_months':
                 return Carbon::now()->subMonths(12);
             case '24_months':

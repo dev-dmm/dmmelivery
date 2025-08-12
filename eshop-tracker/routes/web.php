@@ -56,12 +56,22 @@ Route::prefix('onboarding')->name('onboarding.')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::patch('/profile/acs-credentials', [ProfileController::class, 'updateACSCredentials'])->name('profile.acs-credentials.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // Settings Routes
+    Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/business', [App\Http\Controllers\SettingsController::class, 'updateBusiness'])->name('settings.business.update');
+    Route::post('/settings/courier/acs', [App\Http\Controllers\SettingsController::class, 'updateACSCredentials'])->name('settings.courier.acs.update');
+    Route::post('/settings/courier/test', [App\Http\Controllers\SettingsController::class, 'testCourierConnection'])->name('settings.courier.test');
+    Route::post('/settings/courier/update', [App\Http\Controllers\SettingsController::class, 'updateCourierCredentials'])->name('settings.courier.update');
+    Route::delete('/settings/courier/delete', [App\Http\Controllers\SettingsController::class, 'deleteCourierCredentials'])->name('settings.courier.delete');
+    Route::post('/settings/api/generate', [App\Http\Controllers\SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
+    Route::post('/settings/webhooks', [App\Http\Controllers\SettingsController::class, 'updateWebhooks'])->name('settings.webhooks.update');
 });
 
 Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/courier-performance', [DashboardController::class, 'courierPerformance'])->name('courier.performance');
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
     

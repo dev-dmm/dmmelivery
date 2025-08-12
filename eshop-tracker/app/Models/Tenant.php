@@ -253,6 +253,15 @@ class Tenant extends Model
         return hash_equals($this->api_token, hash('sha256', $token));
     }
 
+    // Shipment Tracking
+    public function getCurrentMonthShipments(): int
+    {
+        return $this->hasMany(\App\Models\Shipment::class)
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->count();
+    }
+
     // Feature Management
     public function hasFeature(string $feature): bool
     {
