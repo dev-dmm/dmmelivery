@@ -256,7 +256,7 @@ export default function ImportIndex({ auth, recentImports, stats, supportedForma
       <Head title="Order Import" />
 
       <div className="py-12">
-        <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div className="mx-auto space-y-6">
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

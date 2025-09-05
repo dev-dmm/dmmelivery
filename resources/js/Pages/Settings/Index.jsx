@@ -269,7 +269,7 @@ export default function SettingsIndex({
             <Head title="Settings" />
 
             <div className="py-12">
-                <div className="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                <div className="mx-auto">
                     <div className="bg-white overflow-hidden shadow-sm rounded-lg">
                         <TabGroup>
                             <TabList className="flex border-b border-gray-200">
