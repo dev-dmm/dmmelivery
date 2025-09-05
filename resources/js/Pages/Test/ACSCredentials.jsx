@@ -86,7 +86,7 @@ export default function ACSCredentials() {
             <Head title="ACS Credentials Test" />
 
             <div className="py-12">
-                <div className="mx-auto max-w-4xl sm:px-6 lg:px-8">
+                <div className="mx-auto">
                     
                     {/* Current Credentials Display */}
                     {currentCreds && (
