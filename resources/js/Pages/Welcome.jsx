@@ -48,7 +48,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }) {
                                 ) : (
                                     <>
                                         <Link
-                                            href={route('registration.form')}
+                                            href={route('registration')}
                                             className="rounded-md bg-blue-600 px-4 py-2 text-white ring-1 ring-transparent transition hover:bg-blue-700 focus:outline-none focus-visible:ring-blue-500 mr-3"
                                         >
                                             🏪 Register eShop
