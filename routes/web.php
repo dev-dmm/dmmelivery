@@ -21,12 +21,16 @@ use App\Http\Controllers\OrderImportController;
 
 // Bind {shipment} safely to current tenant to prevent IDOR
 Route::bind('shipment', function ($id) {
-    $tenantId = app()->has('tenant') ? app('tenant')->id : null;
-    abort_unless($tenantId, 403, 'Tenant not identified');
+    // Get tenant from authenticated user instead of service container
+    // since middleware hasn't run yet when route model binding executes
+    $user = auth()->user();
+    if (!$user || !$user->tenant_id) {
+        abort(403, 'Tenant not identified');
+    }
 
     return \App\Models\Shipment::query()
         ->where('id', $id)
-        ->where('tenant_id', $tenantId)
+        ->where('tenant_id', $user->tenant_id)
         ->firstOrFail();
 });
 
