@@ -1,20 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
-import DangerButton from '@/Components/DangerButton';
-import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import { 
-    CogIcon, 
     BuildingOfficeIcon, 
     TruckIcon, 
     GlobeAltIcon,
     KeyIcon,
     CheckCircleIcon,
-    XCircleIcon,
     ExclamationTriangleIcon,
     ClipboardDocumentIcon,
     ArrowPathIcon
@@ -61,11 +57,12 @@ export default function SettingsIndex({
         webhook_secret: '',
     });
 
+    // === Helpers for messages/loader ===
     const showMessage = (section, message, type = 'success') => {
         setMessages(prev => ({ ...prev, [section]: { message, type } }));
         setTimeout(() => {
             setMessages(prev => ({ ...prev, [section]: null }));
-        }, 3000);
+        }, 3500);
     };
 
     const setLoading = (section, isLoading) => {
@@ -76,9 +73,9 @@ export default function SettingsIndex({
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
+    // === Existing actions ===
     const handleBusinessUpdate = async () => {
         setLoading('business', true);
-        
         try {
             const response = await fetch(route('settings.business.update'), {
                 method: 'POST',
@@ -100,9 +97,7 @@ export default function SettingsIndex({
                     send_notifications: formData.send_notifications,
                 }),
             });
-
             const result = await response.json();
-            
             if (result.success) {
                 showMessage('business', result.message, 'success');
             } else {
@@ -117,7 +112,6 @@ export default function SettingsIndex({
 
     const handleACSCredentialsUpdate = async () => {
         setLoading('acs', true);
-        
         try {
             const response = await fetch(route('settings.courier.acs.update'), {
                 method: 'POST',
@@ -134,10 +128,8 @@ export default function SettingsIndex({
             });
 
             const result = await response.json();
-            
             if (result.success) {
                 showMessage('acs', result.message, 'success');
-                // Clear password fields after successful update
                 setFormData(prev => ({
                     ...prev,
                     acs_company_password: '',
@@ -165,7 +157,6 @@ export default function SettingsIndex({
 
     const testCourierConnection = async (courier) => {
         setLoading(`test_${courier}`, true);
-        
         try {
             const response = await fetch(route('settings.courier.test'), {
                 method: 'POST',
@@ -175,9 +166,7 @@ export default function SettingsIndex({
                 },
                 body: JSON.stringify({ courier }),
             });
-
             const result = await response.json();
-            
             if (result.success) {
                 showMessage(`test_${courier}`, result.message, 'success');
             } else {
@@ -192,7 +181,6 @@ export default function SettingsIndex({
 
     const generateApiToken = async () => {
         setLoading('api_token', true);
-        
         try {
             const response = await fetch(route('settings.api.generate'), {
                 method: 'POST',
@@ -201,12 +189,9 @@ export default function SettingsIndex({
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                 },
             });
-
             const result = await response.json();
-            
             if (result.success) {
-                showMessage('api_token', 'New API token generated', 'success');
-                // Copy to clipboard
+                showMessage('api_token', 'New API token generated (copied to clipboard)', 'success');
                 navigator.clipboard.writeText(result.api_token);
             } else {
                 showMessage('api_token', result.message || 'Generation failed', 'error');
@@ -218,21 +203,91 @@ export default function SettingsIndex({
         }
     };
 
-    const getCourierStatusBadge = (status) => {
-        if (status === 'configured') {
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    <CheckCircleIcon className="w-4 h-4 mr-1" />
-                    Configured
-                </span>
-            );
-        } else {
-            return (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    <XCircleIcon className="w-4 h-4 mr-1" />
-                    Not Configured
-                </span>
-            );
+    // === NEW: WooCommerce Bridge helpers ===
+    const baseUrl = useMemo(() => {
+        // handles http/https + current host
+        if (typeof window !== 'undefined') {
+            return window.location.origin;
+        }
+        return '';
+    }, []);
+
+    const wooEndpoint = `${baseUrl}/api/woocommerce/order`;
+    const tenantId = tenant?.id || '';
+    const apiToken = tenant?.api_token || '';
+
+    const copy = async (text, section = 'woo') => {
+        try {
+            await navigator.clipboard.writeText(text);
+            showMessage(section, 'Copied to clipboard ✅', 'success');
+        } catch {
+            showMessage(section, 'Failed to copy', 'error');
+        }
+    };
+
+    const testWooBridge = async () => {
+        setLoading('woo_test', true);
+
+        // Minimal valid payload per your Laravel validator
+        const payload = {
+            source: 'woocommerce',
+            order: {
+                external_order_id: `TEST-${Date.now()}`,
+                order_number: `TEST-${Date.now()}`,
+                status: 'pending',
+                total_amount: 12.34,
+                subtotal: 10.00,
+                tax_amount: 2.34,
+                shipping_cost: 0.00,
+                currency: 'EUR',
+                payment_status: 'unpaid',
+                payment_method: 'cod',
+            },
+            customer: {
+                first_name: 'Test',
+                last_name: 'Customer',
+                email: 'test@example.com',
+                phone: '6999999999',
+            },
+            shipping: {
+                address: {
+                    first_name: 'Test',
+                    last_name: 'Customer',
+                    address_1: 'Patision 1',
+                    address_2: '',
+                    city: 'Athina',
+                    postcode: '10434',
+                    country: 'GR',
+                    phone: '6999999999',
+                    email: 'test@example.com'
+                }
+            },
+            create_shipment: true
+        };
+
+        try {
+            const res = await fetch(wooEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Either the tenant token or your global bridge key (controller accepts both)
+                    'X-Api-Key': apiToken || '', 
+                    'X-Tenant-Id': tenantId || '',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.success) {
+                showMessage('woo', `Bridge OK: order_id ${data.order_id}${data.shipment_id ? `, shipment_id ${data.shipment_id}` : ''}`, 'success');
+            } else {
+                const msg = data?.message || `HTTP ${res.status}`;
+                showMessage('woo', `Bridge failed: ${msg}`, 'error');
+            }
+        } catch (e) {
+            showMessage('woo', 'Network error while testing', 'error');
+        } finally {
+            setLoading('woo_test', false);
         }
     };
 
@@ -271,9 +326,9 @@ export default function SettingsIndex({
             <div className="py-12">
                 <div className="mx-auto">
                     <div className="bg-white overflow-hidden shadow-sm rounded-lg">
-                        <TabGroup>
+                        <TabGroup selectedIndex={activeTab} onChange={setActiveTab}>
                             <TabList className="flex border-b border-gray-200">
-                                {tabs.map((tab, index) => (
+                                {tabs.map((tab) => (
                                     <Tab
                                         key={tab.name}
                                         className={({ selected }) =>
@@ -592,6 +647,7 @@ export default function SettingsIndex({
                                 {/* API & Webhooks Tab */}
                                 <TabPanel className="p-6">
                                     <div className="space-y-6">
+                                        {/* API Token */}
                                         <div>
                                             <h3 className="text-lg font-medium text-gray-900 mb-4">API Access</h3>
                                             
@@ -604,28 +660,113 @@ export default function SettingsIndex({
                                                         </p>
                                                     </div>
                                                     
-                                                    <SecondaryButton
-                                                        onClick={generateApiToken}
-                                                        disabled={loading.api_token}
-                                                    >
-                                                        {loading.api_token ? (
-                                                            <>
-                                                                <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                                                Generating...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
-                                                                Generate New Token
-                                                            </>
+                                                    <div className="flex items-center gap-2">
+                                                        {tenant.api_token && (
+                                                            <SecondaryButton
+                                                                onClick={() => copy(tenant.api_token, 'api_token')}
+                                                            >
+                                                                <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                                                Copy token
+                                                            </SecondaryButton>
                                                         )}
-                                                    </SecondaryButton>
+                                                        <SecondaryButton
+                                                            onClick={generateApiToken}
+                                                            disabled={loading.api_token}
+                                                        >
+                                                            {loading.api_token ? (
+                                                                <>
+                                                                    <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                                                    Generating...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
+                                                                    Generate New Token
+                                                                </>
+                                                            )}
+                                                        </SecondaryButton>
+                                                    </div>
                                                 </div>
 
                                                 {getMessageAlert('api_token')}
                                             </div>
                                         </div>
 
+                                        {/* NEW: WooCommerce Bridge Block */}
+                                        <div className="border-t pt-6">
+                                            <h3 className="text-lg font-medium text-gray-900 mb-4">WooCommerce Bridge</h3>
+
+                                            {getMessageAlert('woo')}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="bg-white border rounded-lg p-4">
+                                                    <h4 className="text-sm font-medium text-gray-900 mb-2">Endpoint (POST)</h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all">
+                                                            {wooEndpoint}
+                                                        </code>
+                                                        <SecondaryButton onClick={() => copy(wooEndpoint, 'woo')}>
+                                                            <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                                            Copy
+                                                        </SecondaryButton>
+                                                    </div>
+
+                                                    <div className="mt-4 space-y-2">
+                                                        <h5 className="text-sm font-medium text-gray-900">Required Headers</h5>
+                                                        <div className="flex items-center gap-2">
+                                                            <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all">
+                                                                X-Api-Key: {apiToken || '—'}
+                                                            </code>
+                                                            {apiToken && (
+                                                                <SecondaryButton onClick={() => copy(apiToken, 'woo')}>
+                                                                    <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                                                    Copy
+                                                                </SecondaryButton>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all">
+                                                                X-Tenant-Id: {tenantId || '—'}
+                                                            </code>
+                                                            {tenantId && (
+                                                                <SecondaryButton onClick={() => copy(tenantId, 'woo')}>
+                                                                    <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                                                    Copy
+                                                                </SecondaryButton>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 mt-2">
+                                                            The Woo plugin should send orders here using these headers.
+                                                            Your Laravel controller accepts either the tenant token or a global bridge key.
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white border rounded-lg p-4">
+                                                    <h4 className="text-sm font-medium text-gray-900 mb-2">Quick Test</h4>
+                                                    <p className="text-xs text-gray-600 mb-3">
+                                                        Sends a minimal Woo-style payload from your browser to verify the endpoint.
+                                                    </p>
+                                                    <PrimaryButton onClick={testWooBridge} disabled={loading.woo_test || !apiToken || !tenantId}>
+                                                        {loading.woo_test ? (
+                                                            <>
+                                                                <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                                                Testing...
+                                                            </>
+                                                        ) : (
+                                                            'Send Test Order'
+                                                        )}
+                                                    </PrimaryButton>
+                                                    {!apiToken && (
+                                                        <p className="text-xs text-red-600 mt-2">
+                                                            Generate an API token first.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Webhooks */}
                                         <div className="border-t pt-6">
                                             <h3 className="text-lg font-medium text-gray-900 mb-4">Webhook Configuration</h3>
                                             
@@ -662,6 +803,7 @@ export default function SettingsIndex({
                                             </div>
                                         </div>
 
+                                        {/* Usage */}
                                         <div className="border-t pt-6">
                                             <h3 className="text-lg font-medium text-gray-900 mb-4">Usage Information</h3>
                                             
@@ -689,4 +831,4 @@ export default function SettingsIndex({
             </div>
         </AuthenticatedLayout>
     );
-} 
+}
