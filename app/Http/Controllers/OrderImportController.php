@@ -471,6 +471,17 @@ class OrderImportController extends Controller
      */
     public function downloadTemplate(string $format): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
+        // normalize and validate
+        $format = strtolower($format);
+        if ($format === 'excel') {
+            $format = 'xlsx';
+        }
+
+        $allowed = ['csv','xlsx','json','xml'];
+        if (!in_array($format, $allowed, true)) {
+            abort(404, 'Template format not found');
+        }
+
         $templates = [
             'csv' => [
                 'filename' => 'order_import_template.csv',

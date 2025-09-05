@@ -155,7 +155,7 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
             ->whereUuid('importId')->name('import.delete');
 
         Route::get('/import/template/{format}',  [OrderImportController::class, 'downloadTemplate'])
-            ->whereIn('format', ['csv','xlsx'])
+            ->whereIn('format', ['csv','xlsx','excel','xml','json']) // ← add these
             ->name('import.template');
 
         Route::post('/import/field-mapping',     [OrderImportController::class, 'getFieldMapping'])

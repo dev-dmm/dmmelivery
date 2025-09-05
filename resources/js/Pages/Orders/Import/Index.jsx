@@ -239,6 +239,15 @@ export default function ImportIndex({ auth, recentImports, stats, supportedForma
     }
   };
 
+  // --- Helper: normalize the format param for Ziggy (excel -> xlsx) ---
+  const normalizeFormatParam = (label) => {
+    const fm = String(label || '').toLowerCase();
+    if (fm.includes('xlsx') || fm.includes('excel')) return 'xlsx';
+    if (fm.includes('csv')) return 'csv';
+    // Fallback: if supportedFormats keys are weird, default safe to csv
+    return 'csv';
+  };
+
   return (
     <AuthenticatedLayout
       user={auth.user}
@@ -473,16 +482,19 @@ export default function ImportIndex({ auth, recentImports, stats, supportedForma
               {/* Actions */}
               <div className="flex justify-between items-center mt-6">
                 <div className="flex space-x-3">
-                  {Object.keys(supportedFormats).map((format) => (
-                    <a
-                      key={format}
-                      href={route('orders.import.template', { format: format.toLowerCase() })}
-                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                      {format} Template
-                    </a>
-                  ))}
+                  {Object.keys(supportedFormats).map((format) => {
+                    const param = normalizeFormatParam(format);
+                    return (
+                      <a
+                        key={format}
+                        href={route('orders.import.template', { format: param })}
+                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+                        {format} Template
+                      </a>
+                    );
+                  })}
                 </div>
 
                 <div className="flex space-x-3">
