@@ -165,7 +165,7 @@ export default function Dashboard({
                         </p>
                     </div>
                     
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-end space-x-4">
                         {/* Time Period Dropdown */}
                         <div className="relative">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
