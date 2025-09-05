@@ -114,6 +114,8 @@ export default function SettingsIndex({
   const hasAcsCredentials = Boolean(tenant?.has_acs_credentials);
   const tenantId = tenant?.id || '';
   const apiToken = tenant?.api_token || '';
+  // holds the FULL token only when we just generated one
+  const [unmaskedApiToken, setUnmaskedApiToken] = useState('');
 
   // 👇 local token used ONLY by the Quick Test (must be plain ASCII, no •)
   const [testApiKey, setTestApiKey] = useState(() => {
@@ -312,15 +314,16 @@ export default function SettingsIndex({
       showMessage('api_token', 'Too many requests. Please wait a moment.', 'error');
       return;
     }
-
+  
     setLoading('api_token', true);
     recordCall();
-
+  
     try {
       const result = await apiService.post(route('settings.api.generate'), {});
       if (result?.success && result.api_token) {
-        await copyToClipboard(result.api_token, 'api_token');
-        setTestApiKey(result.api_token); // keep Quick Test in sync
+        setUnmaskedApiToken(result.api_token);        // ← store full token locally
+        setTestApiKey(result.api_token);              // keep Quick Test in sync
+        await copyToClipboard(result.api_token, 'api_token'); // copy the real one
         showMessage('api_token', 'New API token generated and copied to clipboard', 'success');
       } else {
         showMessage('api_token', result?.message || 'Generation failed', 'error');
@@ -332,6 +335,7 @@ export default function SettingsIndex({
       setLoading('api_token', false);
     }
   }, [apiService, canMakeCall, recordCall, setLoading, showMessage, copyToClipboard]);
+  
 
   /* --------- Woo Bridge --------- */
   const wooEndpoint = useMemo(() => {
@@ -805,28 +809,46 @@ export default function SettingsIndex({
 
                           <div className="flex items-center gap-2">
                             {apiToken && (
-                              <>
-                                <code className="text-xs bg-white px-2 py-1 rounded border break-all">Token: {maskedToken}</code>
-                                <SecondaryButton onClick={() => copyToClipboard(apiToken, 'api_token')} aria-label="Copy API token to clipboard">
-                                  <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                  Copy token
+                                <>
+                                <code className="text-xs bg-white px-2 py-1 rounded border break-all">
+                                    Token: {maskedToken}
+                                </code>
+                                <SecondaryButton
+                                    onClick={() => {
+                                    if (unmaskedApiToken) {
+                                        copyToClipboard(unmaskedApiToken, 'api_token'); // ← copy the REAL token
+                                    } else {
+                                        showMessage(
+                                        'api_token',
+                                        'For security, the full token is only shown right after generation. Click “Generate New Token” to get a copyable value.',
+                                        'error'
+                                        );
+                                    }
+                                    }}
+                                    aria-label="Copy API token to clipboard"
+                                    disabled={!unmaskedApiToken} // optional: disable if we don’t have the real one
+                                    title={!unmaskedApiToken ? 'Generate a new token to copy the full value' : ''}
+                                >
+                                    <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                    Copy token
                                 </SecondaryButton>
-                              </>
+                                </>
                             )}
+                            {/* Generate button stays the same */}
                             <SecondaryButton onClick={generateApiToken} disabled={loading.api_token}>
-                              {loading.api_token ? (
+                                {loading.api_token ? (
                                 <>
-                                  <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                  Generating...
+                                    <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                    Generating...
                                 </>
-                              ) : (
+                                ) : (
                                 <>
-                                  <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
-                                  Generate New Token
+                                    <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
+                                    Generate New Token
                                 </>
-                              )}
+                                )}
                             </SecondaryButton>
-                          </div>
+                            </div>
                         </div>
 
                         {getMessageAlert('api_token')}
