@@ -55,10 +55,7 @@ class ApiService {
       });
 
       // Try parsing JSON even on non-200 for useful error messages
-      const maybeJson = await response
-        .clone()
-        .json()
-        .catch(() => null);
+      const maybeJson = await response.clone().json().catch(() => null);
 
       if (!response.ok) {
         const errText = maybeJson?.message || (await response.text().catch(() => 'Unknown error'));
@@ -117,6 +114,12 @@ export default function SettingsIndex({
   const hasAcsCredentials = Boolean(tenant?.has_acs_credentials);
   const tenantId = tenant?.id || '';
   const apiToken = tenant?.api_token || '';
+
+  // 👇 local token used ONLY by the Quick Test (must be plain ASCII, no •)
+  const [testApiKey, setTestApiKey] = useState(() => {
+    const t = apiToken || '';
+    return /^[\x20-\x7E]+$/.test(t) ? t : '';
+  });
 
   const [formData, setFormData] = useState({
     // Business Settings
@@ -317,6 +320,7 @@ export default function SettingsIndex({
       const result = await apiService.post(route('settings.api.generate'), {});
       if (result?.success && result.api_token) {
         await copyToClipboard(result.api_token, 'api_token');
+        setTestApiKey(result.api_token); // keep Quick Test in sync
         showMessage('api_token', 'New API token generated and copied to clipboard', 'success');
       } else {
         showMessage('api_token', result?.message || 'Generation failed', 'error');
@@ -336,8 +340,13 @@ export default function SettingsIndex({
   }, []);
 
   const testWooBridge = useCallback(async () => {
-    if (!apiToken || !tenantId) {
-      showMessage('woo', 'API token and tenant ID are required', 'error');
+    // validate token & tenant id
+    if (!testApiKey || !/^[\x20-\x7E]+$/.test(testApiKey)) {
+      showMessage('woo', 'Paste a valid API token (no • characters) in the Quick Test input.', 'error');
+      return;
+    }
+    if (!tenantId) {
+      showMessage('woo', 'Tenant ID is required', 'error');
       return;
     }
 
@@ -390,7 +399,7 @@ export default function SettingsIndex({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Key': apiToken,
+          'X-Api-Key': testApiKey,
           'X-Tenant-Id': tenantId,
         },
         body: JSON.stringify(testPayload),
@@ -413,7 +422,7 @@ export default function SettingsIndex({
     } finally {
       setLoading('woo_test', false);
     }
-  }, [apiToken, tenantId, wooEndpoint, canMakeCall, recordCall, setLoading, showMessage]);
+  }, [testApiKey, tenantId, wooEndpoint, canMakeCall, recordCall, setLoading, showMessage]);
 
   /* --------- UI Helpers --------- */
   const getCourierStatusBadge = useCallback((status) => {
@@ -866,6 +875,22 @@ export default function SettingsIndex({
                               </div>
                             </div>
 
+                            {/* NEW: Quick Test token input (unmasked, ASCII only) */}
+                            <div className="mt-3">
+                              <label className="text-xs text-gray-600">API key for Quick Test</label>
+                              <input
+                                type="text"
+                                value={testApiKey}
+                                onChange={(e) => setTestApiKey(e.target.value.trim())}
+                                placeholder="Paste your API token here (unmasked)"
+                                className="mt-1 w-full rounded border px-2 py-1 text-xs"
+                                autoComplete="off"
+                              />
+                              <p className="text-[11px] text-gray-500 mt-1">
+                                Must be plain ASCII (no • characters). Use “Copy token” or paste the token you generated.
+                              </p>
+                            </div>
+
                             <p className="text-xs text-gray-500 mt-2">
                               The WooCommerce plugin should send orders to this endpoint using these headers. Your Laravel controller accepts either
                               the tenant token or a global bridge key.
@@ -878,7 +903,7 @@ export default function SettingsIndex({
                           <p className="text-xs text-gray-600 mb-3">
                             Sends a minimal WooCommerce-style payload from your browser to verify the endpoint works correctly.
                           </p>
-                          <PrimaryButton onClick={testWooBridge} disabled={loading.woo_test || !apiToken || !tenantId}>
+                          <PrimaryButton onClick={testWooBridge} disabled={loading.woo_test || !testApiKey || !tenantId}>
                             {loading.woo_test ? (
                               <>
                                 <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
@@ -888,12 +913,12 @@ export default function SettingsIndex({
                               'Send Test Order'
                             )}
                           </PrimaryButton>
-                          {(!apiToken || !tenantId) && (
+                          {(!testApiKey || !tenantId) && (
                             <p className="text-xs text-red-600 mt-2">
-                              {!apiToken && !tenantId
-                                ? 'Generate an API token and ensure tenant ID is available.'
-                                : !apiToken
-                                ? 'Generate an API token first.'
+                              {!testApiKey && !tenantId
+                                ? 'Paste an API token and ensure tenant ID is available.'
+                                : !testApiKey
+                                ? 'Paste an API token first.'
                                 : 'Tenant ID is required.'}
                             </p>
                           )}
