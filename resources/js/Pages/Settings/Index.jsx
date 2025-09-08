@@ -46,15 +46,22 @@ class ApiService {
     return `${this.baseURL}${endpoint}`;
   }
 
-  async post(endpoint, data, additionalHeaders = {}) {
+  async post(endpoint, data = {}, additionalHeaders = {}) {
     try {
       const response = await fetch(this.resolveUrl(endpoint), {
         method: 'POST',
-        headers: this.getHeaders(additionalHeaders),
+        credentials: 'same-origin', // ✅ send your session cookie (fixes 419)
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(this.csrfToken ? { 'X-CSRF-TOKEN': this.csrfToken } : {}),
+          ...additionalHeaders,
+        },
         body: JSON.stringify(data),
       });
 
-      // Try parsing JSON even on non-200 for useful error messages
+      // Try parsing JSON even when not OK, so we can surface server messages
       const maybeJson = await response.clone().json().catch(() => null);
 
       if (!response.ok) {
