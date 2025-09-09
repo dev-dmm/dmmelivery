@@ -76,23 +76,13 @@ Route::prefix('register')
     });
 
 // -----------------------------
-// Authenticated profile & settings
+// Authenticated profile (no tenant required)
 // -----------------------------
 Route::middleware(['auth'])->group(function () {
     // Profile
     Route::get('/profile',  [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile',[ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile',[ProfileController::class, 'destroy'])->name('profile.destroy');
-
-    // Settings (keep sensitive actions POST/DELETE and CSRF-protected)
-    Route::get('/settings',                                 [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings/business',                       [SettingsController::class, 'updateBusiness'])->name('settings.business.update');
-    Route::post('/settings/courier/acs',                    [SettingsController::class, 'updateACSCredentials'])->name('settings.courier.acs.update');
-    Route::post('/settings/courier/test',                   [SettingsController::class, 'testCourierConnection'])->name('settings.courier.test');
-    Route::post('/settings/courier/update',                 [SettingsController::class, 'updateCourierCredentials'])->name('settings.courier.update');
-    Route::delete('/settings/courier/delete',               [SettingsController::class, 'deleteCourierCredentials'])->name('settings.courier.delete');
-    Route::post('/settings/api/generate',                   [SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
-    Route::post('/settings/webhooks',                       [SettingsController::class, 'updateWebhooks'])->name('settings.webhooks.update');
 });
 
 // -----------------------------
@@ -126,6 +116,16 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // Settings (keep sensitive actions POST/DELETE and CSRF-protected)
+    Route::get('/settings',                                 [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/business',                       [SettingsController::class, 'updateBusiness'])->name('settings.business.update');
+    Route::post('/settings/courier/acs',                    [SettingsController::class, 'updateACSCredentials'])->name('settings.courier.acs.update');
+    Route::post('/settings/courier/test',                   [SettingsController::class, 'testCourierConnection'])->name('settings.courier.test');
+    Route::post('/settings/courier/update',                 [SettingsController::class, 'updateCourierCredentials'])->name('settings.courier.update');
+    Route::delete('/settings/courier/delete',               [SettingsController::class, 'deleteCourierCredentials'])->name('settings.courier.delete');
+    Route::post('/settings/api/generate',                   [SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
+    Route::post('/settings/webhooks',                       [SettingsController::class, 'updateWebhooks'])->name('settings.webhooks.update');
 
     // Performance view
     Route::get('/courier-performance', [DashboardController::class, 'courierPerformance'])
