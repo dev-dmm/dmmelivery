@@ -126,8 +126,8 @@ export default function SettingsIndex({
 
   // 👇 local token used ONLY by the Quick Test (must be plain ASCII, no •)
   const [testApiKey, setTestApiKey] = useState(() => {
-    const t = apiToken || '';
-    return /^[\x20-\x7E]+$/.test(t) ? t : '';
+    // Don't auto-populate with 'configured' - leave empty so user knows to generate/paste a token
+    return '';
   });
 
   const [formData, setFormData] = useState({
@@ -920,7 +920,7 @@ export default function SettingsIndex({
                                 type="text"
                                 value={testApiKey}
                                 onChange={(e) => setTestApiKey(e.target.value.trim())}
-                                placeholder="Paste your API token here (unmasked)"
+                                placeholder="Generate a new token or paste your full API token here"
                                 className="mt-1 w-full rounded border px-2 py-1 text-xs"
                                 autoComplete="off"
                               />

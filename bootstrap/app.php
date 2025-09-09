@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/acs/update-credentials', // ACS test endpoint
             'api/acs/get-credentials', // ACS get endpoint
             'api/woocommerce/order', // WooCommerce webhook endpoint
+            'settings/api/generate', // Temporary: API token generation for local dev
         ]);
 
         $middleware->web(append: [

@@ -20,12 +20,14 @@ class Courier extends Model
         'api_endpoint',
         'api_key',
         'is_active',
+        'is_default',
         'tracking_url_template',
         'config',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_default' => 'boolean',
         'config' => 'array',
     ];
 

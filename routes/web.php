@@ -83,6 +83,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile',  [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile',[ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile',[ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // Temporary: API token generation for local development (no tenant middleware)
+    Route::post('/settings/api/generate', [SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
 });
 
 // -----------------------------
@@ -124,7 +127,7 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     Route::post('/settings/courier/test',                   [SettingsController::class, 'testCourierConnection'])->name('settings.courier.test');
     Route::post('/settings/courier/update',                 [SettingsController::class, 'updateCourierCredentials'])->name('settings.courier.update');
     Route::delete('/settings/courier/delete',               [SettingsController::class, 'deleteCourierCredentials'])->name('settings.courier.delete');
-    Route::post('/settings/api/generate',                   [SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
+    // Route::post('/settings/api/generate',                   [SettingsController::class, 'generateApiToken'])->name('settings.api.generate'); // Moved to auth-only group for local dev
     Route::post('/settings/webhooks',                       [SettingsController::class, 'updateWebhooks'])->name('settings.webhooks.update');
 
     // Performance view

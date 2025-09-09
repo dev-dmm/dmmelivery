@@ -302,6 +302,13 @@ class SettingsController extends Controller
     {
         $tenant = Auth::user()->currentTenant();
         
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tenant found. Please ensure you are properly authenticated.',
+            ], 422);
+        }
+        
         $newToken = $tenant->generateApiToken();
 
         return response()->json([
