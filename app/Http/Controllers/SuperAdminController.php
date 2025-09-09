@@ -26,8 +26,8 @@ class SuperAdminController extends Controller
             ->with([
                 'tenant:id,name,subdomain',
                 'customer:id,name,email',
-                'shipments:id,order_id,tracking_number,status,courier_id',
-                'shipments.courier:id,name,code'
+                'shipment:id,order_id,tracking_number,status,courier_id',
+                'shipment.courier:id,name,code'
             ])
             ->select([
                 'orders.*'
@@ -122,7 +122,7 @@ class SuperAdminController extends Controller
         $recentOrders = Order::with([
                 'tenant:id,name,subdomain',
                 'customer:id,name,email',
-                'shipments:id,order_id,tracking_number,status'
+                'shipment:id,order_id,tracking_number,status'
             ])
             ->orderBy('created_at', 'desc')
             ->limit(10)

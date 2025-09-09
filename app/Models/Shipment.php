@@ -60,6 +60,11 @@ class Shipment extends Model
         return $this->belongsTo(Courier::class);
     }
 
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
     public function statusHistory(): HasMany
     {
         return $this->hasMany(ShipmentStatusHistory::class);
