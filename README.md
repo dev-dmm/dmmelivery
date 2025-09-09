@@ -1,64 +1,188 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# DM Delivery Bridge - WooCommerce Plugin
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A WordPress/WooCommerce plugin that automatically sends orders to the DM Delivery tracking system.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Automatic Order Sending**: Automatically sends WooCommerce orders to your DM Delivery system when order status changes
+- **Flexible Configuration**: Choose which order statuses trigger the sending
+- **Manual Controls**: Send orders manually from the admin panel or individual order pages
+- **Connection Testing**: Test your API connection before going live
+- **Comprehensive Logging**: Track all API requests and responses for debugging
+- **Error Handling**: Automatic retry functionality for failed requests
+- **Order Status Tracking**: View DM Delivery status directly in WooCommerce order pages
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- WordPress 5.0 or higher
+- WooCommerce 5.0 or higher
+- PHP 7.4 or higher
+- Active DM Delivery account with API access
 
-## Learning Laravel
+## Installation
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Method 1: Manual Installation
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+1. Download the plugin file `dm-delivery-bridge.php`
+2. Create a new folder called `dm-delivery-bridge` in your WordPress `/wp-content/plugins/` directory
+3. Upload the `dm-delivery-bridge.php` file to this folder
+4. Go to your WordPress admin panel → Plugins
+5. Find "DM Delivery Bridge" and click "Activate"
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Method 2: Upload via WordPress Admin
 
-## Laravel Sponsors
+1. Go to WordPress admin → Plugins → Add New
+2. Click "Upload Plugin"
+3. Choose the `dm-delivery-bridge.php` file
+4. Click "Install Now" and then "Activate Plugin"
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Configuration
 
-### Premium Partners
+After installation, configure the plugin:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+1. Go to **WooCommerce → DM Delivery** in your WordPress admin
+2. Fill in the required settings:
 
-## Contributing
+### API Configuration
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- **API Endpoint**: Your DM Delivery API URL (e.g., `https://oreksi.gr/api/woocommerce/order`)
+- **API Key**: Your API key from the DM Delivery system
+- **Tenant ID**: Your tenant ID from the DM Delivery system
 
-## Code of Conduct
+### Behavior Settings
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- **Auto Send Orders**: Enable/disable automatic order sending
+- **Send on Order Status**: Choose which order statuses trigger sending (default: Processing, Completed)
+- **Create Shipment**: Whether to automatically create shipments in DM Delivery
+- **Debug Mode**: Enable detailed logging for troubleshooting
 
-## Security Vulnerabilities
+## Usage
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Automatic Mode
+
+Once configured, the plugin will automatically:
+
+1. Monitor WooCommerce orders for status changes
+2. Send order data to DM Delivery when orders reach selected statuses
+3. Log all activities for your review
+4. Add order notes with success/failure information
+
+### Manual Mode
+
+You can also send orders manually:
+
+1. **From Order Edit Page**: Look for the "DM Delivery Status" meta box on individual order pages
+2. **Bulk Actions**: Use the logs section to resend failed orders
+3. **Test Connection**: Use the "Test Connection" button to verify your setup
+
+### Monitoring
+
+Monitor plugin activity through:
+
+- **Recent Logs**: View the last 20 API requests in the settings page
+- **Order Notes**: Check individual orders for DM Delivery status updates
+- **Order Meta Box**: See DM Delivery status directly on order edit pages
+
+## Order Data Mapping
+
+The plugin maps WooCommerce order data to DM Delivery format:
+
+### Order Information
+- Order ID → External Order ID
+- Order Number → Order Number
+- Order Status → Status
+- Order Total → Total Amount
+- Subtotal, Tax, Shipping, Discounts → Respective fields
+- Currency → Currency
+- Payment Method → Payment Method
+
+### Customer Information
+- Billing Name → Customer Name
+- Billing Email → Customer Email
+- Billing Phone → Customer Phone
+
+### Shipping Information
+- Shipping Address → Delivery Address
+- Product Weights → Total Weight
+- Falls back to billing address if shipping address is empty
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Orders Not Sending Automatically**
+   - Check that "Auto Send Orders" is enabled
+   - Verify the order status is in your selected statuses
+   - Check Recent Logs for error messages
+
+2. **Connection Test Fails**
+   - Verify API endpoint URL is correct
+   - Check API key and tenant ID are valid
+   - Ensure your server can make outbound HTTP requests
+
+3. **Orders Sent Multiple Times**
+   - The plugin prevents duplicate sending by default
+   - Check if you're manually resending already successful orders
+
+### Debug Mode
+
+Enable Debug Mode for detailed logging:
+
+1. Go to WooCommerce → DM Delivery
+2. Check "Debug Mode"
+3. Save settings
+4. Check Recent Logs for detailed request/response data
+
+### Log Information
+
+Each log entry contains:
+- Order ID and timestamp
+- Request data sent to API
+- Response data from API
+- Error messages (if any)
+- Success/failure status
+
+## API Response Handling
+
+The plugin handles various API responses:
+
+- **Success (200/201)**: Order marked as sent, shipment IDs stored
+- **Client Errors (400-499)**: Logged as errors, manual retry available
+- **Server Errors (500-599)**: Logged as errors, automatic retry possible
+- **Network Errors**: Connection timeouts, DNS issues, etc.
+
+## Security
+
+The plugin implements several security measures:
+
+- API keys are stored securely in WordPress options
+- AJAX requests use WordPress nonces
+- User permissions are checked for all admin actions
+- Input validation on all configuration fields
+
+## Support
+
+For support with this plugin:
+
+1. Check the Recent Logs for error details
+2. Enable Debug Mode for more information
+3. Verify your DM Delivery API credentials
+4. Contact your DM Delivery system administrator
+
+## Changelog
+
+### Version 1.0.0
+- Initial release
+- Automatic order sending
+- Manual order controls
+- Connection testing
+- Comprehensive logging
+- Error handling and retry functionality
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This plugin is licensed under the GPL v2 or later.
 
+---
 
-concerning order table             $table->timestamp('order_date')->useCurrent(); // When order was placed in eShop
+**Note**: This plugin requires an active DM Delivery account and proper API credentials to function. Contact your DM Delivery system administrator for API access details.
