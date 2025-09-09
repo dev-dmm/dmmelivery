@@ -175,3 +175,4 @@ class WooCommerceOrderController extends Controller
         return implode(', ', array_filter($parts));
     }
 }
+
