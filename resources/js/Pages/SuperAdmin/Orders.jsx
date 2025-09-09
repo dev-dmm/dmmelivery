@@ -103,7 +103,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                             <option value="">All Tenants</option>
                                             {tenants.map((tenant) => (
                                                 <option key={tenant.id} value={tenant.id}>
-                                                    {tenant.company_name} ({tenant.subdomain})
+                                                    {tenant.name} ({tenant.subdomain})
                                                 </option>
                                             ))}
                                         </select>
@@ -208,7 +208,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
-                                                        {order.tenant?.company_name}
+                                                        {order.tenant?.name}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
                                                         @{order.tenant?.subdomain}

@@ -21,7 +21,7 @@ class UserManagementController extends Controller
         $tenant_filter = $request->get('tenant');
         
         $query = User::query()
-            ->with(['tenant:id,company_name,subdomain'])
+            ->with(['tenant:id,name,subdomain'])
             ->select([
                 'users.*'
             ]);
@@ -33,7 +33,7 @@ class UserManagementController extends Controller
                   ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhereHas('tenant', function ($tenantQuery) use ($search) {
-                      $tenantQuery->where('company_name', 'like', "%{$search}%")
+                      $tenantQuery->where('name', 'like', "%{$search}%")
                                  ->orWhere('subdomain', 'like', "%{$search}%");
                   });
             });
@@ -54,8 +54,8 @@ class UserManagementController extends Controller
                        ->withQueryString();
         
         // Get tenants list for filter dropdown
-        $tenants = Tenant::select('id', 'company_name', 'subdomain')
-                        ->orderBy('company_name')
+        $tenants = Tenant::select('id', 'name', 'subdomain')
+                        ->orderBy('name')
                         ->get();
         
         // Get available roles
@@ -96,7 +96,7 @@ class UserManagementController extends Controller
         return response()->json([
             'success' => true,
             'message' => "User role updated from {$oldRole} to {$request->role}",
-            'user' => $user->load('tenant:id,company_name,subdomain')
+            'user' => $user->load('tenant:id,name,subdomain')
         ]);
     }
     
@@ -110,7 +110,7 @@ class UserManagementController extends Controller
         return response()->json([
             'success' => true,
             'message' => $user->is_active ? 'User activated' : 'User deactivated',
-            'user' => $user->load('tenant:id,company_name,subdomain')
+            'user' => $user->load('tenant:id,name,subdomain')
         ]);
     }
     
@@ -120,7 +120,7 @@ class UserManagementController extends Controller
     public function show(User $user)
     {
         $user->load([
-            'tenant:id,company_name,subdomain,contact_email,created_at'
+            'tenant:id,name,subdomain,contact_email,created_at'
         ]);
         
         return Inertia::render('SuperAdmin/UserDetails', [

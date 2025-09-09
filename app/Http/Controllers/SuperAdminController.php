@@ -24,7 +24,7 @@ class SuperAdminController extends Controller
         
         $query = Order::query()
             ->with([
-                'tenant:id,company_name,subdomain',
+                'tenant:id,name,subdomain',
                 'customer:id,first_name,last_name,email',
                 'shipments:id,order_id,tracking_number,status,courier_id',
                 'shipments.courier:id,name,code'
@@ -44,7 +44,7 @@ class SuperAdminController extends Controller
                                   ->orWhere('email', 'like', "%{$search}%");
                   })
                   ->orWhereHas('tenant', function ($tenantQuery) use ($search) {
-                      $tenantQuery->where('company_name', 'like', "%{$search}%")
+                      $tenantQuery->where('name', 'like', "%{$search}%")
                                  ->orWhere('subdomain', 'like', "%{$search}%");
                   });
             });
@@ -65,8 +65,8 @@ class SuperAdminController extends Controller
                        ->withQueryString();
         
         // Get tenant list for filter dropdown
-        $tenants = Tenant::select('id', 'company_name', 'subdomain')
-                        ->orderBy('company_name')
+        $tenants = Tenant::select('id', 'name', 'subdomain')
+                        ->orderBy('name')
                         ->get();
         
         // Get order statuses for filter
@@ -121,7 +121,7 @@ class SuperAdminController extends Controller
         
         // Recent orders across all tenants
         $recentOrders = Order::with([
-                'tenant:id,company_name,subdomain',
+                'tenant:id,name,subdomain',
                 'customer:id,first_name,last_name,email',
                 'shipments:id,order_id,tracking_number,status'
             ])
@@ -136,7 +136,7 @@ class SuperAdminController extends Controller
             ->having('orders_count', '>', 0)
             ->orderBy('orders_count', 'desc')
             ->limit(10)
-            ->get(['id', 'company_name', 'subdomain']);
+            ->get(['id', 'name', 'subdomain']);
         
         return Inertia::render('SuperAdmin/Dashboard', [
             'stats' => $stats,
@@ -151,7 +151,7 @@ class SuperAdminController extends Controller
     public function tenantDetails(Tenant $tenant)
     {
         $tenant->load([
-            'users:id,tenant_id,name,email,email_verified_at,created_at',
+            'users:id,tenant_id,first_name,last_name,email,email_verified_at,created_at',
             'orders' => function ($q) {
                 $q->with(['customer:id,first_name,last_name,email'])
                   ->orderBy('created_at', 'desc')
@@ -184,13 +184,13 @@ class SuperAdminController extends Controller
         $query = Tenant::query()
             ->withCount(['orders', 'users'])
             ->with(['users' => function ($q) {
-                $q->select('id', 'tenant_id', 'name', 'email', 'created_at')
+                $q->select('id', 'tenant_id', 'first_name', 'last_name', 'email', 'created_at')
                   ->orderBy('created_at');
             }]);
         
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('company_name', 'like', "%{$search}%")
+                $q->where('name', 'like', "%{$search}%")
                   ->orWhere('subdomain', 'like', "%{$search}%")
                   ->orWhere('contact_email', 'like', "%{$search}%");
             });

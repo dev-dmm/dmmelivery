@@ -120,7 +120,7 @@ export default function SuperAdminTenants({ auth, tenants, filters }) {
                                             <tr key={tenant.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
-                                                        {tenant.company_name}
+                                                        {tenant.name}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
                                                         @{tenant.subdomain}
@@ -140,7 +140,7 @@ export default function SuperAdminTenants({ auth, tenants, filters }) {
                                                     </div>
                                                     {tenant.users && tenant.users.length > 0 && (
                                                         <div className="text-sm text-gray-500">
-                                                            Latest: {tenant.users[tenant.users.length - 1]?.name}
+                                                            Latest: {tenant.users[tenant.users.length - 1]?.first_name} {tenant.users[tenant.users.length - 1]?.last_name}
                                                         </div>
                                                     )}
                                                 </td>

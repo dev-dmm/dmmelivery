@@ -115,7 +115,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                             <option value="">All Tenants</option>
                                             {tenants.map((tenant) => (
                                                 <option key={tenant.id} value={tenant.id}>
-                                                    {tenant.company_name} ({tenant.subdomain})
+                                                    {tenant.name} ({tenant.subdomain})
                                                 </option>
                                             ))}
                                         </select>
@@ -226,7 +226,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
-                                                        {user.tenant?.company_name || 'No Tenant'}
+                                                        {user.tenant?.name || 'No Tenant'}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
                                                         @{user.tenant?.subdomain || 'N/A'}

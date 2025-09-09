@@ -22,7 +22,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
             header={
                 <div className="flex items-center justify-between">
                     <h2 className="font-semibold text-xl text-gray-800 leading-tight">
-                        Tenant Details - {tenant.company_name}
+                        Tenant Details - {tenant.name}
                     </h2>
                     <Link
                         href={route('super-admin.tenants')}
@@ -33,7 +33,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
                 </div>
             }
         >
-            <Head title={`Tenant Details - ${tenant.company_name}`} />
+            <Head title={`Tenant Details - ${tenant.name}`} />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -47,7 +47,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
                             <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                                 <div>
                                     <dt className="text-sm font-medium text-gray-500">Company Name</dt>
-                                    <dd className="mt-1 text-sm text-gray-900">{tenant.company_name}</dd>
+                                    <dd className="mt-1 text-sm text-gray-900">{tenant.name}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-sm font-medium text-gray-500">Subdomain</dt>
@@ -105,7 +105,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
                                         {tenant.users.map((user) => (
                                             <div key={user.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                                                 <div>
-                                                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                                    <div className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</div>
                                                     <div className="text-sm text-gray-500">{user.email}</div>
                                                     <div className="text-xs text-gray-400">
                                                         Joined: {new Date(user.created_at).toLocaleDateString()}
