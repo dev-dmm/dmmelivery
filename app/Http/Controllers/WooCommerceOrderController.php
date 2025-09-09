@@ -31,9 +31,10 @@ class WooCommerceOrderController extends Controller
 
         // Accept global bridge key OR tenant-specific token
         $globalKey = (string) config('services.dm_bridge.key');
-        $tenantKey = (string) $tenant->api_token;
+        $isGlobalKeyValid = $globalKey && hash_equals($globalKey, (string) $headerKey);
+        $isTenantTokenValid = $tenant->isApiTokenValid((string) $headerKey);
 
-        if (!hash_equals($globalKey, (string) $headerKey) && !hash_equals($tenantKey, (string) $headerKey)) {
+        if (!$isGlobalKeyValid && !$isTenantTokenValid) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 

@@ -48,7 +48,7 @@ class SettingsController extends Controller
                 'send_notifications' => $tenant->send_notifications ?? true,
                 
                 // API & Integration Settings
-                'api_token' => $tenant->api_token ? substr($tenant->api_token, 0, 8) . '••••••••' : null,
+                'api_token' => $tenant->api_token ? 'configured' : null,
                 'webhook_url' => $tenant->webhook_url,
                 'webhook_secret' => $tenant->webhook_secret ? '••••••••' : null,
                 

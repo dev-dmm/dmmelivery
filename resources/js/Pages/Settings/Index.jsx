@@ -479,7 +479,7 @@ export default function SettingsIndex({
     { name: '🔗 API & Webhooks', icon: GlobeAltIcon },
   ];
 
-  const maskedToken = apiToken ? `${apiToken.slice(0, 4)}••••${apiToken.slice(-4)}` : '—';
+  const maskedToken = apiToken === 'configured' ? '••••••••••••••••' : (apiToken ? `${apiToken.slice(0, 4)}••••${apiToken.slice(-4)}` : '—');
 
   return (
     <AuthenticatedLayout user={auth?.user} header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Settings</h2>}>
@@ -886,7 +886,16 @@ export default function SettingsIndex({
                               <div className="flex items-center gap-2">
                                 <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all flex-1">X-Api-Key: {maskedToken}</code>
                                 {apiToken && (
-                                  <SecondaryButton onClick={() => copyToClipboard(apiToken, 'woo')} aria-label="Copy API key">
+                                  <SecondaryButton 
+                                    onClick={() => {
+                                      if (unmaskedApiToken) {
+                                        copyToClipboard(unmaskedApiToken, 'woo');
+                                      } else {
+                                        showMessage('woo', 'Generate a new token to get a copyable value', 'error');
+                                      }
+                                    }} 
+                                    aria-label="Copy API key"
+                                  >
                                     <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
                                     Copy
                                   </SecondaryButton>
