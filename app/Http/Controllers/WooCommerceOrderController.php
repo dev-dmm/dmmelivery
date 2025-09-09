@@ -95,7 +95,7 @@ class WooCommerceOrderController extends Controller
             'shipping_cost'    => (float) data_get($request, 'order.shipping_cost', 0),
             'discount_amount'  => (float) data_get($request, 'order.discount_amount', 0),
             'currency'         => data_get($request, 'order.currency', 'EUR'),
-            'payment_status'   => data_get($request, 'order.payment_status', 'unpaid'),
+            'payment_status'   => data_get($request, 'order.payment_status', 'pending'),
             'payment_method'   => data_get($request, 'order.payment_method'),
             'customer_id'      => $customer->id,
             

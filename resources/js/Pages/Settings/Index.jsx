@@ -380,7 +380,7 @@ export default function SettingsIndex({
         tax_amount: 2.34,
         shipping_cost: 0.0,
         currency: 'EUR',
-        payment_status: 'unpaid',
+        payment_status: 'pending',
         payment_method: 'cod',
       },
       customer: {
