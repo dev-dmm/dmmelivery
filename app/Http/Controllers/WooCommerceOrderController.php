@@ -98,6 +98,12 @@ class WooCommerceOrderController extends Controller
             'payment_status'   => data_get($request, 'order.payment_status', 'unpaid'),
             'payment_method'   => data_get($request, 'order.payment_method'),
             'customer_id'      => $customer->id,
+            
+            // Shipping address
+            'shipping_address'     => data_get($request, 'shipping.address.address_1'),
+            'shipping_city'        => data_get($request, 'shipping.address.city'),
+            'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
+            'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
         ]);
 
         // Create shipment (default true)
