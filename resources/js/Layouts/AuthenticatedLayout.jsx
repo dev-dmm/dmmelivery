@@ -13,6 +13,12 @@ export default function AuthenticatedLayout({ header, children }) {
 
     // Check if user is super admin
     const isSuperAdmin = () => {
+        // Check role first
+        if (user.role === 'super_admin') {
+            return true;
+        }
+        
+        // Fallback: Check by specific emails for backward compatibility
         const superAdminEmails = ['admin@dmm.gr', 'dev@dmm.gr', 'super@dmm.gr'];
         return superAdminEmails.includes(user.email);
     };
@@ -82,6 +88,9 @@ export default function AuthenticatedLayout({ header, children }) {
                                                 </Dropdown.Link>
                                                 <Dropdown.Link href={route('super-admin.tenants')}>
                                                     🏢 All Tenants
+                                                </Dropdown.Link>
+                                                <Dropdown.Link href={route('super-admin.users')}>
+                                                    👥 All Users
                                                 </Dropdown.Link>
                                             </Dropdown.Content>
                                         </Dropdown>
@@ -250,6 +259,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                     active={route().current('super-admin.tenants')}
                                 >
                                     🏢 All Tenants
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink
+                                    href={route('super-admin.users')}
+                                    active={route().current('super-admin.users')}
+                                >
+                                    👥 All Users
                                 </ResponsiveNavLink>
                             </>
                         )}

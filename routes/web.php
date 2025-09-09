@@ -15,6 +15,7 @@ use App\Http\Controllers\ACSTestController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OrderImportController;
 use App\Http\Controllers\SuperAdminController;
+use App\Http\Controllers\UserManagementController;
 
 // -----------------------------
 // Feature flags / helpers
@@ -278,6 +279,12 @@ Route::prefix('super-admin')
         Route::get('/orders', [SuperAdminController::class, 'orders'])->name('orders');
         Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
         Route::get('/tenants/{tenant}', [SuperAdminController::class, 'tenantDetails'])->name('tenants.show');
+        
+        // User Management
+        Route::get('/users', [UserManagementController::class, 'index'])->name('users');
+        Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
+        Route::patch('/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.update-role');
+        Route::patch('/users/{user}/toggle-active', [UserManagementController::class, 'toggleActive'])->name('users.toggle-active');
     });
 
 // -----------------------------

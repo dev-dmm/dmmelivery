@@ -21,8 +21,12 @@ class SuperAdminMiddleware
             abort(401, 'Unauthenticated');
         }
         
-        // Check if user is super admin (you can adjust this logic based on your needs)
-        // Option 1: Check by email domain or specific emails
+        // Check if user has super admin role
+        if ($user->isSuperAdmin()) {
+            return $next($request);
+        }
+        
+        // Fallback: Check by specific emails for backward compatibility
         $superAdminEmails = [
             'admin@dmm.gr',
             'dev@dmm.gr',
@@ -32,16 +36,6 @@ class SuperAdminMiddleware
         if (in_array($user->email, $superAdminEmails)) {
             return $next($request);
         }
-        
-        // Option 2: Check by a role/permission system if you have one
-        // if ($user->hasRole('super_admin') || $user->can('view_all_tenants')) {
-        //     return $next($request);
-        // }
-        
-        // Option 3: Check by a specific user field (if you add is_super_admin column)
-        // if ($user->is_super_admin) {
-        //     return $next($request);
-        // }
         
         abort(403, 'Access denied. Super admin privileges required.');
     }

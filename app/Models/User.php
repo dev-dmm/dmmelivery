@@ -65,4 +65,47 @@ class User extends Authenticatable
         $this->attributes['first_name'] = $nameParts[0];
         $this->attributes['last_name'] = $nameParts[1] ?? '';
     }
+
+    /**
+     * Role-based helper methods
+     */
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super_admin');
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('admin') || $this->isSuperAdmin();
+    }
+
+    public function isUser(): bool
+    {
+        return $this->hasRole('user');
+    }
+
+    /**
+     * Check if user has any of the given roles
+     */
+    public function hasAnyRole(array $roles): bool
+    {
+        return in_array($this->role, $roles);
+    }
+
+    /**
+     * Get all available roles
+     */
+    public static function getAvailableRoles(): array
+    {
+        return [
+            'user' => 'User',
+            'admin' => 'Admin',
+            'super_admin' => 'Super Admin'
+        ];
+    }
 }
