@@ -14,6 +14,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ACSTestController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OrderImportController;
+use App\Http\Controllers\SuperAdminController;
 
 // -----------------------------
 // Feature flags / helpers
@@ -265,6 +266,19 @@ Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:30,1'])->gro
     Route::post('/api/acs/get-credentials', [ACSTestController::class, 'getCredentials'])->name('api.acs.get');
     Route::post('/api/acs/update-credentials', [ACSTestController::class, 'updateCredentials'])->name('api.acs.update');
 });
+
+// -----------------------------
+// Super Admin Routes
+// -----------------------------
+Route::prefix('super-admin')
+    ->name('super-admin.')
+    ->middleware(['auth', 'verified', 'super.admin', 'throttle:60,1'])
+    ->group(function () {
+        Route::get('/dashboard', [SuperAdminController::class, 'dashboard'])->name('dashboard');
+        Route::get('/orders', [SuperAdminController::class, 'orders'])->name('orders');
+        Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
+        Route::get('/tenants/{tenant}', [SuperAdminController::class, 'tenantDetails'])->name('tenants.show');
+    });
 
 // -----------------------------
 require __DIR__.'/auth.php';

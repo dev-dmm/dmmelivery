@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.scope' => \App\Http\Middleware\TenantScope::class,
             'identify.tenant' => \App\Http\Middleware\IdentifyTenant::class,
+            'super.admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
         ]);
 
         // 🔓 CSRF exceptions for API testing  

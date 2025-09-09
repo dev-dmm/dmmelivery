@@ -499,35 +499,123 @@ class DMM_Delivery_Bridge {
     public function courier_meta_field_callback() {
         $value = isset($this->options['courier_meta_field']) ? $this->options['courier_meta_field'] : '';
         
-        echo '<select name="dmm_delivery_bridge_options[courier_meta_field]" class="regular-text">';
-        echo '<option value="">' . __('Select a meta field...', 'dmm-delivery-bridge') . '</option>';
+        // Get all available meta fields
+        $all_fields = $this->get_recent_order_meta_fields();
         
-        // Get common WooCommerce order meta fields
-        $common_meta_fields = [
-            '_shipping_method' => __('Shipping Method', 'dmm-delivery-bridge'),
-            '_courier' => __('Courier', 'dmm-delivery-bridge'),
-            '_delivery_method' => __('Delivery Method', 'dmm-delivery-bridge'),
-            '_shipping_company' => __('Shipping Company', 'dmm-delivery-bridge'),
-            '_courier_service' => __('Courier Service', 'dmm-delivery-bridge'),
+        echo '<select name="dmm_delivery_bridge_options[courier_meta_field]" class="regular-text" style="max-height: 30px;" size="1">';
+        echo '<option value="">' . __('-- Select a meta field --', 'dmm-delivery-bridge') . '</option>';
+        
+        // Group fields by type
+        $grouped_fields = [
+            'Order Fields' => [],
+            'Product Fields' => [],
+            'Custom Fields' => [],
+            'ACF Fields' => [],
+            'Meta Box Fields' => [],
+            'Toolset Fields' => [],
+            'Other Fields' => []
         ];
         
-        // Get actual meta fields from recent orders
-        $recent_meta_fields = $this->get_recent_order_meta_fields();
-        
-        // Merge and display options
-        $all_fields = array_merge($common_meta_fields, $recent_meta_fields);
-        asort($all_fields);
-        
         foreach ($all_fields as $meta_key => $display_name) {
-            $selected = selected($value, $meta_key, false);
-            echo '<option value="' . esc_attr($meta_key) . '"' . $selected . '>' . esc_html($display_name) . '</option>';
+            if (strpos($display_name, '[Order]') === 0) {
+                $grouped_fields['Order Fields'][$meta_key] = str_replace('[Order] ', '', $display_name);
+            } elseif (strpos($display_name, '[Product]') === 0) {
+                $grouped_fields['Product Fields'][$meta_key] = str_replace('[Product] ', '', $display_name);
+            } elseif (strpos($display_name, '[Custom]') === 0) {
+                $grouped_fields['Custom Fields'][$meta_key] = str_replace('[Custom] ', '', $display_name);
+            } elseif (strpos($display_name, '[ACF]') === 0) {
+                $grouped_fields['ACF Fields'][$meta_key] = str_replace('[ACF] ', '', $display_name);
+            } elseif (strpos($display_name, '[Meta Box]') === 0) {
+                $grouped_fields['Meta Box Fields'][$meta_key] = str_replace('[Meta Box] ', '', $display_name);
+            } elseif (strpos($display_name, '[Toolset]') === 0) {
+                $grouped_fields['Toolset Fields'][$meta_key] = str_replace('[Toolset] ', '', $display_name);
+            } else {
+                $grouped_fields['Other Fields'][$meta_key] = $display_name;
+            }
+        }
+        
+        // Display grouped options
+        foreach ($grouped_fields as $group_name => $fields) {
+            if (!empty($fields)) {
+                echo '<optgroup label="' . esc_attr($group_name) . '">';
+                asort($fields);
+                foreach ($fields as $meta_key => $display_name) {
+                    $selected = selected($value, $meta_key, false);
+                    echo '<option value="' . esc_attr($meta_key) . '"' . $selected . '>' . esc_html($display_name) . '</option>';
+                }
+                echo '</optgroup>';
+            }
         }
         
         echo '</select>';
-        echo '<p class="description">' . __('Select the WooCommerce order meta field that contains courier information (ACS, Speedex, ELTA, etc.). This will be sent to the DMM Delivery system.', 'dmm-delivery-bridge') . '</p>';
+        
+        // Add styling to make it look more like CTX Feed
+        ?>
+        <style>
+        select[name="dmm_delivery_bridge_options[courier_meta_field]"] {
+            width: 100%;
+            max-width: 500px;
+            height: 200px;
+            font-family: monospace;
+            font-size: 12px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        select[name="dmm_delivery_bridge_options[courier_meta_field]"] optgroup {
+            font-weight: bold;
+            background: #f0f0f0;
+            color: #333;
+            padding: 5px;
+            margin: 2px 0;
+        }
+        select[name="dmm_delivery_bridge_options[courier_meta_field]"] option {
+            padding: 3px 8px;
+            color: #555;
+            background: #fff;
+        }
+        select[name="dmm_delivery_bridge_options[courier_meta_field]"] option:hover {
+            background: #e0e0e0;
+        }
+        .dmm-meta-field-info {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .dmm-meta-field-info h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #333;
+        }
+        .dmm-meta-field-info ul {
+            margin: 5px 0 5px 20px;
+            list-style: disc;
+        }
+        .dmm-meta-field-info li {
+            margin: 2px 0;
+            color: #666;
+        }
+        </style>
+        <?php
+        
+        echo '<div class="dmm-meta-field-info">';
+        echo '<h4>' . __('Field Types Explained:', 'dmm-delivery-bridge') . '</h4>';
+        echo '<ul>';
+        echo '<li><strong>' . __('Order Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Meta fields attached to WooCommerce orders (billing, shipping, payment info)', 'dmm-delivery-bridge') . '</li>';
+        echo '<li><strong>' . __('Product Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Meta fields attached to WooCommerce products (SKU, weight, dimensions, etc.)', 'dmm-delivery-bridge') . '</li>';
+        echo '<li><strong>' . __('Custom Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Generic custom fields that might contain courier information', 'dmm-delivery-bridge') . '</li>';
+        echo '<li><strong>' . __('ACF Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Advanced Custom Fields plugin fields', 'dmm-delivery-bridge') . '</li>';
+        echo '<li><strong>' . __('Meta Box Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Meta Box plugin fields', 'dmm-delivery-bridge') . '</li>';
+        echo '<li><strong>' . __('Toolset Fields:', 'dmm-delivery-bridge') . '</strong> ' . __('Toolset Types plugin fields', 'dmm-delivery-bridge') . '</li>';
+        echo '</ul>';
+        echo '<p><em>' . __('Select the field that contains courier information like "ACS", "Speedex", "ELTA", etc. The plugin will automatically map these to courier codes.', 'dmm-delivery-bridge') . '</em></p>';
+        echo '</div>';
         
         // Add refresh button
-        echo '<p><button type="button" id="refresh-meta-fields" class="button button-secondary">' . __('Refresh Meta Fields', 'dmm-delivery-bridge') . '</button></p>';
+        echo '<p><button type="button" id="refresh-meta-fields" class="button button-secondary">' . __('🔄 Refresh Meta Fields', 'dmm-delivery-bridge') . '</button></p>';
         
         // Add JavaScript for refresh functionality
         ?>
@@ -535,7 +623,7 @@ class DMM_Delivery_Bridge {
         jQuery(document).ready(function($) {
             $('#refresh-meta-fields').on('click', function() {
                 var button = $(this);
-                button.prop('disabled', true).text('<?php _e('Refreshing...', 'dmm-delivery-bridge'); ?>');
+                button.prop('disabled', true).text('🔄 <?php _e('Refreshing...', 'dmm-delivery-bridge'); ?>');
                 
                 $.ajax({
                     url: ajaxurl,
@@ -555,7 +643,7 @@ class DMM_Delivery_Bridge {
                         alert('<?php _e('Failed to refresh meta fields.', 'dmm-delivery-bridge'); ?>');
                     },
                     complete: function() {
-                        button.prop('disabled', false).text('<?php _e('Refresh Meta Fields', 'dmm-delivery-bridge'); ?>');
+                        button.prop('disabled', false).text('🔄 <?php _e('Refresh Meta Fields', 'dmm-delivery-bridge'); ?>');
                     }
                 });
             });
@@ -981,35 +1069,223 @@ class DMM_Delivery_Bridge {
     }
     
     /**
-     * Get recent order meta fields
+     * Get all available meta fields (orders, products, and custom)
      */
     private function get_recent_order_meta_fields() {
         global $wpdb;
         
-        // Get meta keys from recent orders
-        $meta_keys = $wpdb->get_results("
-            SELECT DISTINCT pm.meta_key, pm.meta_value
+        $fields = [];
+        
+        // Get ALL meta keys from orders (not just recent ones)
+        $order_meta_keys = $wpdb->get_results("
+            SELECT DISTINCT pm.meta_key, COUNT(*) as usage_count
             FROM {$wpdb->postmeta} pm
             INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
             WHERE p.post_type = 'shop_order'
-            AND p.post_status IN ('wc-processing', 'wc-completed', 'wc-on-hold', 'wc-pending')
-            AND pm.meta_key NOT LIKE '\_%'
-            AND pm.meta_key NOT IN ('_edit_last', '_edit_lock')
+            AND pm.meta_key NOT IN ('_edit_last', '_edit_lock', '_wp_old_slug', '_wp_old_date', '_wp_attachment_metadata')
             AND pm.meta_value != ''
-            ORDER BY p.post_date DESC
-            LIMIT 100
+            AND LENGTH(pm.meta_value) < 500
+            GROUP BY pm.meta_key
+            ORDER BY usage_count DESC, pm.meta_key ASC
+            LIMIT 500
         ");
         
-        $fields = [];
-        foreach ($meta_keys as $meta) {
-            // Skip if already in common fields or if value looks like serialized data
-            if (!isset($fields[$meta->meta_key]) && !is_serialized($meta->meta_value)) {
+        // Get ALL meta keys from products
+        $product_meta_keys = $wpdb->get_results("
+            SELECT DISTINCT pm.meta_key, COUNT(*) as usage_count
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE p.post_type IN ('product', 'product_variation')
+            AND pm.meta_key NOT IN ('_edit_last', '_edit_lock', '_wp_old_slug', '_wp_old_date', '_wp_attachment_metadata')
+            AND pm.meta_value != ''
+            AND LENGTH(pm.meta_value) < 500
+            GROUP BY pm.meta_key
+            ORDER BY usage_count DESC, pm.meta_key ASC
+            LIMIT 500
+        ");
+        
+        // Add comprehensive WooCommerce order fields
+        $wc_order_fields = [
+            // Billing fields
+            '_billing_first_name' => '[Order] Billing First Name (_billing_first_name)',
+            '_billing_last_name' => '[Order] Billing Last Name (_billing_last_name)',
+            '_billing_company' => '[Order] Billing Company (_billing_company)',
+            '_billing_address_1' => '[Order] Billing Address 1 (_billing_address_1)',
+            '_billing_address_2' => '[Order] Billing Address 2 (_billing_address_2)',
+            '_billing_city' => '[Order] Billing City (_billing_city)',
+            '_billing_state' => '[Order] Billing State (_billing_state)',
+            '_billing_postcode' => '[Order] Billing Postcode (_billing_postcode)',
+            '_billing_country' => '[Order] Billing Country (_billing_country)',
+            '_billing_email' => '[Order] Billing Email (_billing_email)',
+            '_billing_phone' => '[Order] Billing Phone (_billing_phone)',
+            
+            // Shipping fields
+            '_shipping_first_name' => '[Order] Shipping First Name (_shipping_first_name)',
+            '_shipping_last_name' => '[Order] Shipping Last Name (_shipping_last_name)',
+            '_shipping_company' => '[Order] Shipping Company (_shipping_company)',
+            '_shipping_address_1' => '[Order] Shipping Address 1 (_shipping_address_1)',
+            '_shipping_address_2' => '[Order] Shipping Address 2 (_shipping_address_2)',
+            '_shipping_city' => '[Order] Shipping City (_shipping_city)',
+            '_shipping_state' => '[Order] Shipping State (_shipping_state)',
+            '_shipping_postcode' => '[Order] Shipping Postcode (_shipping_postcode)',
+            '_shipping_country' => '[Order] Shipping Country (_shipping_country)',
+            '_shipping_phone' => '[Order] Shipping Phone (_shipping_phone)',
+            
+            // Order details
+            '_order_total' => '[Order] Order Total (_order_total)',
+            '_order_tax' => '[Order] Order Tax (_order_tax)',
+            '_order_shipping' => '[Order] Order Shipping (_order_shipping)',
+            '_order_discount' => '[Order] Order Discount (_order_discount)',
+            '_cart_discount' => '[Order] Cart Discount (_cart_discount)',
+            '_order_currency' => '[Order] Order Currency (_order_currency)',
+            '_payment_method' => '[Order] Payment Method (_payment_method)',
+            '_payment_method_title' => '[Order] Payment Method Title (_payment_method_title)',
+            '_transaction_id' => '[Order] Transaction ID (_transaction_id)',
+            '_customer_user' => '[Order] Customer User ID (_customer_user)',
+            '_order_key' => '[Order] Order Key (_order_key)',
+            '_order_stock_reduced' => '[Order] Order Stock Reduced (_order_stock_reduced)',
+            '_download_permissions_granted' => '[Order] Download Permissions Granted (_download_permissions_granted)',
+            '_recorded_sales' => '[Order] Recorded Sales (_recorded_sales)',
+            '_recorded_coupon_usage_counts' => '[Order] Recorded Coupon Usage (_recorded_coupon_usage_counts)',
+            
+            // Shipping methods
+            '_shipping_method' => '[Order] Shipping Method (_shipping_method)',
+            '_shipping_method_title' => '[Order] Shipping Method Title (_shipping_method_title)',
+        ];
+        
+        // Add comprehensive WooCommerce product fields
+        $wc_product_fields = [
+            // Basic product info
+            '_sku' => '[Product] SKU (_sku)',
+            '_weight' => '[Product] Weight (_weight)',
+            '_length' => '[Product] Length (_length)',
+            '_width' => '[Product] Width (_width)',
+            '_height' => '[Product] Height (_height)',
+            '_price' => '[Product] Price (_price)',
+            '_regular_price' => '[Product] Regular Price (_regular_price)',
+            '_sale_price' => '[Product] Sale Price (_sale_price)',
+            '_sale_price_dates_from' => '[Product] Sale Price From (_sale_price_dates_from)',
+            '_sale_price_dates_to' => '[Product] Sale Price To (_sale_price_dates_to)',
+            
+            // Stock management
+            '_stock_status' => '[Product] Stock Status (_stock_status)',
+            '_manage_stock' => '[Product] Manage Stock (_manage_stock)',
+            '_stock' => '[Product] Stock Quantity (_stock)',
+            '_backorders' => '[Product] Backorders (_backorders)',
+            '_low_stock_amount' => '[Product] Low Stock Amount (_low_stock_amount)',
+            '_sold_individually' => '[Product] Sold Individually (_sold_individually)',
+            
+            // Product settings
+            '_virtual' => '[Product] Virtual (_virtual)',
+            '_downloadable' => '[Product] Downloadable (_downloadable)',
+            '_featured' => '[Product] Featured (_featured)',
+            '_visibility' => '[Product] Visibility (_visibility)',
+            '_tax_status' => '[Product] Tax Status (_tax_status)',
+            '_tax_class' => '[Product] Tax Class (_tax_class)',
+            
+            // Shipping
+            '_shipping_class' => '[Product] Shipping Class (_shipping_class)',
+            '_shipping_class_id' => '[Product] Shipping Class ID (_shipping_class_id)',
+            
+            // Images
+            '_thumbnail_id' => '[Product] Thumbnail ID (_thumbnail_id)',
+            '_product_image_gallery' => '[Product] Image Gallery (_product_image_gallery)',
+            
+            // Reviews
+            '_wc_average_rating' => '[Product] Average Rating (_wc_average_rating)',
+            '_wc_review_count' => '[Product] Review Count (_wc_review_count)',
+            
+            // Other
+            '_product_version' => '[Product] Product Version (_product_version)',
+            '_product_url' => '[Product] Product URL (_product_url)',
+            '_button_text' => '[Product] Button Text (_button_text)',
+        ];
+        
+        // Process order meta fields
+        foreach ($order_meta_keys as $meta) {
+            if (!isset($fields[$meta->meta_key])) {
                 $display_name = ucwords(str_replace(['_', '-'], ' ', $meta->meta_key));
-                $fields[$meta->meta_key] = $display_name . ' (' . $meta->meta_key . ')';
+                $fields[$meta->meta_key] = '[Order] ' . $display_name . ' (' . $meta->meta_key . ')';
             }
         }
         
+        // Process product meta fields
+        foreach ($product_meta_keys as $meta) {
+            if (!isset($fields[$meta->meta_key])) {
+                $display_name = ucwords(str_replace(['_', '-'], ' ', $meta->meta_key));
+                $fields[$meta->meta_key] = '[Product] ' . $display_name . ' (' . $meta->meta_key . ')';
+            }
+        }
+        
+        // Merge WooCommerce fields (they take precedence over auto-detected ones)
+        $fields = array_merge($fields, $wc_order_fields, $wc_product_fields);
+        
+        // Add common custom fields that might contain courier info
+        $custom_fields = [
+            'courier' => '[Custom] Courier (courier)',
+            'shipping_courier' => '[Custom] Shipping Courier (shipping_courier)',
+            'delivery_method' => '[Custom] Delivery Method (delivery_method)',
+            'courier_service' => '[Custom] Courier Service (courier_service)',
+            'shipping_service' => '[Custom] Shipping Service (shipping_service)',
+            'delivery_service' => '[Custom] Delivery Service (delivery_service)',
+            'courier_company' => '[Custom] Courier Company (courier_company)',
+            'shipping_company' => '[Custom] Shipping Company (shipping_company)',
+            'transport_method' => '[Custom] Transport Method (transport_method)',
+            'shipping_provider' => '[Custom] Shipping Provider (shipping_provider)',
+        ];
+        
+        $fields = array_merge($fields, $custom_fields);
+        
+        // Get custom fields from various plugins
+        $plugin_fields = $this->get_custom_fields();
+        $fields = array_merge($fields, $plugin_fields);
+        
         return $fields;
+    }
+    
+    /**
+     * Get custom fields from various plugins
+     */
+    private function get_custom_fields() {
+        $custom_fields = [];
+        
+        // ACF Fields
+        if (function_exists('acf_get_field_groups')) {
+            $field_groups = acf_get_field_groups();
+            foreach ($field_groups as $group) {
+                $fields = acf_get_fields($group['key']);
+                if ($fields) {
+                    foreach ($fields as $field) {
+                        $custom_fields[$field['name']] = '[ACF] ' . $field['label'] . ' (' . $field['name'] . ')';
+                    }
+                }
+            }
+        }
+        
+        // Meta Box fields
+        if (function_exists('rwmb_get_registry')) {
+            $meta_boxes = rwmb_get_registry('meta_box')->all();
+            foreach ($meta_boxes as $meta_box) {
+                if (isset($meta_box->fields)) {
+                    foreach ($meta_box->fields as $field) {
+                        if (isset($field['id'])) {
+                            $label = isset($field['name']) ? $field['name'] : ucwords(str_replace('_', ' ', $field['id']));
+                            $custom_fields[$field['id']] = '[Meta Box] ' . $label . ' (' . $field['id'] . ')';
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Toolset Types fields
+        if (function_exists('wpcf_admin_fields_get_fields')) {
+            $toolset_fields = wpcf_admin_fields_get_fields();
+            foreach ($toolset_fields as $field) {
+                $custom_fields['wpcf-' . $field['slug']] = '[Toolset] ' . $field['name'] . ' (wpcf-' . $field['slug'] . ')';
+            }
+        }
+        
+        return $custom_fields;
     }
     
     /**
@@ -1038,8 +1314,24 @@ class DMM_Delivery_Bridge {
             return null;
         }
         
-        // Get the courier value from the selected meta field
+        $courier_value = '';
+        
+        // First try to get from order meta
         $courier_value = get_post_meta($order->get_id(), $courier_meta_field, true);
+        
+        // If not found in order meta, try to get from product meta
+        if (empty($courier_value)) {
+            foreach ($order->get_items() as $item) {
+                $product = $item->get_product();
+                if ($product) {
+                    $product_courier_value = get_post_meta($product->get_id(), $courier_meta_field, true);
+                    if (!empty($product_courier_value)) {
+                        $courier_value = $product_courier_value;
+                        break; // Use the first product's courier value
+                    }
+                }
+            }
+        }
         
         if (empty($courier_value)) {
             return null;
@@ -1054,6 +1346,9 @@ class DMM_Delivery_Bridge {
             'elta courier' => 'ELT',
             'geniki taxydromiki' => 'GTX',
             'geniki' => 'GTX',
+            'dhl' => 'DHL',
+            'fedex' => 'FDX',
+            'ups' => 'UPS',
         ];
         
         $courier_lower = strtolower(trim($courier_value));
@@ -1062,10 +1357,10 @@ class DMM_Delivery_Bridge {
             return $courier_mapping[$courier_lower];
         }
         
-        // Return the original value if no mapping found
+        // Return the original value if no mapping found (first 3 letters, uppercase)
         return strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $courier_value), 0, 3));
     }
 }
 
 // Initialize the plugin
-dmm_Delivery_Bridge::getInstance();
+DMM_Delivery_Bridge::getInstance();

@@ -11,6 +11,12 @@ export default function AuthenticatedLayout({ header, children }) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
 
+    // Check if user is super admin
+    const isSuperAdmin = () => {
+        const superAdminEmails = ['admin@dmm.gr', 'dev@dmm.gr', 'super@dmm.gr'];
+        return superAdminEmails.includes(user.email);
+    };
+
     return (
         <div className="min-h-screen bg-gray-100">
             <nav className="border-b border-gray-100 bg-white">
@@ -54,7 +60,35 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     ⚙️ Settings
                                 </NavLink>
-                                                        <NavLink
+                                
+                                {/* Super Admin Navigation */}
+                                {isSuperAdmin() && (
+                                    <div className="relative">
+                                        <Dropdown>
+                                            <Dropdown.Trigger>
+                                                <button className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300 transition duration-150 ease-in-out">
+                                                    👑 Super Admin
+                                                    <svg className="ml-1 -mr-0.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                    </svg>
+                                                </button>
+                                            </Dropdown.Trigger>
+                                            <Dropdown.Content>
+                                                <Dropdown.Link href={route('super-admin.dashboard')}>
+                                                    📊 Dashboard
+                                                </Dropdown.Link>
+                                                <Dropdown.Link href={route('super-admin.orders')}>
+                                                    📦 All Orders
+                                                </Dropdown.Link>
+                                                <Dropdown.Link href={route('super-admin.tenants')}>
+                                                    🏢 All Tenants
+                                                </Dropdown.Link>
+                                            </Dropdown.Content>
+                                        </Dropdown>
+                                    </div>
+                                )}
+                                
+                                <NavLink
                             href={route('test.courier-api')}
                             active={route().current('test.courier-api')}
                         >
@@ -195,6 +229,31 @@ export default function AuthenticatedLayout({ header, children }) {
                         >
                             ⚙️ Settings
                         </ResponsiveNavLink>
+                        
+                        {/* Super Admin Mobile Navigation */}
+                        {isSuperAdmin() && (
+                            <>
+                                <ResponsiveNavLink
+                                    href={route('super-admin.dashboard')}
+                                    active={route().current('super-admin.dashboard')}
+                                >
+                                    📊 Super Admin Dashboard
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink
+                                    href={route('super-admin.orders')}
+                                    active={route().current('super-admin.orders')}
+                                >
+                                    📦 All Orders
+                                </ResponsiveNavLink>
+                                <ResponsiveNavLink
+                                    href={route('super-admin.tenants')}
+                                    active={route().current('super-admin.tenants')}
+                                >
+                                    🏢 All Tenants
+                                </ResponsiveNavLink>
+                            </>
+                        )}
+                        
                         <ResponsiveNavLink
                             href={route('test.courier-api')}
                             active={route().current('test.courier-api')}
