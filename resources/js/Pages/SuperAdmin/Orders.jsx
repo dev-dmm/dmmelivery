@@ -188,7 +188,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                 Total
                                             </th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Shipments
+                                                Shipment
                                             </th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Created
@@ -216,7 +216,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
-                                                        {order.customer?.first_name} {order.customer?.last_name}
+                                                        {order.customer?.name}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
                                                         {order.customer?.email}
@@ -231,24 +231,22 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                     €{parseFloat(order.total_amount).toFixed(2)}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    {order.shipments && order.shipments.length > 0 ? (
+                                                    {order.shipment ? (
                                                         <div className="text-sm">
-                                                            {order.shipments.map((shipment, index) => (
-                                                                <div key={shipment.id} className="mb-1">
-                                                                    <span className="font-medium">{shipment.tracking_number}</span>
-                                                                    <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(shipment.status)}`}>
-                                                                        {shipment.status}
-                                                                    </span>
-                                                                    {shipment.courier && (
-                                                                        <div className="text-xs text-gray-500">
-                                                                            {shipment.courier.name} ({shipment.courier.code})
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
+                                                            <div className="mb-1">
+                                                                <span className="font-medium">{order.shipment.tracking_number}</span>
+                                                                <span className={`ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.shipment.status)}`}>
+                                                                    {order.shipment.status}
+                                                                </span>
+                                                                {order.shipment.courier && (
+                                                                    <div className="text-xs text-gray-500">
+                                                                        {order.shipment.courier.name} ({order.shipment.courier.code})
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-sm text-gray-500">No shipments</span>
+                                                        <span className="text-sm text-gray-500">No shipment</span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -267,20 +265,29 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                         Showing {orders.from} to {orders.to} of {orders.total} results
                                     </div>
                                     <div className="flex space-x-1">
-                                        {orders.links.map((link, index) => (
-                                            <Link
-                                                key={index}
-                                                href={link.url}
-                                                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                                                    link.active
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : link.url
-                                                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                }`}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        ))}
+                                            {orders.links.map((link, index) => {
+                                                if (!link.url) {
+                                                    return (
+                                                        <span
+                                                            key={index}
+                                                            className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                            dangerouslySetInnerHTML={{ __html: link.label }}
+                                                        />
+                                                    );
+                                                }
+                                                return (
+                                                    <Link
+                                                        key={index}
+                                                        href={link.url}
+                                                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                                                            link.active
+                                                                ? 'bg-indigo-600 text-white'
+                                                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                        }`}
+                                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                                    />
+                                                );
+                                            })
                                     </div>
                                 </div>
                             )}
