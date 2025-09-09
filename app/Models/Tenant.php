@@ -116,6 +116,11 @@ class Tenant extends Model
         return $this->hasMany(Courier::class);
     }
 
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
     // Onboarding Status Methods
     public function isOnboardingComplete(): bool
     {
