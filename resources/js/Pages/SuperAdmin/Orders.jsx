@@ -287,7 +287,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                                     />
                                                 );
-                                            })
+                                            })}
                                     </div>
                                 </div>
                             )}
