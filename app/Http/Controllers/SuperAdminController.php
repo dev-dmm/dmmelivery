@@ -25,7 +25,7 @@ class SuperAdminController extends Controller
         $query = Order::query()
             ->with([
                 'tenant:id,name,subdomain',
-                'customer:id,first_name,last_name,email',
+                'customer:id,name,email',
                 'shipments:id,order_id,tracking_number,status,courier_id',
                 'shipments.courier:id,name,code'
             ])
@@ -39,8 +39,7 @@ class SuperAdminController extends Controller
                 $q->where('external_order_id', 'like', "%{$search}%")
                   ->orWhere('order_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($customerQuery) use ($search) {
-                      $customerQuery->where('first_name', 'like', "%{$search}%")
-                                  ->orWhere('last_name', 'like', "%{$search}%")
+                      $customerQuery->where('name', 'like', "%{$search}%")
                                   ->orWhere('email', 'like', "%{$search}%");
                   })
                   ->orWhereHas('tenant', function ($tenantQuery) use ($search) {
@@ -122,7 +121,7 @@ class SuperAdminController extends Controller
         // Recent orders across all tenants
         $recentOrders = Order::with([
                 'tenant:id,name,subdomain',
-                'customer:id,first_name,last_name,email',
+                'customer:id,name,email',
                 'shipments:id,order_id,tracking_number,status'
             ])
             ->orderBy('created_at', 'desc')
@@ -153,7 +152,7 @@ class SuperAdminController extends Controller
         $tenant->load([
             'users:id,tenant_id,first_name,last_name,email,email_verified_at,created_at',
             'orders' => function ($q) {
-                $q->with(['customer:id,first_name,last_name,email'])
+                $q->with(['customer:id,name,email'])
                   ->orderBy('created_at', 'desc')
                   ->limit(20);
             },
