@@ -100,11 +100,11 @@ class SuperAdminController extends Controller
         return [
             'total_orders' => Order::count(),
             'total_tenants' => Tenant::count(),
-            'total_shipments' => Shipment::count(),
+            'total_shipments' => Shipment::withoutGlobalScopes()->count(),
             'orders_today' => Order::whereDate('created_at', today())->count(),
             'orders_this_week' => Order::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->count(),
             'orders_this_month' => Order::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'pending_shipments' => Shipment::where('status', 'pending')->count(),
+            'pending_shipments' => Shipment::withoutGlobalScopes()->where('status', 'pending')->count(),
             'active_tenants' => Tenant::whereHas('orders', function ($q) {
                 $q->where('created_at', '>=', now()->subDays(30));
             })->count()
@@ -122,7 +122,9 @@ class SuperAdminController extends Controller
         $recentOrders = Order::with([
                 'tenant:id,name,subdomain',
                 'customer:id,name,email',
-                'shipment:id,order_id,tracking_number,status'
+                'shipment' => function ($query) {
+                    $query->withoutGlobalScopes();
+                }
             ])
             ->orderBy('created_at', 'desc')
             ->limit(10)
@@ -161,9 +163,9 @@ class SuperAdminController extends Controller
         
         $tenantStats = [
             'total_orders' => $tenant->orders()->count(),
-            'total_shipments' => Shipment::where('tenant_id', $tenant->id)->count(),
+            'total_shipments' => Shipment::withoutGlobalScopes()->where('tenant_id', $tenant->id)->count(),
             'orders_this_month' => $tenant->orders()->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'pending_shipments' => Shipment::where('tenant_id', $tenant->id)->where('status', 'pending')->count()
+            'pending_shipments' => Shipment::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('status', 'pending')->count()
         ];
         
         return Inertia::render('SuperAdmin/TenantDetails', [
