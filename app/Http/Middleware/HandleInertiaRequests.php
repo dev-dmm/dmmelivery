@@ -18,7 +18,8 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        
+        $isSuperAdminRoute = $request->routeIs('super-admin.*');
+                
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $user ? [
@@ -28,7 +29,8 @@ class HandleInertiaRequests extends Middleware
                     'tenant_id' => $user->tenant_id,
                     'role' => $user->role,
                 ] : null,
-                'tenant' => ($user && $user->tenant) ? [
+                // ❌ Do not send tenant context on super-admin routes
+                'tenant' => ($user && !$isSuperAdminRoute && $user->tenant) ? [
                     'id' => $user->tenant->id,
                     'name' => $user->tenant->name,
                     'subdomain' => $user->tenant->subdomain,

@@ -116,9 +116,14 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function shipment(): BelongsTo
+    public function primaryShipment(): HasOne
     {
-        return $this->belongsTo(Shipment::class);
+        return $this->hasOne(Shipment::class, 'id', 'shipment_id');
+    }
+
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class, 'order_id');
     }
 
     public function importLog(): BelongsTo
@@ -306,38 +311,23 @@ class Order extends Model
     // Shipment Creation
     public function createShipment(): Shipment
     {
-        if ($this->shipment) {
-            return $this->shipment;
+        if ($this->primaryShipment) {
+            return $this->primaryShipment;
         }
 
         $shipment = Shipment::create([
             'tenant_id' => $this->tenant_id,
+            'order_id' => $this->id,
             'customer_id' => $this->customer_id,
+            'courier_id' => null, // Will be set when courier is assigned
             'tracking_number' => $this->generateTrackingNumber(),
+            'courier_tracking_id' => $this->generateTrackingNumber(), // Temp, will be updated by courier
             'status' => 'pending',
-            
-            // Customer Info
-            'recipient_name' => $this->getCustomerDisplayName(),
-            'recipient_email' => $this->getCustomerEmail(),
-            'recipient_phone' => $this->getCustomerPhone(),
-            
-            // Address
-            'delivery_address' => $this->shipping_address,
-            'delivery_city' => $this->shipping_city,
-            'delivery_postal_code' => $this->shipping_postal_code,
-            'delivery_country' => $this->shipping_country,
-            'delivery_notes' => $this->shipping_notes,
-            
-            // Shipment Details
-            'total_amount' => $this->total_amount,
-            'currency' => $this->currency,
             'weight' => $this->getTotalWeight(),
-            'requires_signature' => $this->requires_signature,
-            'fragile' => $this->hasFragileItems(),
-            'special_instructions' => $this->special_instructions,
-            
-            // Dates
-            'expected_delivery_date' => $this->expected_ship_date,
+            'shipping_address' => $this->getFullShippingAddress(),
+            'billing_address' => $this->getFullBillingAddress(),
+            'shipping_cost' => $this->shipping_cost ?? 0,
+            'estimated_delivery' => $this->expected_ship_date,
         ]);
 
         $this->update(['shipment_id' => $shipment->id]);
