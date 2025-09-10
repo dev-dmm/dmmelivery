@@ -17,7 +17,12 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
         if (selectedRole) params.append('role', selectedRole);
         if (perPage !== 25) params.append('per_page', perPage);
 
-        router.get(route('super-admin.users'), Object.fromEntries(params));
+        if (router && router.get) {
+            router.get(route('super-admin.users'), Object.fromEntries(params));
+        } else {
+            console.error('Router or router.get is not available');
+            window.location.href = route('super-admin.users') + '?' + params.toString();
+        }
     };
 
     const clearFilters = () => {
@@ -25,29 +30,54 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
         setSelectedTenant('');
         setSelectedRole('');
         setPerPage(25);
-        router.get(route('super-admin.users'));
+        if (router && router.get) {
+            router.get(route('super-admin.users'));
+        } else {
+            console.error('Router or router.get is not available');
+            window.location.href = route('super-admin.users');
+        }
     };
 
     const updateUserRole = (userId, newRole) => {
-        router.patch(route('super-admin.users.update-role', userId), {
-            role: newRole
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                // Refresh the page to show updated data
-                router.reload();
-            }
-        });
+        if (router && router.patch) {
+            router.patch(route('super-admin.users.update-role', userId), {
+                role: newRole
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    // Refresh the page to show updated data
+                    if (router && router.reload) {
+                        router.reload();
+                    } else {
+                        window.location.reload();
+                    }
+                }
+            });
+        } else {
+            console.error('Router or router.patch is not available');
+            // Fallback to page reload
+            window.location.reload();
+        }
     };
 
     const toggleUserActive = (userId) => {
-        router.patch(route('super-admin.users.toggle-active', userId), {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                // Refresh the page to show updated data
-                router.reload();
-            }
-        });
+        if (router && router.patch) {
+            router.patch(route('super-admin.users.toggle-active', userId), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    // Refresh the page to show updated data
+                    if (router && router.reload) {
+                        router.reload();
+                    } else {
+                        window.location.reload();
+                    }
+                }
+            });
+        } else {
+            console.error('Router or router.patch is not available');
+            // Fallback to page reload
+            window.location.reload();
+        }
     };
 
     const getRoleBadge = (role) => {
@@ -86,7 +116,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                     {/* Search and Filters */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
                         <div className="p-6">
-                            <form onSubmit={handleSearch} className="space-y-4">
+                            <form onSubmit={handleSearch} method="GET" className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div>
                                         <label htmlFor="search" className="block text-sm font-medium text-gray-700">

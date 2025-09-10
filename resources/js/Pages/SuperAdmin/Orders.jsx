@@ -74,7 +74,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                     {/* Search and Filters */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
                         <div className="p-6">
-                            <form onSubmit={handleSearch} className="space-y-4">
+                            <form onSubmit={handleSearch} method="GET" className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div>
                                         <label htmlFor="search" className="block text-sm font-medium text-gray-700">
