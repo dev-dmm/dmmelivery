@@ -19,7 +19,16 @@
         'dashboard',
         'login',
         'logout',
-        // 'register', // include only if you allow self-signup
+
+        'register', // include for registration
+
+        // Password reset routes
+        'password.request',
+        'password.email', 
+        'password.reset',
+        'password.store',
+        'password.update',
+        'password.confirm',
 
         'profile.edit',
 
