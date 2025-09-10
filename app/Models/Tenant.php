@@ -79,6 +79,22 @@ class Tenant extends Model
         'onboarding_data',
     ];
 
+    protected $hidden = [
+        // API Credentials - never expose these
+        'acs_api_key',
+        'acs_company_password',
+        'acs_user_password',
+        'courier_api_keys',
+        'api_token',
+        'webhook_urls',
+        'integration_settings',
+        
+        // Internal/sensitive data
+        'admin_notes',
+        'onboarding_data',
+        'notification_settings',
+    ];
+
     protected $casts = [
         'branding_config' => 'array',
         'notification_settings' => 'array',

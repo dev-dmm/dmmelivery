@@ -4,6 +4,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Shipment;
+use App\Http\Resources\ShipmentResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -38,7 +39,7 @@ class ShipmentController extends Controller
             ->withQueryString();
 
         return Inertia::render('Shipments/Index', [
-            'shipments' => $shipments,
+            'shipments' => ShipmentResource::collection($shipments),
             'filters' => $request->only([
                 'filter.tracking_number', 
                 'filter.status', 
@@ -57,7 +58,7 @@ class ShipmentController extends Controller
         }]);
 
         return Inertia::render('Shipments/Show', [
-            'shipment' => $shipment,
+            'shipment' => new ShipmentResource($shipment),
         ]);
     }
 }

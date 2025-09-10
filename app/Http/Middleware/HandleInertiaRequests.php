@@ -5,6 +5,9 @@ namespace App\Http\Middleware;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
+use Illuminate\Support\Facades\Gate;
+use App\Http\Resources\UserResource;
+use App\Http\Resources\TenantResource;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -22,27 +25,47 @@ class HandleInertiaRequests extends Middleware
                 
         return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $user ? [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'tenant_id' => $user->tenant_id,
-                    'role' => $user->role,
-                ] : null,
-                // ❌ Do not send tenant context on super-admin routes
-                'tenant' => ($user && !$isSuperAdminRoute && $user->tenant) ? [
-                    'id' => $user->tenant->id,
-                    'name' => $user->tenant->name,
-                    'subdomain' => $user->tenant->subdomain,
-                    'branding' => $user->tenant->branding_config,
-                ] : null,
+                // Lean user data using Resource
+                'user' => $user ? new UserResource($user) : null,
+                
+                // Boolean abilities using Gates
+                'abilities' => $user ? [
+                    'manageUsers' => Gate::allows('manage-users'),
+                    'manageTenants' => Gate::allows('manage-tenants'),
+                    'viewReports' => Gate::allows('view-reports'),
+                    'accessSuperAdmin' => Gate::allows('access-super-admin'),
+                    'manageSettings' => Gate::allows('manage-settings'),
+                ] : [],
+                
+                // Minimal tenant context - only when needed
+                'tenant' => ($user && !$isSuperAdminRoute && $user->tenant) 
+                    ? new TenantResource($user->tenant) 
+                    : null,
             ],
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            // Minimal Ziggy configuration
             'ziggy' => function () use ($request) {
-                return array_merge((new Ziggy)->toArray(), [
+                $ziggy = new Ziggy();
+                
+                // Only include routes the frontend actually uses
+                $allowedRoutes = [
+                    'dashboard',
+                    'logout',
+                    'shipments.*',
+                    'settings.*',
+                    'onboarding.*',
+                    'courier-performance',
+                ];
+                
+                // Add super-admin routes only if user is super admin
+                if ($request->user()?->isSuperAdmin()) {
+                    $allowedRoutes[] = 'super-admin.*';
+                }
+                
+                return array_merge($ziggy->filter($allowedRoutes, true)->toArray(), [
                     'location' => $request->url(),
                 ]);
             },

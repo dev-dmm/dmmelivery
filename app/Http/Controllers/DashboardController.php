@@ -7,6 +7,8 @@ use App\Models\Shipment;
 use App\Models\Customer;
 use App\Models\Courier;
 use App\Models\NotificationLog;
+use App\Http\Resources\TenantResource;
+use App\Http\Resources\ShipmentResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -157,10 +159,7 @@ class DashboardController extends Controller
             'recentNotifications' => $recentNotifications,
             'selectedPeriod'      => $period,
             'periodOptions'       => $periodOptions,
-            'tenant'              => [
-                'name'     => $tenant->name,
-                'branding' => $tenant->branding_config,
-            ],
+            'tenant'              => new TenantResource($tenant),
         ]);
     }
 

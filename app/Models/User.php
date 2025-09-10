@@ -29,6 +29,10 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'permissions', // Internal permissions array
     ];
 
     protected $casts = [
