@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Gate;
 
 class UserResource extends JsonResource
 {
@@ -22,12 +23,12 @@ class UserResource extends JsonResource
                 $request->user()?->id === $this->id || $request->user()?->isAdmin(),
                 $this->email
             ),
-            // Role as boolean abilities instead of raw role
+            // Role as boolean abilities using Gates
             'abilities' => [
                 'is_admin' => $this->isAdmin(),
                 'is_super_admin' => $this->isSuperAdmin(),
-                'can_manage_users' => $this->isAdmin(),
-                'can_view_settings' => $this->isAdmin() || $this->isUser(),
+                'can_manage_users' => Gate::forUser($this)->allows('manage-users'),
+                'can_view_settings' => Gate::forUser($this)->allows('view-reports'),
             ],
             // Only include tenant_id if needed for routing logic
             'tenant_id' => $this->when(

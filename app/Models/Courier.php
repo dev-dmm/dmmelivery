@@ -25,6 +25,11 @@ class Courier extends Model
         'config',
     ];
 
+    protected $hidden = [
+        'api_key', // Never expose API keys
+        'config',  // Internal configuration data
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',

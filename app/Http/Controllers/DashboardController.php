@@ -153,13 +153,14 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard', [
             'stats'               => $stats,
             'recentShipments'     => $recentShipments,
-            'weeklyStats'         => $weeklyStats,
-            'chartData'           => $chartData,
-            'courierStats'        => $courierStats->values(),
-            'recentNotifications' => $recentNotifications,
             'selectedPeriod'      => $period,
             'periodOptions'       => $periodOptions,
             'tenant'              => new TenantResource($tenant),
+            // Lazy load heavy chart data - only loaded when requested
+            'weeklyStats'         => Inertia::lazy(fn() => $weeklyStats),
+            'chartData'           => Inertia::lazy(fn() => $chartData),
+            'courierStats'        => Inertia::lazy(fn() => $courierStats->values()),
+            'recentNotifications' => Inertia::lazy(fn() => $recentNotifications),
         ]);
     }
 

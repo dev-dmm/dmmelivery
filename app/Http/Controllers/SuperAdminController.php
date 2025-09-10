@@ -148,8 +148,9 @@ class SuperAdminController extends Controller
 
         return Inertia::render('SuperAdmin/Dashboard', [
             'stats'        => $stats,
-            'recentOrders' => $recentOrders,
-            'topTenants'   => $topTenants,
+            // Lazy load heavy collections
+            'recentOrders' => Inertia::lazy(fn() => $recentOrders),
+            'topTenants'   => Inertia::lazy(fn() => $topTenants),
         ]);
     }
 

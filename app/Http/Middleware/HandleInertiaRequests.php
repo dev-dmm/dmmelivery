@@ -46,26 +46,9 @@ class HandleInertiaRequests extends Middleware
                 'message' => fn () => $request->session()->get('message'),
                 'error' => fn () => $request->session()->get('error'),
             ],
-            // Minimal Ziggy configuration
+            // Ziggy configuration (filtered by config/ziggy.php and blade template)
             'ziggy' => function () use ($request) {
-                $ziggy = new Ziggy();
-                
-                // Only include routes the frontend actually uses
-                $allowedRoutes = [
-                    'dashboard',
-                    'logout',
-                    'shipments.*',
-                    'settings.*',
-                    'onboarding.*',
-                    'courier-performance',
-                ];
-                
-                // Add super-admin routes only if user is super admin
-                if ($request->user()?->isSuperAdmin()) {
-                    $allowedRoutes[] = 'super-admin.*';
-                }
-                
-                return array_merge($ziggy->filter($allowedRoutes, true)->toArray(), [
+                return array_merge((new Ziggy)->toArray(), [
                     'location' => $request->url(),
                 ]);
             },

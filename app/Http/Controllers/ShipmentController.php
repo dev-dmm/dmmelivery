@@ -51,14 +51,39 @@ class ShipmentController extends Controller
 
     public function show(Shipment $shipment): Response
     {
-        $shipment->load(['customer', 'courier', 'statusHistory' => function ($query) {
-            $query->orderBy('happened_at', 'desc');
-        }, 'notifications' => function ($query) {
-            $query->orderBy('sent_at', 'desc')->limit(10);
-        }]);
+        // Load basic shipment data
+        $shipment->load(['customer', 'courier']);
 
         return Inertia::render('Shipments/Show', [
             'shipment' => new ShipmentResource($shipment),
+            // Lazy load heavy status history and notifications
+            'statusHistory' => Inertia::lazy(function () use ($shipment) {
+                return $shipment->statusHistory()
+                    ->orderBy('happened_at', 'desc')
+                    ->get()
+                    ->map(function ($status) {
+                        return [
+                            'status' => $status->status,
+                            'happened_at' => $status->happened_at?->format('Y-m-d H:i:s'),
+                            'location' => $status->location,
+                            'notes' => $status->notes,
+                        ];
+                    });
+            }),
+            'notifications' => Inertia::lazy(function () use ($shipment) {
+                return $shipment->notifications()
+                    ->orderBy('sent_at', 'desc')
+                    ->limit(10)
+                    ->get()
+                    ->map(function ($notification) {
+                        return [
+                            'id' => $notification->id,
+                            'type' => $notification->type,
+                            'sent_at' => $notification->sent_at?->format('Y-m-d H:i:s'),
+                            'status' => $notification->status,
+                        ];
+                    });
+            }),
         ]);
     }
 }

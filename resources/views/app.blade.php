@@ -14,7 +14,7 @@
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
-        @routes(['only' => [
+        @routes(['only' => array_filter([
             'dashboard',
             'logout',
             'login',
@@ -24,7 +24,7 @@
             'onboarding.*',
             'courier-performance',
             auth()->user()?->isSuperAdmin() ? 'super-admin.*' : null,
-        ]])
+        ])])
         @viteReactRefresh
         @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])
         @inertiaHead

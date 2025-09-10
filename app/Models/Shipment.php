@@ -31,6 +31,10 @@ class Shipment extends Model
         'courier_response',
     ];
 
+    protected $hidden = [
+        'courier_response', // Internal API responses
+    ];
+
     protected $casts = [
         'dimensions' => 'array',
         'courier_response' => 'array',
