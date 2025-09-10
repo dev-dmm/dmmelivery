@@ -51,6 +51,23 @@ class UserManagementController extends Controller
         
         $users = $query->orderBy('created_at', 'desc')
                        ->paginate($perPage)
+                       ->through(function ($user) {
+                           return [
+                               'id' => $user->id,
+                               'first_name' => $user->first_name,
+                               'last_name' => $user->last_name,
+                               'email' => $user->email,
+                               'role' => $user->role,
+                               'is_active' => $user->is_active,
+                               'email_verified_at' => $user->email_verified_at,
+                               'created_at' => $user->created_at,
+                               'tenant' => $user->tenant ? [
+                                   'id' => $user->tenant->id,
+                                   'name' => $user->tenant->name,
+                                   'subdomain' => $user->tenant->subdomain,
+                               ] : null,
+                           ];
+                       })
                        ->withQueryString();
         
         // Get tenants list for filter dropdown

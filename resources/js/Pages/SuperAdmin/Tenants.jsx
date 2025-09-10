@@ -92,7 +92,7 @@ export default function SuperAdminUsers({
           It never actually submits. */}
       <form method="GET" onSubmit={(e) => e.preventDefault()}>
         <div className="py-12">
-          <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+          <div className="mx-auto">
             {/* Role stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {Object.entries(availableRoles).map(([roleKey, roleName]) => {
