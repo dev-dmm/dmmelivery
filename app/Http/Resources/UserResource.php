@@ -27,8 +27,8 @@ class UserResource extends JsonResource
             'abilities' => [
                 'is_admin' => $this->isAdmin(),
                 'is_super_admin' => $this->isSuperAdmin(),
-                'can_manage_users' => Gate::forUser($this)->allows('manage-users'),
-                'can_view_settings' => Gate::forUser($this)->allows('view-reports'),
+                'can_manage_users' => Gate::forUser($this->resource)->allows('manage-users'),
+                'can_view_settings' => Gate::forUser($this->resource)->allows('view-reports'),
             ],
             // Only include tenant_id if needed for routing logic
             'tenant_id' => $this->when(
