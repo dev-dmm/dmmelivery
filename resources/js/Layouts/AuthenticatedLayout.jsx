@@ -166,7 +166,6 @@ export default function AuthenticatedLayout({ header, children }) {
           <div className="mx-auto container px-4 py-6 sm:px-6 lg:px-8">{header}</div>
         </header>
       )}
-
       <main className="container">{children}</main>
     </div>
   );
