@@ -3,10 +3,10 @@ import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function SuperAdminUsers({ auth, users, tenants, availableRoles, roleStats, filters }) {
-    const [searchTerm, setSearchTerm] = useState(filters.search || '');
-    const [selectedTenant, setSelectedTenant] = useState(filters.tenant || '');
-    const [selectedRole, setSelectedRole] = useState(filters.role || '');
-    const [perPage, setPerPage] = useState(filters.per_page || 25);
+    const [searchTerm, setSearchTerm] = useState(filters?.search || '');
+    const [selectedTenant, setSelectedTenant] = useState(filters?.tenant || '');
+    const [selectedRole, setSelectedRole] = useState(filters?.role || '');
+    const [perPage, setPerPage] = useState(filters?.per_page || 25);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -101,17 +101,19 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
                     
                     {/* Role Statistics Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        {Object.entries(availableRoles).map(([roleKey, roleName]) => {
-                            const count = roleStats[roleKey]?.count || 0;
-                            return (
-                                <div key={roleKey} className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                                    <div className="text-sm font-medium text-gray-500">{roleName}</div>
-                                    <div className="mt-2 text-3xl font-bold text-gray-900">{count.toLocaleString()}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {availableRoles && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {Object.entries(availableRoles).map(([roleKey, roleName]) => {
+                                const count = roleStats?.[roleKey]?.count || 0;
+                                return (
+                                    <div key={roleKey} className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                                        <div className="text-sm font-medium text-gray-500">{roleName}</div>
+                                        <div className="mt-2 text-3xl font-bold text-gray-900">{count.toLocaleString()}</div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Search and Filters */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
@@ -143,7 +145,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                         >
                                             <option value="">All Tenants</option>
-                                            {tenants.map((tenant) => (
+                                            {tenants?.map((tenant) => (
                                                 <option key={tenant.id} value={tenant.id}>
                                                     {tenant.name} ({tenant.subdomain})
                                                 </option>
@@ -162,7 +164,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                         >
                                             <option value="">All Roles</option>
-                                            {Object.entries(availableRoles).map(([roleKey, roleName]) => (
+                                            {availableRoles && Object.entries(availableRoles).map(([roleKey, roleName]) => (
                                                 <option key={roleKey} value={roleKey}>
                                                     {roleName}
                                                 </option>
@@ -235,7 +237,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {users.data.map((user) => (
+                                        {users?.data?.map((user) => (
                                             <tr key={user.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
@@ -268,7 +270,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                                         onChange={(e) => updateUserRole(user.id, e.target.value)}
                                                         className={`text-xs font-semibold rounded-full px-2 py-1 border-0 ${getRoleBadge(user.role)}`}
                                                     >
-                                                        {Object.entries(availableRoles).map(([roleKey, roleName]) => (
+                                                        {availableRoles && Object.entries(availableRoles).map(([roleKey, roleName]) => (
                                                             <option key={roleKey} value={roleKey}>
                                                                 {roleName}
                                                             </option>
@@ -305,25 +307,31 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                             </div>
 
                             {/* Pagination */}
-                            {users.links && (
+                            {users?.links && (
                                 <div className="mt-6 flex items-center justify-between">
                                     <div className="text-sm text-gray-700">
                                         Showing {users.from} to {users.to} of {users.total} results
                                     </div>
                                     <div className="flex space-x-1">
                                         {users.links.map((link, index) => (
-                                            <Link
-                                                key={index}
-                                                href={link.url}
-                                                className={`px-3 py-2 text-sm font-medium rounded-md ${
-                                                    link.active
-                                                        ? 'bg-indigo-600 text-white'
-                                                        : link.url
-                                                        ? 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                }`}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
+                                            link.url ? (
+                                                <Link
+                                                    key={index}
+                                                    href={link.url}
+                                                    className={`px-3 py-2 text-sm font-medium rounded-md ${
+                                                        link.active
+                                                            ? 'bg-indigo-600 text-white'
+                                                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                                />
+                                            ) : (
+                                                <span
+                                                    key={index}
+                                                    className="px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                                />
+                                            )
                                         ))}
                                     </div>
                                 </div>
