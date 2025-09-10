@@ -24,7 +24,7 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
             <Head title="Super Admin Dashboard" />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="mx-auto">
                     
                     {/* Statistics Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

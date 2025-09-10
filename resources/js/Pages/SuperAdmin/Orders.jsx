@@ -49,7 +49,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
             <Head title="Super Admin - Orders" />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="mx-auto">
                     
                     {/* Statistics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

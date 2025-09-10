@@ -36,7 +36,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
             <Head title={`Tenant Details - ${tenant.name}`} />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <div className="mx-auto">
                     
                     {/* Tenant Information */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
