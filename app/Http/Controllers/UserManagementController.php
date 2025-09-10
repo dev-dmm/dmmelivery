@@ -10,9 +10,6 @@ use Illuminate\Validation\Rule;
 
 class UserManagementController extends Controller
 {
-    /**
-     * Display all users for super admin management
-     */
     public function index(Request $request)
     {
         $perPage = $request->get('per_page', 25);
@@ -22,29 +19,24 @@ class UserManagementController extends Controller
         
         $query = User::query()
             ->with(['tenant:id,name,subdomain'])
-            ->select([
-                'users.*'
-            ]);
+            ->select(['users.*']);
         
-        // Search functionality
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
+                $q->where('first_name', 'like', '%'.$search.'%')
+                  ->orWhere('last_name', 'like', '%'.$search.'%')
+                  ->orWhere('email', 'like', '%'.$search.'%')
                   ->orWhereHas('tenant', function ($tenantQuery) use ($search) {
-                      $tenantQuery->where('name', 'like', "%{$search}%")
-                                 ->orWhere('subdomain', 'like', "%{$search}%");
+                      $tenantQuery->where('name', 'like', '%'.$search.'%')
+                                 ->orWhere('subdomain', 'like', '%'.$search.'%');
                   });
             });
         }
         
-        // Filter by role
         if ($role_filter) {
             $query->where('role', $role_filter);
         }
         
-        // Filter by tenant
         if ($tenant_filter) {
             $query->where('tenant_id', $tenant_filter);
         }
@@ -70,15 +62,12 @@ class UserManagementController extends Controller
                        })
                        ->withQueryString();
         
-        // Get tenants list for filter dropdown
         $tenants = Tenant::select('id', 'name', 'subdomain')
                         ->orderBy('name')
                         ->get();
         
-        // Get available roles
         $availableRoles = User::getAvailableRoles();
         
-        // Get role statistics
         $roleStats = User::selectRaw('role, COUNT(*) as count')
                         ->groupBy('role')
                         ->get()
@@ -98,9 +87,6 @@ class UserManagementController extends Controller
         ]);
     }
     
-    /**
-     * Update user role
-     */
     public function updateRole(Request $request, User $user)
     {
         $request->validate([
@@ -112,14 +98,11 @@ class UserManagementController extends Controller
         
         return response()->json([
             'success' => true,
-            'message' => "User role updated from {$oldRole} to {$request->role}",
+            'message' => 'User role updated from '.$oldRole.' to '.$request->role,
             'user' => $user->load('tenant:id,name,subdomain')
         ]);
     }
     
-    /**
-     * Toggle user active status
-     */
     public function toggleActive(Request $request, User $user)
     {
         $user->update(['is_active' => !$user->is_active]);
@@ -131,9 +114,6 @@ class UserManagementController extends Controller
         ]);
     }
     
-    /**
-     * Show user details
-     */
     public function show(User $user)
     {
         $user->load([
