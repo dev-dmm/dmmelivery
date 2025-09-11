@@ -180,7 +180,8 @@ export default function Index({
             </h3>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -197,8 +198,8 @@ export default function Index({
                   shipments.data.map((shipment) => (
                     <tr key={shipment.id ?? `row-${Math.random()}`} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{shipment.tracking_number}</div>
-                        <div className="text-sm text-gray-500">{shipment.order_id}</div>
+                        <div className="text-sm font-medium text-gray-900">{shipment.tracking_number || 'No tracking number'}</div>
+                        <div className="text-sm text-gray-500">{shipment.order_id || 'No order ID'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipment.status)}`}>
@@ -219,7 +220,7 @@ export default function Index({
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {shipment?.id ? (
                           <Link
-                            href={route('shipments.show', shipment.id)} // <-- scalar id avoids the Ziggy param error
+                            href={route('shipments.show', shipment.id)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,10 +252,78 @@ export default function Index({
             </table>
           </div>
 
+          {/* Mobile Card View */}
+          <div className="lg:hidden">
+            {shipments.data && shipments.data.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {shipments.data.map((shipment) => (
+                  <div key={shipment.id ?? `row-${Math.random()}`} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center mb-2">
+                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                            <span className="text-xs font-mono">{shipment.tracking_number?.slice(-4) || 'N/A'}</span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{shipment.tracking_number || 'No tracking number'}</p>
+                            <p className="text-xs text-gray-500">{shipment.order_id || 'No order ID'}</p>
+                          </div>
+                        </div>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipment.status)}`}>
+                          {formatStatus(shipment.status)}
+                        </span>
+                      </div>
+                      {shipment?.id && (
+                        <Link
+                          href={route('shipments.show', shipment.id)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 flex-shrink-0"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View
+                        </Link>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Customer</p>
+                        <p className="font-medium text-gray-900 truncate">{shipment?.customer?.name || '-'}</p>
+                        <p className="text-xs text-gray-500 truncate">{shipment?.customer?.email || ''}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Courier</p>
+                        <p className="font-medium text-gray-900 truncate">{shipment?.courier?.name || '-'}</p>
+                        <p className="text-xs text-gray-500">{shipment?.courier?.code || ''}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-500 mb-1">ETA</p>
+                      <p className="text-sm text-gray-900">{formatDate(shipment.estimated_delivery)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-6 py-12 text-center text-gray-500">
+                <div className="flex flex-col items-center">
+                  <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p className="text-lg font-medium">No shipments found</p>
+                  <p className="text-sm">Try adjusting your search criteria or clear filters</p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Pagination */}
           {Array.isArray(shipments.links) && shipments.links.length > 0 && (
             <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center">
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{shipments.from || 0}</span> to{' '}
@@ -262,21 +331,23 @@ export default function Index({
                     <span className="font-medium">{shipments.total || 0}</span> results
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {shipments.links.map((link, index) => (
-                    <Link
-                      key={index}
-                      href={link.url || '#'}
-                      className={`px-3 py-1 text-sm rounded-md ${
-                        link.active
-                          ? 'bg-blue-500 text-white'
-                          : link.url
-                          ? 'bg-white text-gray-500 hover:text-gray-700 border'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      }`}
-                      dangerouslySetInnerHTML={{ __html: link.label }}
-                    />
-                  ))}
+                <div className="flex items-center justify-center sm:justify-end">
+                  <div className="flex items-center space-x-1 sm:space-x-2 overflow-x-auto">
+                    {shipments.links.map((link, index) => (
+                      <Link
+                        key={index}
+                        href={link.url || '#'}
+                        className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-md whitespace-nowrap flex-shrink-0 ${
+                          link.active
+                            ? 'bg-blue-500 text-white'
+                            : link.url
+                            ? 'bg-white text-gray-500 hover:text-gray-700 border'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                        dangerouslySetInnerHTML={{ __html: link.label }}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

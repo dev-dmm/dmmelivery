@@ -379,21 +379,21 @@ export default function Dashboard(props) {
               <div className="space-y-4">
                 {recentShipments?.length
                   ? recentShipments.slice(0, 5).map((s) => (
-                      <div key={s.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div key={s.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors gap-3">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3">
+                          <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                             <span className="text-xs font-mono">{s.tracking_number.slice(-4)}</span>
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{s.tracking_number}</p>
-                            <p className="text-sm text-gray-500">{s.customer?.name || 'Άγνωστος πελάτης'}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-gray-900 truncate">{s.tracking_number}</p>
+                            <p className="text-sm text-gray-500 truncate">{s.customer?.name || 'Άγνωστος πελάτης'}</p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(s.status)}`}>
+                        <div className="flex items-center justify-between sm:justify-end space-x-3">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(s.status)} flex-shrink-0`}>
                             {s.status.replace('_', ' ').toUpperCase()}
                           </span>
-                          <Link href={route('shipments.show', { shipment: s.id })} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                          <Link href={route('shipments.show', { shipment: s.id })} className="text-blue-600 hover:text-blue-800 text-sm font-medium flex-shrink-0">
                             Προβολή
                           </Link>
                         </div>
@@ -412,17 +412,17 @@ export default function Dashboard(props) {
               <div className="space-y-4">
                 {courierStats?.length
                   ? courierStats.slice(0, 4).map((c, i) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors gap-3">
                         <div className="flex items-center">
-                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
                             <span className="text-sm font-bold text-blue-700">{c.code}</span>
                           </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{c.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-gray-900 truncate">{c.name}</p>
                             <p className="text-sm text-gray-500">Σύνολο: <span className="font-medium">{c.total_shipments}</span> αποστολές</p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left sm:text-right">
                           <div className="space-y-1">
                             <p className="text-sm text-green-600">✅ <span className="font-semibold">{c.delivered_shipments}</span> παραδοτέα</p>
                             <p className="text-sm text-yellow-600">⏳ <span className="font-semibold">{c.pending_shipments}</span> εκρεμότητα</p>

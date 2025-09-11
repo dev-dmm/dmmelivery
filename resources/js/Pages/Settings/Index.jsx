@@ -502,12 +502,12 @@ export default function SettingsIndex({
         <div className="mx-auto">
           <div className="bg-white overflow-hidden shadow-sm rounded-lg">
             <TabGroup selectedIndex={activeTab} onChange={setActiveTab}>
-              <TabList className="flex border-b border-gray-200">
+              <TabList className="flex flex-col sm:flex-row border-b border-gray-200 overflow-x-auto">
                 {tabs.map((tab) => (
                   <Tab
                     key={tab.name}
                     className={({ selected }) =>
-                      `flex-1 px-6 py-4 text-sm font-medium text-center border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset ${
+                      `flex-1 px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-center border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset whitespace-nowrap ${
                         selected ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`
                     }
@@ -701,17 +701,19 @@ export default function SettingsIndex({
                     {Object.entries(couriers).length > 0 ? (
                       Object.entries(couriers).map(([key, courier]) => (
                         <div key={key} className="border rounded-lg p-6">
-                          <div className="flex items-center justify-between mb-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                             <div className="flex items-center space-x-3">
-                              <span className="text-2xl" aria-hidden="true">
+                              <span className="text-2xl flex-shrink-0" aria-hidden="true">
                                 {courier.logo}
                               </span>
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <h4 className="text-lg font-medium text-gray-900">{courier.name}</h4>
                                 <p className="text-sm text-gray-500">{courier.description}</p>
                               </div>
                             </div>
-                            {getCourierStatusBadge(courier.status)}
+                            <div className="flex-shrink-0 self-start sm:self-auto">
+                              {getCourierStatusBadge(courier.status)}
+                            </div>
                           </div>
 
                           {key === 'acs' ? (
@@ -766,12 +768,18 @@ export default function SettingsIndex({
                                 </div>
                               </div>
 
-                              <div className="flex items-center justify-between mt-6">
-                                <SecondaryButton onClick={fillDemoCredentials}>Fill Demo Credentials</SecondaryButton>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 gap-4">
+                                <SecondaryButton onClick={fillDemoCredentials} className="w-full sm:w-auto">
+                                  Fill Demo Credentials
+                                </SecondaryButton>
 
-                                <div className="flex space-x-3">
+                                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                                   {hasAcsCredentials && (
-                                    <SecondaryButton onClick={() => testCourierConnection('acs')} disabled={loading.test_acs}>
+                                    <SecondaryButton 
+                                      onClick={() => testCourierConnection('acs')} 
+                                      disabled={loading.test_acs}
+                                      className="w-full sm:w-auto"
+                                    >
                                       {loading.test_acs ? (
                                         <>
                                           <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
@@ -783,7 +791,11 @@ export default function SettingsIndex({
                                     </SecondaryButton>
                                   )}
 
-                                  <PrimaryButton onClick={handleACSCredentialsUpdate} disabled={loading.acs}>
+                                  <PrimaryButton 
+                                    onClick={handleACSCredentialsUpdate} 
+                                    disabled={loading.acs}
+                                    className="w-full sm:w-auto"
+                                  >
                                     {loading.acs ? (
                                       <>
                                         <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
@@ -821,54 +833,58 @@ export default function SettingsIndex({
                       <h3 className="text-lg font-medium text-gray-900 mb-4">API Access</h3>
 
                       <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="min-w-0 flex-1">
                             <h4 className="text-sm font-medium text-gray-900">API Token</h4>
                             <p className="text-sm text-gray-500">{apiToken ? 'Token is configured' : 'No token generated'}</p>
+                            {apiToken && (
+                              <code className="text-xs bg-white px-2 py-1 rounded border break-all block mt-2">
+                                Token: {maskedToken}
+                              </code>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             {apiToken && (
-                                <>
-                                <code className="text-xs bg-white px-2 py-1 rounded border break-all">
-                                    Token: {maskedToken}
-                                </code>
-                                <SecondaryButton
-                                    onClick={() => {
-                                    if (unmaskedApiToken) {
-                                        copyToClipboard(unmaskedApiToken, 'api_token'); // ← copy the REAL token
-                                    } else {
-                                        showMessage(
-                                        'api_token',
-                                        'For security, the full token is only shown right after generation. Click “Generate New Token” to get a copyable value.',
-                                        'error'
-                                        );
-                                    }
-                                    }}
-                                    aria-label="Copy API token to clipboard"
-                                    disabled={!unmaskedApiToken} // optional: disable if we don’t have the real one
-                                    title={!unmaskedApiToken ? 'Generate a new token to copy the full value' : ''}
-                                >
-                                    <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                    Copy token
-                                </SecondaryButton>
-                                </>
+                              <SecondaryButton
+                                onClick={() => {
+                                  if (unmaskedApiToken) {
+                                    copyToClipboard(unmaskedApiToken, 'api_token');
+                                  } else {
+                                    showMessage(
+                                      'api_token',
+                                      'For security, the full token is only shown right after generation. Click "Generate New Token" to get a copyable value.',
+                                      'error'
+                                    );
+                                  }
+                                }}
+                                aria-label="Copy API token to clipboard"
+                                disabled={!unmaskedApiToken}
+                                title={!unmaskedApiToken ? 'Generate a new token to copy the full value' : ''}
+                                className="w-full sm:w-auto"
+                              >
+                                <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                Copy token
+                              </SecondaryButton>
                             )}
-                            {/* Generate button stays the same */}
-                            <SecondaryButton onClick={generateApiToken} disabled={loading.api_token}>
-                                {loading.api_token ? (
+                            <SecondaryButton 
+                              onClick={generateApiToken} 
+                              disabled={loading.api_token}
+                              className="w-full sm:w-auto"
+                            >
+                              {loading.api_token ? (
                                 <>
-                                    <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                    Generating...
+                                  <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                  Generating...
                                 </>
-                                ) : (
+                              ) : (
                                 <>
-                                    <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
-                                    Generate New Token
+                                  <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
+                                  Generate New Token
                                 </>
-                                )}
+                              )}
                             </SecondaryButton>
-                            </div>
+                          </div>
                         </div>
 
                         {getMessageAlert('api_token')}

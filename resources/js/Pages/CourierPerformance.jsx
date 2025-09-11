@@ -74,17 +74,17 @@ export default function CourierPerformance({
 
         return (
             <div className="bg-white rounded-lg shadow-sm border p-6 transition-all hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                     <div className="flex items-center">
-                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-semibold">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-semibold flex-shrink-0">
                             {getInitials(courier.name)}
                         </div>
-                        <div className="ml-3">
-                            <h3 className="text-lg font-semibold text-gray-900">{courier.name}</h3>
+                        <div className="ml-3 min-w-0 flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">{courier.name}</h3>
                             <p className="text-sm text-gray-500">{courier.total_shipments} συνολικές αποστολές</p>
                         </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getGradeColor(courier.grade)}`}>
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getGradeColor(courier.grade)} flex-shrink-0 self-start sm:self-auto`}>
                         Βαθμός: {courier.grade}
                     </span>
                 </div>
@@ -105,16 +105,16 @@ export default function CourierPerformance({
                             style={{ width: `${courier.other_percentage}%` }}
                         ></div>
                     </div>
-                    <div className="flex justify-between text-xs text-gray-600 mt-1">
-                        <span>Παραδοτέα: {courier.delivered_percentage}%</span>
-                        <span>Επιστραφήκαν: {courier.returned_percentage}%</span>
-                        <span>Άλλα: {courier.other_percentage}%</span>
-                        <span>100%</span>
+                    <div className="flex flex-wrap justify-between text-xs text-gray-600 mt-1 gap-1">
+                        <span className="whitespace-nowrap">Παραδοτέα: {courier.delivered_percentage}%</span>
+                        <span className="whitespace-nowrap">Επιστραφήκαν: {courier.returned_percentage}%</span>
+                        <span className="whitespace-nowrap">Άλλα: {courier.other_percentage}%</span>
+                        <span className="whitespace-nowrap">100%</span>
                     </div>
                 </div>
 
                 {/* KPIs */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="text-center">
                         <div className="flex items-center justify-center mb-1">
                             <span className="text-green-500 mr-1">↗</span>
@@ -159,15 +159,15 @@ export default function CourierPerformance({
 
                     {/* Filters */}
                     <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-                        <div className="flex flex-wrap gap-4 items-center">
-                            <div>
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 items-start sm:items-center">
+                            <div className="flex-1 sm:flex-none min-w-0">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Χρονικό Διάστημα
                                 </label>
                                 <select
                                     value={selectedPeriod}
                                     onChange={(e) => handleFilterChange(e.target.value, selectedArea)}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full sm:w-auto border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     disabled={isChangingFilters}
                                 >
                                     {Object.entries(periodOptions).map(([value, label]) => (
@@ -175,14 +175,14 @@ export default function CourierPerformance({
                                     ))}
                                 </select>
                             </div>
-                            <div>
+                            <div className="flex-1 sm:flex-none min-w-0">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Περιοχή
                                 </label>
                                 <select
                                     value={selectedArea}
                                     onChange={(e) => handleFilterChange(selectedPeriod, e.target.value)}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full sm:w-auto border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     disabled={isChangingFilters}
                                 >
                                     <option value="all">Όλες οι περιοχές</option>
@@ -192,7 +192,7 @@ export default function CourierPerformance({
                                 </select>
                             </div>
                             {isChangingFilters && (
-                                <div className="flex items-center text-sm text-gray-500">
+                                <div className="flex items-center text-sm text-gray-500 flex-shrink-0">
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
                                     Ενημέρωση...
                                 </div>
