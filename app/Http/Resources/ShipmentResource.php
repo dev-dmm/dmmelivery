@@ -19,7 +19,7 @@ class ShipmentResource extends JsonResource
             'status'               => $this->status ?? 'unknown',
             'created_at'           => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at'           => $this->updated_at?->format('Y-m-d H:i:s'),
-            'estimated_delivery'   => $this->estimated_delivery?->format('Y-m-d'),
+            'estimated_delivery'   => $this->estimated_delivery?->format('Y-m-d H:i:s'),
             'actual_delivery'      => $this->actual_delivery?->format('Y-m-d H:i:s'),
             'shipping_address'     => $this->shipping_address,
             'billing_address'      => $this->billing_address,

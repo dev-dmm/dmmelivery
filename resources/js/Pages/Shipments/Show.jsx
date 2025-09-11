@@ -3,6 +3,13 @@ import { route } from 'ziggy-js';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function Show({ shipment, statusHistory }) {
+  // Extract the actual shipment data from the data property
+  const shipmentData = shipment?.data || shipment;
+  
+  // Check if shipment is undefined
+  if (!shipmentData) {
+    return <div>Error: Shipment not found</div>;
+  }
   const getStatusBadgeColor = (status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -42,7 +49,7 @@ export default function Show({ shipment, statusHistory }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title={`Tracking ${shipment.tracking_number}`} />
+      <Head title={`Tracking ${shipmentData.tracking_number}`} />
 
       <div className="py-6 space-y-6">
         {/* Header */}
@@ -54,14 +61,14 @@ export default function Show({ shipment, statusHistory }) {
               </svg>
               Back to Shipments
             </Link>
-            <h1 className="text-3xl font-bold text-gray-800">📦 Tracking #{shipment.tracking_number}</h1>
-            <p className="text-gray-600">Order: {shipment.order_id}</p>
+            <h1 className="text-3xl font-bold text-gray-800">📦 Tracking #{shipmentData.tracking_number}</h1>
+            <p className="text-gray-600">Order: {shipmentData.order_id}</p>
           </div>
           <div className="text-right">
-            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border ${getStatusBadgeColor(shipment.status)}`}>
-              {formatStatus(shipment.status)}
+            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border ${getStatusBadgeColor(shipmentData.status)}`}>
+              {formatStatus(shipmentData.status)}
             </span>
-            <p className="text-sm text-gray-500 mt-1">Last updated: {formatDate(shipment.updated_at)}</p>
+            <p className="text-sm text-gray-500 mt-1">Last updated: {formatDate(shipmentData.updated_at)}</p>
           </div>
         </div>
 
@@ -74,28 +81,28 @@ export default function Show({ shipment, statusHistory }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Tracking Number</label>
-                  <p className="text-lg font-mono">{shipment.tracking_number}</p>
+                  <p className="text-lg font-mono">{shipmentData.tracking_number}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Courier Tracking ID</label>
-                  <p className="text-lg font-mono">{shipment.courier_tracking_id || '-'}</p>
+                  <p className="text-lg font-mono">{shipmentData.courier_tracking_id || '-'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Weight</label>
-                  <p>{shipment.weight ? `${shipment.weight} kg` : '-'}</p>
+                  <p>{shipmentData.weight ? `${shipmentData.weight} kg` : '-'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Shipping Cost</label>
-                  <p>{shipment.shipping_cost ? `€${shipment.shipping_cost}` : '-'}</p>
+                  <p>{shipmentData.shipping_cost ? `€${shipmentData.shipping_cost}` : '-'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Estimated Delivery</label>
-                  <p>{formatDate(shipment.estimated_delivery)}</p>
+                  <p>{formatDate(shipmentData.estimated_delivery)}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Actual Delivery</label>
-                  <p className={shipment.actual_delivery ? 'text-green-600 font-medium' : 'text-gray-400'}>
-                    {shipment.actual_delivery ? formatDate(shipment.actual_delivery) : 'Pending'}
+                  <p className={shipmentData.actual_delivery ? 'text-green-600 font-medium' : 'text-gray-400'}>
+                    {shipmentData.actual_delivery ? formatDate(shipmentData.actual_delivery) : 'Pending'}
                   </p>
                 </div>
               </div>
@@ -143,15 +150,15 @@ export default function Show({ shipment, statusHistory }) {
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Name</label>
-                  <p className="font-medium">{shipment?.customer?.name || 'N/A'}</p>
+                  <p className="font-medium">{shipmentData?.customer?.name || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Email</label>
-                  <p className="text-sm">{shipment?.customer?.email || 'N/A'}</p>
+                  <p className="text-sm">{shipmentData?.customer?.email || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Phone</label>
-                  <p className="text-sm">{shipment?.customer?.phone || 'N/A'}</p>
+                  <p className="text-sm">{shipmentData?.customer?.phone || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -162,16 +169,16 @@ export default function Show({ shipment, statusHistory }) {
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Company</label>
-                  <p className="font-medium">{shipment?.courier?.name || 'N/A'}</p>
+                  <p className="font-medium">{shipmentData?.courier?.name || 'N/A'}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Code</label>
-                  <p className="text-sm font-mono">{shipment?.courier?.code || 'N/A'}</p>
+                  <p className="text-sm font-mono">{shipmentData?.courier?.code || 'N/A'}</p>
                 </div>
-                {shipment?.courier?.tracking_url_template && (
+                {shipmentData?.courier?.tracking_url_template && (
                   <div>
                     <a
-                      href={shipment.courier.tracking_url_template.replace('{tracking_number}', shipment.tracking_number)}
+                      href={shipmentData.courier.tracking_url_template.replace('{tracking_number}', shipmentData.tracking_number)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm"
@@ -192,12 +199,12 @@ export default function Show({ shipment, statusHistory }) {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Shipping Address</label>
-                  <p className="text-sm whitespace-pre-line">{shipment.shipping_address || 'N/A'}</p>
+                  <p className="text-sm whitespace-pre-line">{shipmentData.shipping_address || 'N/A'}</p>
                 </div>
-                {shipment.billing_address && (
+                {shipmentData.billing_address && (
                   <div>
                     <label className="text-sm font-medium text-gray-500">Billing Address</label>
-                    <p className="text-sm whitespace-pre-line">{shipment.billing_address}</p>
+                    <p className="text-sm whitespace-pre-line">{shipmentData.billing_address}</p>
                   </div>
                 )}
               </div>

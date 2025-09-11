@@ -77,32 +77,25 @@ class ShipmentController extends Controller
 
         return Inertia::render('Shipments/Show', [
             'shipment' => new ShipmentResource($shipment),
-
-            // Lazy heavy data:
-            'statusHistory' => Inertia::lazy(function () use ($shipment) {
-                return $shipment->statusHistory()
-                    ->orderBy('happened_at', 'desc')
-                    ->get()
-                    ->map(fn ($s) => [
-                        'status'      => $s->status,
-                        'happened_at' => $s->happened_at?->format('Y-m-d H:i:s'),
-                        'location'    => $s->location,
-                        'notes'       => $s->notes,
-                    ]);
-            }),
-
-            'notifications' => Inertia::lazy(function () use ($shipment) {
-                return $shipment->notifications()
-                    ->orderBy('sent_at', 'desc')
-                    ->limit(10)
-                    ->get()
-                    ->map(fn ($n) => [
-                        'id'     => $n->id,
-                        'type'   => $n->type,
-                        'sent_at'=> $n->sent_at?->format('Y-m-d H:i:s'),
-                        'status' => $n->status,
-                    ]);
-            }),
+            'statusHistory' => $shipment->statusHistory()
+                ->orderBy('happened_at', 'desc')
+                ->get()
+                ->map(fn ($s) => [
+                    'status'      => $s->status,
+                    'happened_at' => $s->happened_at?->format('Y-m-d H:i:s'),
+                    'location'    => $s->location,
+                    'notes'       => $s->notes,
+                ]),
+            'notifications' => $shipment->notifications()
+                ->orderBy('sent_at', 'desc')
+                ->limit(10)
+                ->get()
+                ->map(fn ($n) => [
+                    'id'     => $n->id,
+                    'type'   => $n->type,
+                    'sent_at'=> $n->sent_at?->format('Y-m-d H:i:s'),
+                    'status' => $n->status,
+                ]),
         ]);
     }
 }

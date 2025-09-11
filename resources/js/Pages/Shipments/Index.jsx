@@ -195,32 +195,35 @@ export default function Index({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {shipments.data && shipments.data.length > 0 ? (
-                  shipments.data.map((shipment) => (
-                    <tr key={shipment.id ?? `row-${Math.random()}`} className="hover:bg-gray-50">
+                  shipments.data.map((shipment) => {
+                    // Extract the actual shipment data from the data property
+                    const shipmentData = shipment?.data || shipment;
+                    return (
+                    <tr key={shipmentData.id ?? `row-${Math.random()}`} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{shipment.tracking_number || 'No tracking number'}</div>
-                        <div className="text-sm text-gray-500">{shipment.order_id || 'No order ID'}</div>
+                        <div className="text-sm font-medium text-gray-900">{shipmentData.tracking_number || 'No tracking number'}</div>
+                        <div className="text-sm text-gray-500">{shipmentData.order_id || 'No order ID'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipment.status)}`}>
-                          {formatStatus(shipment.status)}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipmentData.status)}`}>
+                          {formatStatus(shipmentData.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{shipment?.customer?.name || '-'}</div>
-                        <div className="text-sm text-gray-500">{shipment?.customer?.email || ''}</div>
+                        <div className="text-sm font-medium text-gray-900">{shipmentData?.customer?.name || '-'}</div>
+                        <div className="text-sm text-gray-500">{shipmentData?.customer?.email || ''}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(shipment.estimated_delivery)}
+                        {formatDate(shipmentData.estimated_delivery)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{shipment?.courier?.name || '-'}</div>
-                        <div className="text-sm text-gray-500">{shipment?.courier?.code || ''}</div>
+                        <div className="text-sm font-medium text-gray-900">{shipmentData?.courier?.name || '-'}</div>
+                        <div className="text-sm text-gray-500">{shipmentData?.courier?.code || ''}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {shipment?.id ? (
+                        {shipmentData?.id ? (
                           <Link
-                            href={route('shipments.show', shipment.id)}
+                            href={route('shipments.show', shipmentData.id)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,7 +237,8 @@ export default function Index({
                         )}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 ) : (
                   <tr>
                     <td className="px-6 py-12 text-center text-gray-500" colSpan="6">
@@ -256,26 +260,29 @@ export default function Index({
           <div className="lg:hidden">
             {shipments.data && shipments.data.length > 0 ? (
               <div className="divide-y divide-gray-200">
-                {shipments.data.map((shipment) => (
-                  <div key={shipment.id ?? `row-${Math.random()}`} className="p-4 hover:bg-gray-50">
+                {shipments.data.map((shipment) => {
+                  // Extract the actual shipment data from the data property
+                  const shipmentData = shipment?.data || shipment;
+                  return (
+                  <div key={shipmentData.id ?? `row-${Math.random()}`} className="p-4 hover:bg-gray-50">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center mb-2">
                           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                            <span className="text-xs font-mono">{shipment.tracking_number?.slice(-4) || 'N/A'}</span>
+                            <span className="text-xs font-mono">{shipmentData.tracking_number?.slice(-4) || 'N/A'}</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{shipment.tracking_number || 'No tracking number'}</p>
-                            <p className="text-xs text-gray-500">{shipment.order_id || 'No order ID'}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{shipmentData.tracking_number || 'No tracking number'}</p>
+                            <p className="text-xs text-gray-500">{shipmentData.order_id || 'No order ID'}</p>
                           </div>
                         </div>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipment.status)}`}>
-                          {formatStatus(shipment.status)}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(shipmentData.status)}`}>
+                          {formatStatus(shipmentData.status)}
                         </span>
                       </div>
-                      {shipment?.id && (
+                      {shipmentData?.id && (
                         <Link
-                          href={route('shipments.show', shipment.id)}
+                          href={route('shipments.show', shipmentData.id)}
                           className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 flex-shrink-0"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,22 +297,23 @@ export default function Index({
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Customer</p>
-                        <p className="font-medium text-gray-900 truncate">{shipment?.customer?.name || '-'}</p>
-                        <p className="text-xs text-gray-500 truncate">{shipment?.customer?.email || ''}</p>
+                        <p className="font-medium text-gray-900 truncate">{shipmentData?.customer?.name || '-'}</p>
+                        <p className="text-xs text-gray-500 truncate">{shipmentData?.customer?.email || ''}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Courier</p>
-                        <p className="font-medium text-gray-900 truncate">{shipment?.courier?.name || '-'}</p>
-                        <p className="text-xs text-gray-500">{shipment?.courier?.code || ''}</p>
+                        <p className="font-medium text-gray-900 truncate">{shipmentData?.courier?.name || '-'}</p>
+                        <p className="text-xs text-gray-500">{shipmentData?.courier?.code || ''}</p>
                       </div>
                     </div>
                     
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="text-xs text-gray-500 mb-1">ETA</p>
-                      <p className="text-sm text-gray-900">{formatDate(shipment.estimated_delivery)}</p>
+                      <p className="text-sm text-gray-900">{formatDate(shipmentData.estimated_delivery)}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="px-6 py-12 text-center text-gray-500">
