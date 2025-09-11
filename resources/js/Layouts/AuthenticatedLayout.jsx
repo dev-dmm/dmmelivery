@@ -64,7 +64,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 </Link>
               </div>
 
-              <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+              <div className="hidden space-x-2 lg:space-x-8 sm:-my-px sm:ms-10 sm:flex">
                 {hasRoute('dashboard') && (
                   <NavLink href={route('dashboard')} active={route().current('dashboard')}>
                     Dashboard
@@ -73,31 +73,36 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 {hasRoute('courier.performance') && (
                   <NavLink href={route('courier.performance')} active={route().current('courier.performance')}>
-                    📊 Απόδοση Courier
+                    <span className="hidden lg:inline">📊 Απόδοση Courier</span>
+                    <span className="lg:hidden">📊 Courier</span>
                   </NavLink>
                 )}
 
                 {hasRoute('orders.index') && (
                   <NavLink href={route('orders.index')} active={route().current('orders.*')}>
-                    📦 Orders
+                    <span className="hidden lg:inline">📦 Orders</span>
+                    <span className="lg:hidden">📦 Orders</span>
                   </NavLink>
                 )}
 
                 {hasRoute('shipments.index') && (
                   <NavLink href={route('shipments.index')} active={route().current('shipments.*')}>
-                    Shipments Dashboard
+                    <span className="hidden lg:inline">Shipments Dashboard</span>
+                    <span className="lg:hidden">Shipments</span>
                   </NavLink>
                 )}
 
                 {hasRoute('orders.import.index') && (
                   <NavLink href={route('orders.import.index')} active={route().current('orders.import.*')}>
-                    📥 Order Import
+                    <span className="hidden lg:inline">📥 Order Import</span>
+                    <span className="lg:hidden">📥 Import</span>
                   </NavLink>
                 )}
 
                 {hasRoute('settings.index') && (
                   <NavLink href={route('settings.index')} active={route().current('settings.*')}>
-                    ⚙️ Settings
+                    <span className="hidden lg:inline">⚙️ Settings</span>
+                    <span className="lg:hidden">⚙️</span>
                   </NavLink>
                 )}
 
@@ -106,7 +111,8 @@ export default function AuthenticatedLayout({ header, children }) {
                     <Dropdown>
                       <Dropdown.Trigger>
                         <button className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                          👑 Super Admin
+                          <span className="hidden lg:inline">👑 Super Admin</span>
+                          <span className="lg:hidden">👑</span>
                           <svg className="ml-1 -mr-0.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fillRule="evenodd"
@@ -134,16 +140,19 @@ export default function AuthenticatedLayout({ header, children }) {
                   </div>
                 )}
 
-                {hasRoute('test.courier-api') && (
-                  <NavLink href={route('test.courier-api')} active={route().current('test.courier-api')}>
-                    🧪 API Test
-                  </NavLink>
-                )}
-                {hasRoute('test.acs-credentials') && (
-                  <NavLink href={route('test.acs-credentials')} active={route().current('test.acs-credentials')}>
-                    🔑 ACS Test
-                  </NavLink>
-                )}
+                {/* Test links - only show on larger screens to reduce clutter */}
+                <div className="hidden xl:flex space-x-2">
+                  {hasRoute('test.courier-api') && (
+                    <NavLink href={route('test.courier-api')} active={route().current('test.courier-api')}>
+                      🧪 API Test
+                    </NavLink>
+                  )}
+                  {hasRoute('test.acs-credentials') && (
+                    <NavLink href={route('test.acs-credentials')} active={route().current('test.acs-credentials')}>
+                      🔑 ACS Test
+                    </NavLink>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -277,6 +286,11 @@ export default function AuthenticatedLayout({ header, children }) {
             {hasRoute('test.courier-api') && (
               <ResponsiveNavLink href={route('test.courier-api')} active={route().current('test.courier-api')}>
                 🧪 API Test
+              </ResponsiveNavLink>
+            )}
+            {hasRoute('test.acs-credentials') && (
+              <ResponsiveNavLink href={route('test.acs-credentials')} active={route().current('test.acs-credentials')}>
+                🔑 ACS Test
               </ResponsiveNavLink>
             )}
           </div>

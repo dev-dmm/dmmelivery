@@ -495,10 +495,10 @@ export default function SettingsIndex({
   const maskedToken = apiToken === 'configured' ? '••••••••••••••••' : (apiToken ? `${apiToken.slice(0, 4)}••••${apiToken.slice(-4)}` : '—');
 
   return (
-    <AuthenticatedLayout user={auth?.user} header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Settings</h2>}>
+    <AuthenticatedLayout user={auth?.user} header={<h2 className="font-semibold text-lg lg:text-xl text-gray-800 leading-tight">Settings</h2>}>
       <Head title="Settings" />
 
-      <div className="py-12">
+      <div className="py-4 lg:py-12">
         <div className="mx-auto">
           <div className="bg-white overflow-hidden shadow-sm rounded-lg">
             <TabGroup selectedIndex={activeTab} onChange={setActiveTab}>
@@ -507,7 +507,7 @@ export default function SettingsIndex({
                   <Tab
                     key={tab.name}
                     className={({ selected }) =>
-                      `flex-1 px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-medium text-center border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset whitespace-nowrap ${
+                      `flex-1 px-2 sm:px-3 lg:px-6 py-2 sm:py-3 lg:py-4 text-xs sm:text-sm font-medium text-center border-b-2 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset whitespace-nowrap ${
                         selected ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`
                     }
@@ -519,14 +519,14 @@ export default function SettingsIndex({
 
               <TabPanels>
                 {/* Business Settings Tab */}
-                <TabPanel className="p-6">
+                <TabPanel className="p-4 lg:p-6">
                   {getMessageAlert('business')}
 
-                  <div className="space-y-6">
+                  <div className="space-y-4 lg:space-y-6">
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Business Information</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Business Information</h3>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                         <div>
                           <InputLabel htmlFor="business_name" value="Business Name *" />
                           <TextInput
@@ -602,10 +602,10 @@ export default function SettingsIndex({
                       </div>
                     </div>
 
-                    <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Order Defaults</h3>
+                    <div className="border-t pt-4 lg:pt-6">
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Order Defaults</h3>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                         <div>
                           <InputLabel htmlFor="default_currency" value="Default Currency" />
                           <select
@@ -650,7 +650,7 @@ export default function SettingsIndex({
                         </div>
                       </div>
 
-                      <div className="mt-4 space-y-3">
+                      <div className="mt-3 lg:mt-4 space-y-2 lg:space-y-3">
                         <label className="flex items-center">
                           <input
                             type="checkbox"
@@ -658,7 +658,7 @@ export default function SettingsIndex({
                             onChange={(e) => updateFormData('auto_create_shipments', e.target.checked)}
                             className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                           />
-                          <span className="ml-2 text-sm text-gray-600">Auto-create shipments for new orders</span>
+                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Auto-create shipments for new orders</span>
                         </label>
 
                         <label className="flex items-center">
@@ -668,7 +668,7 @@ export default function SettingsIndex({
                             onChange={(e) => updateFormData('send_notifications', e.target.checked)}
                             className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                           />
-                          <span className="ml-2 text-sm text-gray-600">Send notifications to customers</span>
+                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Send notifications to customers</span>
                         </label>
                       </div>
                     </div>
@@ -689,26 +689,26 @@ export default function SettingsIndex({
                 </TabPanel>
 
                 {/* Couriers Tab */}
-                <TabPanel className="p-6">
-                  <div className="space-y-6">
+                <TabPanel className="p-4 lg:p-6">
+                  <div className="space-y-4 lg:space-y-6">
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Courier Integrations</h3>
-                      <p className="text-sm text-gray-600 mb-6">
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Courier Integrations</h3>
+                      <p className="text-xs lg:text-sm text-gray-600 mb-4 lg:mb-6">
                         Configure API credentials for your courier partners to enable real-time tracking and automated processing.
                       </p>
                     </div>
 
                     {Object.entries(couriers).length > 0 ? (
                       Object.entries(couriers).map(([key, courier]) => (
-                        <div key={key} className="border rounded-lg p-6">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl flex-shrink-0" aria-hidden="true">
+                        <div key={key} className="border rounded-lg p-4 lg:p-6">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 lg:mb-4 gap-3">
+                            <div className="flex items-center space-x-2 lg:space-x-3">
+                              <span className="text-xl lg:text-2xl flex-shrink-0" aria-hidden="true">
                                 {courier.logo}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-lg font-medium text-gray-900">{courier.name}</h4>
-                                <p className="text-sm text-gray-500">{courier.description}</p>
+                                <h4 className="text-base lg:text-lg font-medium text-gray-900">{courier.name}</h4>
+                                <p className="text-xs lg:text-sm text-gray-500">{courier.description}</p>
                               </div>
                             </div>
                             <div className="flex-shrink-0 self-start sm:self-auto">
@@ -720,7 +720,7 @@ export default function SettingsIndex({
                             <div className="space-y-4">
                               {getMessageAlert('acs')}
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                                 <div>
                                   <InputLabel htmlFor="acs_company_id" value="Company ID" />
                                   <TextInput
@@ -768,12 +768,12 @@ export default function SettingsIndex({
                                 </div>
                               </div>
 
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-6 gap-4">
-                                <SecondaryButton onClick={fillDemoCredentials} className="w-full sm:w-auto">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 lg:mt-6 gap-3 lg:gap-4">
+                                <SecondaryButton onClick={fillDemoCredentials} className="w-full sm:w-auto text-xs lg:text-sm">
                                   Fill Demo Credentials
                                 </SecondaryButton>
 
-                                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                                <div className="flex flex-col sm:flex-row gap-2 lg:gap-3 w-full sm:w-auto">
                                   {hasAcsCredentials && (
                                     <SecondaryButton 
                                       onClick={() => testCourierConnection('acs')} 
@@ -826,17 +826,17 @@ export default function SettingsIndex({
                 </TabPanel>
 
                 {/* API & Webhooks Tab */}
-                <TabPanel className="p-6">
-                  <div className="space-y-6">
+                <TabPanel className="p-4 lg:p-6">
+                  <div className="space-y-4 lg:space-y-6">
                     {/* API Token */}
                     <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">API Access</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">API Access</h3>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div className="bg-gray-50 rounded-lg p-3 lg:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 lg:gap-4">
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-sm font-medium text-gray-900">API Token</h4>
-                            <p className="text-sm text-gray-500">{apiToken ? 'Token is configured' : 'No token generated'}</p>
+                            <h4 className="text-xs lg:text-sm font-medium text-gray-900">API Token</h4>
+                            <p className="text-xs lg:text-sm text-gray-500">{apiToken ? 'Token is configured' : 'No token generated'}</p>
                             {apiToken && (
                               <code className="text-xs bg-white px-2 py-1 rounded border break-all block mt-2">
                                 Token: {maskedToken}
@@ -892,14 +892,14 @@ export default function SettingsIndex({
                     </div>
 
                     {/* WooCommerce Bridge */}
-                    <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">WooCommerce Bridge</h3>
+                    <div className="border-t pt-4 lg:pt-6">
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">WooCommerce Bridge</h3>
 
                       {getMessageAlert('woo')}
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white border rounded-lg p-4">
-                          <h4 className="text-sm font-medium text-gray-900 mb-2">Endpoint (POST)</h4>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                        <div className="bg-white border rounded-lg p-3 lg:p-4">
+                          <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-2">Endpoint (POST)</h4>
                           <div className="flex items-center gap-2 mb-4">
                             <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all flex-1">{wooEndpoint}</code>
                             <SecondaryButton onClick={() => copyToClipboard(wooEndpoint, 'woo')} aria-label="Copy WooCommerce endpoint">

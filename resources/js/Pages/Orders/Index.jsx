@@ -58,30 +58,30 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
     return (
         <AuthenticatedLayout
             header={
-                <h2 className="text-xl font-semibold leading-tight text-gray-800">
+                <h2 className="text-lg lg:text-xl font-semibold leading-tight text-gray-800">
                     📦 Orders
                 </h2>
             }
         >
             <Head title="Orders" />
 
-            <div className="py-12">
-                <div className="mx-auto space-y-6">
+            <div className="py-4 lg:py-12">
+                <div className="mx-auto space-y-4 lg:space-y-6">
                     
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-6">
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
+                            <div className="p-3 lg:p-6">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <span className="text-blue-600 font-bold">📋</span>
+                                        <div className="w-6 h-6 lg:w-8 lg:h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <span className="text-blue-600 font-bold text-xs lg:text-sm">📋</span>
                                         </div>
                                     </div>
-                                    <div className="ml-5 w-0 flex-1">
+                                    <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Total Orders</dt>
-                                            <dd className="text-lg font-medium text-gray-900">{stats.total}</dd>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Total Orders</dt>
+                                            <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.total}</dd>
                                         </dl>
                                     </div>
                                 </div>
@@ -89,17 +89,17 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                         </div>
 
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
+                            <div className="p-3 lg:p-6">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                                            <span className="text-yellow-600 font-bold">⏳</span>
+                                        <div className="w-6 h-6 lg:w-8 lg:h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                                            <span className="text-yellow-600 font-bold text-xs lg:text-sm">⏳</span>
                                         </div>
                                     </div>
-                                    <div className="ml-5 w-0 flex-1">
+                                    <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
-                                            <dd className="text-lg font-medium text-gray-900">{stats.pending}</dd>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Pending</dt>
+                                            <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.pending}</dd>
                                         </dl>
                                     </div>
                                 </div>
@@ -107,17 +107,17 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                         </div>
 
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
+                            <div className="p-3 lg:p-6">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <span className="text-blue-600 font-bold">⚙️</span>
+                                        <div className="w-6 h-6 lg:w-8 lg:h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <span className="text-blue-600 font-bold text-xs lg:text-sm">⚙️</span>
                                         </div>
                                     </div>
-                                    <div className="ml-5 w-0 flex-1">
+                                    <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Processing</dt>
-                                            <dd className="text-lg font-medium text-gray-900">{stats.processing}</dd>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Processing</dt>
+                                            <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.processing}</dd>
                                         </dl>
                                     </div>
                                 </div>
@@ -125,17 +125,17 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                         </div>
 
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
+                            <div className="p-3 lg:p-6">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                            <span className="text-indigo-600 font-bold">🚚</span>
+                                        <div className="w-6 h-6 lg:w-8 lg:h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                            <span className="text-indigo-600 font-bold text-xs lg:text-sm">🚚</span>
                                         </div>
                                     </div>
-                                    <div className="ml-5 w-0 flex-1">
+                                    <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Shipped</dt>
-                                            <dd className="text-lg font-medium text-gray-900">{stats.shipped}</dd>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Shipped</dt>
+                                            <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.shipped}</dd>
                                         </dl>
                                     </div>
                                 </div>
@@ -143,17 +143,17 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                         </div>
 
                         <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div className="p-6">
+                            <div className="p-3 lg:p-6">
                                 <div className="flex items-center">
                                     <div className="flex-shrink-0">
-                                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                            <span className="text-green-600 font-bold">✅</span>
+                                        <div className="w-6 h-6 lg:w-8 lg:h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                            <span className="text-green-600 font-bold text-xs lg:text-sm">✅</span>
                                         </div>
                                     </div>
-                                    <div className="ml-5 w-0 flex-1">
+                                    <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
-                                            <dd className="text-lg font-medium text-gray-900">{stats.completed}</dd>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Completed</dt>
+                                            <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.completed}</dd>
                                         </dl>
                                     </div>
                                 </div>
@@ -163,28 +163,28 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
 
                     {/* Filters */}
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6">
+                        <div className="p-4 lg:p-6">
                             <form onSubmit={handleSearch} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                                     <div>
-                                        <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search</label>
+                                        <label htmlFor="search" className="block text-xs lg:text-sm font-medium text-gray-700">Search</label>
                                         <input
                                             type="text"
                                             id="search"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                             placeholder="Order number, customer name, email..."
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         />
                                     </div>
 
                                     <div>
-                                        <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                                        <label htmlFor="status" className="block text-xs lg:text-sm font-medium text-gray-700">Status</label>
                                         <select
                                             id="status"
                                             value={selectedStatus}
                                             onChange={(e) => setSelectedStatus(e.target.value)}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         >
                                             <option value="">All Statuses</option>
                                             {Object.entries(statusOptions).map(([value, label]) => (
@@ -194,12 +194,12 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
 
                                     <div>
-                                        <label htmlFor="per_page" className="block text-sm font-medium text-gray-700">Per Page</label>
+                                        <label htmlFor="per_page" className="block text-xs lg:text-sm font-medium text-gray-700">Per Page</label>
                                         <select
                                             id="per_page"
                                             value={perPage}
                                             onChange={(e) => setPerPage(e.target.value)}
-                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         >
                                             <option value="15">15</option>
                                             <option value="25">25</option>
@@ -208,17 +208,17 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                         </select>
                                     </div>
 
-                                    <div className="flex items-end space-x-2">
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-end space-y-2 sm:space-y-0 sm:space-x-2">
                                         <button
                                             type="submit"
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium"
                                         >
                                             Search
                                         </button>
                                         <button
                                             type="button"
                                             onClick={clearFilters}
-                                            className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md text-sm font-medium"
+                                            className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium"
                                         >
                                             Clear
                                         </button>
@@ -234,25 +234,25 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Order
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Customer
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Status
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Total
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Items
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Created
                                         </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Actions
                                         </th>
                                     </tr>
@@ -261,37 +261,37 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     {orders.data.length > 0 ? (
                                         orders.data.map((order) => (
                                             <tr key={order.id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                                                    <div className="text-xs lg:text-sm font-medium text-gray-900">
                                                         #{order.order_number}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
+                                                    <div className="text-xs text-gray-500">
                                                         ID: {order.external_order_id}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                                                    <div className="text-xs lg:text-sm font-medium text-gray-900 truncate">
                                                         {order.customer_name}
                                                     </div>
-                                                    <div className="text-sm text-gray-500">
+                                                    <div className="text-xs text-gray-500 truncate">
                                                         {order.customer_email}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
                                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.status)}`}>
                                                         {getStatusIcon(order.status)} {statusOptions[order.status] || order.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                                                     €{parseFloat(order.total_amount).toFixed(2)}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
                                                     {order.items?.length || 0} items
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
                                                     {new Date(order.created_at).toLocaleDateString()}
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm font-medium">
                                                     <Link
                                                         href={route('orders.show', order.id)}
                                                         className="text-indigo-600 hover:text-indigo-900"
@@ -303,11 +303,11 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="7" className="px-6 py-12 text-center">
+                                            <td colSpan="7" className="px-3 lg:px-6 py-8 lg:py-12 text-center">
                                                 <div className="text-gray-500">
-                                                    <div className="text-4xl mb-4">📦</div>
-                                                    <h3 className="text-lg font-medium">No orders found</h3>
-                                                    <p className="text-sm mt-2">
+                                                    <div className="text-3xl lg:text-4xl mb-4">📦</div>
+                                                    <h3 className="text-base lg:text-lg font-medium">No orders found</h3>
+                                                    <p className="text-xs lg:text-sm mt-2">
                                                         {filters.search || filters.status 
                                                             ? 'Try adjusting your filters or search terms.'
                                                             : 'Orders will appear here when they are created or imported.'
@@ -323,12 +323,12 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
 
                         {/* Pagination */}
                         {orders.data.length > 0 && (
-                            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                            <div className="bg-white px-3 lg:px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
                                 <div className="flex-1 flex justify-between sm:hidden">
                                     {orders.prev_page_url && (
                                         <Link
                                             href={orders.prev_page_url}
-                                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                            className="relative inline-flex items-center px-3 lg:px-4 py-2 border border-gray-300 text-xs lg:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                         >
                                             Previous
                                         </Link>
@@ -336,7 +336,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     {orders.next_page_url && (
                                         <Link
                                             href={orders.next_page_url}
-                                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                            className="ml-3 relative inline-flex items-center px-3 lg:px-4 py-2 border border-gray-300 text-xs lg:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                         >
                                             Next
                                         </Link>
@@ -344,7 +344,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                 </div>
                                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                                     <div>
-                                        <p className="text-sm text-gray-700">
+                                        <p className="text-xs lg:text-sm text-gray-700">
                                             Showing <span className="font-medium">{orders.from}</span> to{' '}
                                             <span className="font-medium">{orders.to}</span> of{' '}
                                             <span className="font-medium">{orders.total}</span> results
@@ -356,7 +356,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                                 <Link
                                                     key={index}
                                                     href={link.url || '#'}
-                                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                                    className={`relative inline-flex items-center px-2 lg:px-4 py-2 border text-xs lg:text-sm font-medium ${
                                                         link.active
                                                             ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
                                                             : link.url

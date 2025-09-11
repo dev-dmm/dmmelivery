@@ -187,23 +187,23 @@ export default function Dashboard(props) {
     <AuthenticatedLayout>
       <Head title="Dashboard" />
 
-      <div className="py-6 space-y-8">
+      <div className="py-4 lg:py-6 space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">📊 Dashboard - {effectiveTenantName}</h1>
-            <p className="text-sm text-gray-500 mt-1">Παρακολουθήστε την απόδοση των αποστολών και τις ειδοποιήσεις πελατών</p>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 truncate">📊 Dashboard - {effectiveTenantName}</h1>
+            <p className="text-sm text-gray-500 mt-1 hidden sm:block">Παρακολουθήστε την απόδοση των αποστολών και τις ειδοποιήσεις πελατών</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:space-x-4 flex-shrink-0">
             {/* Period selector */}
             <div className="relative flex-1 sm:flex-none">
-              <label className="block text-sm font-medium text-gray-700 mb-1">📅 Χρονική Περίοδος</label>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">📅 Χρονική Περίοδος</label>
               <select
                 value={selectedPeriod}
                 onChange={(e) => handlePeriodChange(e.target.value)}
                 disabled={isChangingPeriod}
-                className="block w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="block w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs lg:text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {Object.entries(periodOptions).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -310,9 +310,9 @@ export default function Dashboard(props) {
 
             <Link
               href={route('shipments.index')}
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors w-full sm:w-auto"
+              className="inline-flex items-center justify-center px-3 lg:px-4 py-2 border border-transparent text-xs lg:text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors w-full sm:w-auto"
             >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               Προβολή Όλων
@@ -321,7 +321,7 @@ export default function Dashboard(props) {
         </div>
 
         {/* KPI cards (EAGER) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <StatCard title="Συνολικές Αποστολές" value={stats.total_shipments} icon="📦" color="blue" subtitle="για την επιλεγμένη περίοδο" />
           <StatCard title="Παραδοτέα" value={stats.delivered_shipments} icon="✅" color="green" subtitle={`${stats.delivery_success_rate}% επιτυχία`} />
           <StatCard title="Σε Μεταφορά" value={stats.in_transit_shipments + stats.out_for_delivery_shipments} icon="🚚" color="indigo" subtitle="Αποστολές σε εξέλιξη" />
@@ -329,34 +329,34 @@ export default function Dashboard(props) {
         </div>
 
         {/* Charts + Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">📊 Κατάσταση Αποστολών</h3>
-              <div className="text-sm text-gray-500">{periodOptions[selectedPeriod]}</div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+          <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 gap-2">
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900">📊 Κατάσταση Αποστολών</h3>
+              <div className="text-xs lg:text-sm text-gray-500">{periodOptions[selectedPeriod]}</div>
             </div>
-            <div style={{ height: '300px' }}>
+            <div style={{ height: '250px' }} className="lg:h-80">
               {chartDataConfig
                 ? <Bar data={chartDataConfig} options={chartOptions} />
-                : <div className="flex items-center justify-center h-full"><div className="text-gray-500">Φόρτωση γραφήματος…</div></div>}
+                : <div className="flex items-center justify-center h-full"><div className="text-gray-500 text-sm">Φόρτωση γραφήματος…</div></div>}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold mb-4">📈 Δραστηριότητα Περιόδου</h3>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6">
+            <h3 className="text-base lg:text-lg font-semibold mb-3 lg:mb-4">📈 Δραστηριότητα Περιόδου</h3>
+            <div className="space-y-2 lg:space-y-3 max-h-64 lg:max-h-80 overflow-y-auto">
               {weeklyStats && weeklyStats.length
                 ? weeklyStats.map((day, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors gap-2">
                       <span className="text-sm font-medium text-gray-600">{day.date}</span>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3 sm:space-x-4">
                         <div className="flex items-center">
-                          <div className="w-3 h-3 bg-blue-400 rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-600">{day.shipments} αποστολές</span>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 bg-blue-400 rounded-full mr-2"></div>
+                          <span className="text-xs sm:text-sm text-gray-600">{day.shipments} αποστολές</span>
                         </div>
                         <div className="flex items-center">
-                          <div className="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
-                          <span className="text-sm text-gray-600">{day.delivered} παραδοτέα</span>
+                          <div className="w-2 h-2 sm:w-3 sm:h-3 bg-green-400 rounded-full mr-2"></div>
+                          <span className="text-xs sm:text-sm text-gray-600">{day.delivered} παραδοτέα</span>
                         </div>
                       </div>
                     </div>
@@ -367,15 +367,15 @@ export default function Dashboard(props) {
         </div>
 
         {/* Recent Shipments (EAGER) & Courier performance (LAZY) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           <div className="bg-white rounded-lg shadow-sm border">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">🚢 Πρόσφατες Αποστολές</h3>
-              <Link href={route('shipments.index')} className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+            <div className="px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-base lg:text-lg font-semibold">🚢 Πρόσφατες Αποστολές</h3>
+              <Link href={route('shipments.index')} className="text-blue-600 hover:text-blue-800 text-xs lg:text-sm font-medium">
                 Προβολή όλων →
               </Link>
             </div>
-            <div className="p-6">
+            <div className="p-4 lg:p-6">
               <div className="space-y-4">
                 {recentShipments?.length
                   ? recentShipments.slice(0, 5).map((s) => (
@@ -405,29 +405,29 @@ export default function Dashboard(props) {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold">🚚 Απόδοση Courier</h3>
+            <div className="px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200">
+              <h3 className="text-base lg:text-lg font-semibold">🚚 Απόδοση Courier</h3>
             </div>
-            <div className="p-6">
+            <div className="p-4 lg:p-6">
               <div className="space-y-4">
                 {courierStats?.length
                   ? courierStats.slice(0, 4).map((c, i) => (
                       <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors gap-3">
                         <div className="flex items-center">
-                          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
-                            <span className="text-sm font-bold text-blue-700">{c.code}</span>
+                          <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-3 flex-shrink-0">
+                            <span className="text-xs lg:text-sm font-bold text-blue-700">{c.code}</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium text-gray-900 truncate">{c.name}</p>
-                            <p className="text-sm text-gray-500">Σύνολο: <span className="font-medium">{c.total_shipments}</span> αποστολές</p>
+                            <p className="font-medium text-gray-900 truncate text-sm lg:text-base">{c.name}</p>
+                            <p className="text-xs lg:text-sm text-gray-500">Σύνολο: <span className="font-medium">{c.total_shipments}</span> αποστολές</p>
                           </div>
                         </div>
                         <div className="text-left sm:text-right">
                           <div className="space-y-1">
-                            <p className="text-sm text-green-600">✅ <span className="font-semibold">{c.delivered_shipments}</span> παραδοτέα</p>
-                            <p className="text-sm text-yellow-600">⏳ <span className="font-semibold">{c.pending_shipments}</span> εκρεμότητα</p>
+                            <p className="text-xs lg:text-sm text-green-600">✅ <span className="font-semibold">{c.delivered_shipments}</span> παραδοτέα</p>
+                            <p className="text-xs lg:text-sm text-yellow-600">⏳ <span className="font-semibold">{c.pending_shipments}</span> εκρεμότητα</p>
                             {c.failed_shipments > 0 && (
-                              <p className="text-sm text-red-600">❌ <span className="font-semibold">{c.failed_shipments}</span> αποτυχημένα</p>
+                              <p className="text-xs lg:text-sm text-red-600">❌ <span className="font-semibold">{c.failed_shipments}</span> αποτυχημένα</p>
                             )}
                           </div>
                         </div>
@@ -445,15 +445,15 @@ export default function Dashboard(props) {
 
 function StatCard({ title, value, icon, color = 'blue', subtitle = null }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6 transition-all hover:shadow-md">
+    <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6 transition-all hover:shadow-md">
       <div className="flex items-center">
-        <div className={`flex-shrink-0 w-12 h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
-          <span className="text-2xl">{icon}</span>
+        <div className={`flex-shrink-0 w-10 h-10 lg:w-12 lg:h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
+          <span className="text-xl lg:text-2xl">{icon}</span>
         </div>
-        <div className="ml-4 flex-1">
-          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
+        <div className="ml-3 lg:ml-4 flex-1 min-w-0">
+          <h3 className="text-xs lg:text-sm font-medium text-gray-500 truncate">{title}</h3>
+          <p className="text-xl lg:text-2xl font-bold text-gray-900">{value}</p>
+          {subtitle && <p className="text-xs lg:text-sm text-gray-600 truncate">{subtitle}</p>}
         </div>
       </div>
     </div>
