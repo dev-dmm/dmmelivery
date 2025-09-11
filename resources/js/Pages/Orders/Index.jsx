@@ -1,0 +1,383 @@
+import React, { useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { route } from 'ziggy-js';
+
+export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
+    const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [selectedStatus, setSelectedStatus] = useState(filters.status || '');
+    const [perPage, setPerPage] = useState(filters.per_page || 15);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        
+        const params = new URLSearchParams();
+        if (searchTerm) params.append('search', searchTerm);
+        if (selectedStatus) params.append('status', selectedStatus);
+        if (perPage !== 15) params.append('per_page', perPage);
+
+        router.get(route('orders.index'), Object.fromEntries(params));
+    };
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setSelectedStatus('');
+        setPerPage(15);
+        router.get(route('orders.index'));
+    };
+
+    const getStatusBadge = (status) => {
+        const statusColors = {
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'processing': 'bg-blue-100 text-blue-800',
+            'ready_to_ship': 'bg-purple-100 text-purple-800',
+            'shipped': 'bg-indigo-100 text-indigo-800',
+            'delivered': 'bg-green-100 text-green-800',
+            'cancelled': 'bg-red-100 text-red-800',
+            'failed': 'bg-red-100 text-red-800',
+            'returned': 'bg-gray-100 text-gray-800'
+        };
+        
+        return statusColors[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const getStatusIcon = (status) => {
+        const icons = {
+            'pending': '⏳',
+            'processing': '⚙️',
+            'ready_to_ship': '📦',
+            'shipped': '🚚',
+            'delivered': '✅',
+            'cancelled': '❌',
+            'failed': '⚠️',
+            'returned': '↩️'
+        };
+        return icons[status] || '📋';
+    };
+
+    return (
+        <AuthenticatedLayout
+            header={
+                <h2 className="text-xl font-semibold leading-tight text-gray-800">
+                    📦 Orders
+                </h2>
+            }
+        >
+            <Head title="Orders" />
+
+            <div className="py-12">
+                <div className="mx-auto space-y-6">
+                    
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="p-6">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <span className="text-blue-600 font-bold">📋</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-gray-500 truncate">Total Orders</dt>
+                                            <dd className="text-lg font-medium text-gray-900">{stats.total}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="p-6">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                                            <span className="text-yellow-600 font-bold">⏳</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-gray-500 truncate">Pending</dt>
+                                            <dd className="text-lg font-medium text-gray-900">{stats.pending}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="p-6">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <span className="text-blue-600 font-bold">⚙️</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-gray-500 truncate">Processing</dt>
+                                            <dd className="text-lg font-medium text-gray-900">{stats.processing}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="p-6">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                                            <span className="text-indigo-600 font-bold">🚚</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-gray-500 truncate">Shipped</dt>
+                                            <dd className="text-lg font-medium text-gray-900">{stats.shipped}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="p-6">
+                                <div className="flex items-center">
+                                    <div className="flex-shrink-0">
+                                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                            <span className="text-green-600 font-bold">✅</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-5 w-0 flex-1">
+                                        <dl>
+                                            <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                                            <dd className="text-lg font-medium text-gray-900">{stats.completed}</dd>
+                                        </dl>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div className="p-6">
+                            <form onSubmit={handleSearch} className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search</label>
+                                        <input
+                                            type="text"
+                                            id="search"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            placeholder="Order number, customer name, email..."
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                                        <select
+                                            id="status"
+                                            value={selectedStatus}
+                                            onChange={(e) => setSelectedStatus(e.target.value)}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        >
+                                            <option value="">All Statuses</option>
+                                            {Object.entries(statusOptions).map(([value, label]) => (
+                                                <option key={value} value={value}>{label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="per_page" className="block text-sm font-medium text-gray-700">Per Page</label>
+                                        <select
+                                            id="per_page"
+                                            value={perPage}
+                                            onChange={(e) => setPerPage(e.target.value)}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                        >
+                                            <option value="15">15</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-end space-x-2">
+                                        <button
+                                            type="submit"
+                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                                        >
+                                            Search
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={clearFilters}
+                                            className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md text-sm font-medium"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Orders Table */}
+                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Order
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Customer
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Total
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Items
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Created
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {orders.data.length > 0 ? (
+                                        orders.data.map((order) => (
+                                            <tr key={order.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        #{order.order_number}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        ID: {order.external_order_id}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-medium text-gray-900">
+                                                        {order.customer_name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {order.customer_email}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.status)}`}>
+                                                        {getStatusIcon(order.status)} {statusOptions[order.status] || order.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    €{parseFloat(order.total_amount).toFixed(2)}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {order.items?.length || 0} items
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {new Date(order.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <Link
+                                                        href={route('orders.show', order.id)}
+                                                        className="text-indigo-600 hover:text-indigo-900"
+                                                    >
+                                                        View
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="7" className="px-6 py-12 text-center">
+                                                <div className="text-gray-500">
+                                                    <div className="text-4xl mb-4">📦</div>
+                                                    <h3 className="text-lg font-medium">No orders found</h3>
+                                                    <p className="text-sm mt-2">
+                                                        {filters.search || filters.status 
+                                                            ? 'Try adjusting your filters or search terms.'
+                                                            : 'Orders will appear here when they are created or imported.'
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        {orders.data.length > 0 && (
+                            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                                <div className="flex-1 flex justify-between sm:hidden">
+                                    {orders.prev_page_url && (
+                                        <Link
+                                            href={orders.prev_page_url}
+                                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                        >
+                                            Previous
+                                        </Link>
+                                    )}
+                                    {orders.next_page_url && (
+                                        <Link
+                                            href={orders.next_page_url}
+                                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                        >
+                                            Next
+                                        </Link>
+                                    )}
+                                </div>
+                                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-700">
+                                            Showing <span className="font-medium">{orders.from}</span> to{' '}
+                                            <span className="font-medium">{orders.to}</span> of{' '}
+                                            <span className="font-medium">{orders.total}</span> results
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                                            {orders.links.map((link, index) => (
+                                                <Link
+                                                    key={index}
+                                                    href={link.url || '#'}
+                                                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                                        link.active
+                                                            ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                                            : link.url
+                                                            ? 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                                            : 'bg-white border-gray-300 text-gray-300 cursor-not-allowed'
+                                                    } ${index === 0 ? 'rounded-l-md' : ''} ${
+                                                        index === orders.links.length - 1 ? 'rounded-r-md' : ''
+                                                    }`}
+                                                    preserveState
+                                                    preserveScroll
+                                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                                />
+                                            ))}
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </AuthenticatedLayout>
+    );
+}

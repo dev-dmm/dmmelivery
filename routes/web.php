@@ -16,6 +16,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OrderImportController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\OrderController;
 
 // -----------------------------
 // Feature flags / helpers
@@ -100,7 +101,7 @@ Route::prefix('onboarding')
         Route::get('/welcome',     [OnboardingController::class, 'welcome'])->name('welcome');
 
         Route::get('/profile',     [OnboardingController::class, 'profile'])->name('profile');
-        Route::post('/profile',    [OnboardingController::class, 'updateProfile'])->name('profile.update');
+        Route::post('/profile',    [OnboardingController::class, 'updateProfile'])->name('onboarding.profile.update');
 
         Route::get('/branding',    [OnboardingController::class, 'branding'])->name('branding');
         Route::post('/branding',   [OnboardingController::class, 'updateBranding'])->name('branding.update');
@@ -135,6 +136,10 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     // Performance view
     Route::get('/courier-performance', [DashboardController::class, 'courierPerformance'])
         ->name('courier.performance');
+
+    // Orders (tenant-scoped)
+    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
 
     // Shipments (IDOR protection via model binding + policy)
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');

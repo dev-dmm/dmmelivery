@@ -14,15 +14,29 @@ class ShipmentController extends Controller
 {
     public function index(Request $request): Response
     {
-        $shipments = QueryBuilder::for(
-                Shipment::select([
-                    'id','tracking_number','order_id','status',
-                    'estimated_delivery','created_at','updated_at',
-                    'customer_id','courier_id','shipping_address',
-                    'billing_address','weight',
-                    'shipping_cost','courier_tracking_id',
-                ])
-            )
+        // Get the authenticated user and their tenant
+        $user = $request->user();
+        
+        if (!$user || !$user->tenant) {
+            return redirect()->route('login')
+                ->with('error', 'Unable to identify your tenant. Please log in again.');
+        }
+
+        $tenantId = $user->tenant->id;
+        
+        // Bind tenant to container for this request if not already bound
+        if (!app()->bound('tenant')) {
+            app()->instance('tenant', $user->tenant);
+        }
+    
+        $base = \App\Models\Shipment::select([
+            'id','tracking_number','order_id','status',
+            'estimated_delivery','created_at','updated_at',
+            'customer_id','courier_id','shipping_address',
+            'billing_address','weight','shipping_cost','courier_tracking_id',
+        ])->when($tenantId, fn($q) => $q->where('tenant_id', $tenantId));
+    
+        $shipments = QueryBuilder::for($base)
             ->with([
                 'customer:id,name,email,phone',
                 'courier:id,name,code,tracking_url_template',
@@ -32,30 +46,27 @@ class ShipmentController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::callback('courier', function ($query, $value) {
                     if (!filled($value)) return;
-                    $query->whereHas('courier', function ($q) use ($value) {
-                        $q->where('name', 'like', "%{$value}%")
-                          ->orWhere('code', 'like', "%{$value}%");
-                    });
+                    $query->whereHas('courier', fn($q) =>
+                        $q->where('name','like',"%{$value}%")
+                          ->orWhere('code','like',"%{$value}%"));
                 }),
                 AllowedFilter::callback('customer', function ($query, $value) {
                     if (!filled($value)) return;
-                    $query->whereHas('customer', function ($q) use ($value) {
-                        $q->where('name', 'like', "%{$value}%")
-                          ->orWhere('email', 'like', "%{$value}%");
-                    });
+                    $query->whereHas('customer', fn($q) =>
+                        $q->where('name','like',"%{$value}%")
+                          ->orWhere('email','like',"%{$value}%"));
                 }),
             ])
-            ->allowedSorts(['created_at', 'status', 'tracking_number', 'estimated_delivery'])
+            ->allowedSorts(['created_at','status','tracking_number','estimated_delivery'])
             ->defaultSort('-created_at')
             ->paginate(20)
             ->withQueryString()
-            // keep paginator shape while transforming items:
-            ->through(fn ($shipment) => new ShipmentResource($shipment));
-
+            ->through(fn($s) => new ShipmentResource($s));
+    
         return Inertia::render('Shipments/Index', [
             'shipments' => $shipments,
-            'filters'   => $request->only([
-                'filter.tracking_number', 'filter.status', 'filter.courier', 'filter.customer',
+            'filters' => $request->only([
+                'filter.tracking_number','filter.status','filter.courier','filter.customer',
             ]),
         ]);
     }

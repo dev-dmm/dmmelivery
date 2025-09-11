@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
+import { route } from 'ziggy-js';
 import { useState } from 'react';
 
 export default function CourierPerformance({ 

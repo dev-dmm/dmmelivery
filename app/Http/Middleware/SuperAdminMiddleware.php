@@ -26,17 +26,6 @@ class SuperAdminMiddleware
             return $next($request);
         }
         
-        // Fallback: Check by specific emails for backward compatibility
-        $superAdminEmails = [
-            'admin@dmm.gr',
-            'dev@dmm.gr',
-            'super@dmm.gr'
-        ];
-        
-        if (in_array($user->email, $superAdminEmails)) {
-            return $next($request);
-        }
-        
         abort(403, 'Access denied. Super admin privileges required.');
     }
 }

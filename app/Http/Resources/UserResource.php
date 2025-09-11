@@ -18,11 +18,8 @@ class UserResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            // Only include email if user is viewing their own profile or is admin
-            'email' => $this->when(
-                $request->user()?->id === $this->id || $request->user()?->isAdmin(),
-                $this->email
-            ),
+            // Always include email for authenticated user viewing their own data
+            'email' => $this->email,
             // Role as boolean abilities using Gates
             'abilities' => [
                 'is_admin' => $this->isAdmin(),

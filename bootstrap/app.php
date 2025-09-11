@@ -4,9 +4,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
-use App\Http\Middleware\IdentifyTenant;
-use App\Jobs\FetchCourierStatuses;
-use App\Http\Middleware\TenantScope; 
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,21 +13,23 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // ✅ Register the alias 'tenant'
+        // Aliases (optional if you use them in routes)
         $middleware->alias([
-            'tenant.scope' => \App\Http\Middleware\TenantScope::class,
+            'tenant.scope'    => \App\Http\Middleware\TenantScope::class,
             'identify.tenant' => \App\Http\Middleware\IdentifyTenant::class,
-            'super.admin' => \App\Http\Middleware\SuperAdminMiddleware::class,
+            'super.admin'     => \App\Http\Middleware\SuperAdminMiddleware::class,
         ]);
 
-        // 🔓 CSRF exceptions for API testing  
+        // CSRF exceptions (keep your own)
         $middleware->validateCsrfTokens(except: [
             '/api/test/courier-api',
-            'api/acs/update-credentials', // ACS test endpoint
-            'api/acs/get-credentials', // ACS get endpoint
-            'api/woocommerce/order', // WooCommerce webhook endpoint
-            'settings/api/generate', // Temporary: API token generation for local dev
+            'api/acs/update-credentials',
+            'api/acs/get-credentials',
+            'api/woocommerce/order',
+            'settings/api/generate',
         ]);
+
+        // Tenant middleware is applied per-route, not globally
 
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
@@ -38,9 +37,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        // ⏰ Schedule background job to run every 10 minutes
-        $schedule->job(new FetchCourierStatuses)->everyTenMinutes();
+        $schedule->job(new \App\Jobs\FetchCourierStatuses)->everyTenMinutes();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
-    })->create();
+    })
+    ->create();

@@ -25,7 +25,13 @@ export default function ACSCredentials() {
 
     const fetchCurrentCredentials = async () => {
         try {
-            const response = await fetch('/api/acs/get-credentials');
+            const response = await fetch('/api/acs/get-credentials', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+                },
+            });
             if (response.ok) {
                 const data = await response.json();
                 setCurrentCreds(data);

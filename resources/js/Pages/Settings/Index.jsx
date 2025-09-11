@@ -29,8 +29,14 @@ class ApiService {
   initCSRFToken() {
     if (typeof document !== 'undefined') {
       const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-      if (!token) console.warn('CSRF token not found in meta tags');
-      this.csrfToken = token || null;
+      if (!token) {
+        console.warn('CSRF token not found in meta tags');
+        // Try to get it from the page props or other sources
+        const pageToken = document.querySelector('input[name="_token"]')?.value;
+        this.csrfToken = pageToken || null;
+      } else {
+        this.csrfToken = token;
+      }
     }
   }
 
@@ -48,16 +54,21 @@ class ApiService {
 
   async post(endpoint, data = {}, additionalHeaders = {}) {
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(this.csrfToken ? { 'X-CSRF-TOKEN': this.csrfToken } : {}),
+        ...additionalHeaders,
+      };
+      
+      console.log('API Post Headers:', headers);
+      console.log('CSRF Token:', this.csrfToken);
+      
       const response = await fetch(this.resolveUrl(endpoint), {
         method: 'POST',
         credentials: 'same-origin', // ✅ send your session cookie (fixes 419)
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          ...(this.csrfToken ? { 'X-CSRF-TOKEN': this.csrfToken } : {}),
-          ...additionalHeaders,
-        },
+        headers,
         body: JSON.stringify(data),
       });
 
@@ -231,7 +242,9 @@ export default function SettingsIndex({
         send_notifications: formData.send_notifications,
       };
 
-      const result = await apiService.post(route('settings.business.update'), payload);
+      const routeUrl = route('settings.business.update');
+      console.log('Posting to:', routeUrl, 'with payload:', payload);
+      const result = await apiService.post(routeUrl, payload);
 
       if (result?.success) {
         showMessage('business', result.message || 'Business settings updated successfully', 'success');

@@ -5,6 +5,8 @@ import TextInput from '@/Components/TextInput';
 import { Transition } from '@headlessui/react';
 import { Link, useForm, usePage } from '@inertiajs/react';
 
+import { route } from 'ziggy-js';
+
 export default function UpdateProfileInformation({
     mustVerifyEmail,
     status,
@@ -14,14 +16,15 @@ export default function UpdateProfileInformation({
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
-            name: user.name,
-            email: user.email,
+            name: user?.name || '',
+            email: user?.email || '',
         });
 
     const submit = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'));
+        // Temporary workaround: use direct URL instead of route helper
+        patch('/profile');
     };
 
     return (

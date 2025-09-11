@@ -21,32 +21,39 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        $isSuperAdminRoute = $request->routeIs('super-admin.*');
-                
+
         return array_merge(parent::share($request), [
             'auth' => [
-                // Lean user data using Resource
                 'user' => $user ? new UserResource($user) : null,
-                
-                // Boolean abilities using Gates
                 'abilities' => $user ? [
-                    'manageUsers' => Gate::allows('manage-users'),
-                    'manageTenants' => Gate::allows('manage-tenants'),
-                    'viewReports' => Gate::allows('view-reports'),
+                    'manageUsers'      => Gate::allows('manage-users'),
+                    'manageTenants'    => Gate::allows('manage-tenants'),
+                    'viewReports'      => Gate::allows('view-reports'),
                     'accessSuperAdmin' => Gate::allows('access-super-admin'),
-                    'manageSettings' => Gate::allows('manage-settings'),
+                    'manageSettings'   => Gate::allows('manage-settings'),
                 ] : [],
-                
-                // Minimal tenant context - only when needed
-                'tenant' => ($user && !$isSuperAdminRoute && $user->tenant) 
-                    ? new TenantResource($user->tenant) 
-                    : null,
             ],
+
+            // ✅ Share tenant - try container first, then user relationship
+            'tenant' => function () use ($user) {
+                // First try the bound tenant from container
+                if (app()->bound('tenant')) {
+                    return new TenantResource(app('tenant'));
+                }
+                
+                // Fallback to user's tenant if user is authenticated
+                if ($user && $user->tenant) {
+                    return new TenantResource($user->tenant);
+                }
+                
+                return null;
+            },
+
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
-                'error' => fn () => $request->session()->get('error'),
+                'error'   => fn () => $request->session()->get('error'),
             ],
-            // Ziggy configuration (filtered by config/ziggy.php and blade template)
+
             'ziggy' => function () use ($request) {
                 return array_merge((new Ziggy)->toArray(), [
                     'location' => $request->url(),
