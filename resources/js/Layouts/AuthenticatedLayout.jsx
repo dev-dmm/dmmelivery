@@ -9,8 +9,8 @@ import { useState } from 'react';
 
 export default function AuthenticatedLayout({ header, children }) {
   const { props } = usePage();
-  const user   = props?.auth?.user;
-  const tenant = props?.auth?.tenant ?? props?.tenant; // support both shapes
+  const user   = props?.auth?.user?.data || props?.auth?.user;
+  const tenant = props?.auth?.tenant?.data || props?.auth?.tenant || props?.tenant?.data || props?.tenant;
   const ziggyRoutes = props?.ziggy?.routes || {};
   const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
 
@@ -30,7 +30,25 @@ export default function AuthenticatedLayout({ header, children }) {
 
   function handleLogout(e) {
     e.preventDefault();
-    router.post(route('logout')); // sends CSRF + session cookie
+    
+    // Get CSRF token from meta tag
+    const token = document.head.querySelector('meta[name="csrf-token"]');
+    if (!token) {
+      console.error('CSRF token not found');
+      return;
+    }
+    
+    router.post(route('logout'), {}, {
+      headers: {
+        'X-CSRF-TOKEN': token.content,
+      },
+      onError: (errors) => {
+        console.error('Logout error:', errors);
+      },
+      onSuccess: () => {
+        console.log('Logout successful');
+      }
+    });
   }
 
   return (

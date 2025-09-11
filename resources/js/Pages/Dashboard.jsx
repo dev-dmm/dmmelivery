@@ -29,7 +29,7 @@ export default function Dashboard(props) {
     recentShipments,
     selectedPeriod,
     periodOptions,
-    tenant,
+    tenant: tenantProp,
     weeklyStats,           // LAZY (null on first render)
     chartData,             // LAZY
     courierStats,          // LAZY
@@ -38,14 +38,15 @@ export default function Dashboard(props) {
     customEnd,
   } = props;
 
+  // Extract tenant data from resource wrapper
+  const tenant = tenantProp?.data || tenantProp;
+
   // Get shared tenant from page props as fallback
   const page = usePage();
-  const sharedTenant = page.props.tenant;
+  const sharedTenant = page.props.tenant?.data || page.props.tenant;
   const effectiveTenantName = tenant?.name ?? sharedTenant?.name ?? 'Your eShop';
 
-  // Debug logging
-  console.log('Dashboard props:', { tenant, sharedTenant, effectiveTenantName });
-  console.log('Full page props:', page.props);
+  // Debug logging removed for production
 
   const [isChangingPeriod, setIsChangingPeriod] = useState(false);
   

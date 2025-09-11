@@ -30,8 +30,18 @@ export default function DeleteUserForm({ className = '' }) {
     const deleteUser = (e) => {
         e.preventDefault();
 
+        // Get CSRF token from meta tag
+        const token = document.head.querySelector('meta[name="csrf-token"]');
+        if (!token) {
+            console.error('CSRF token not found for profile delete');
+            return;
+        }
+
         destroy(route('profile.destroy'), {
             preserveScroll: true,
+            headers: {
+                'X-CSRF-TOKEN': token.content,
+            },
             onSuccess: () => closeModal(),
             onError: () => passwordInput.current.focus(),
             onFinish: () => reset(),

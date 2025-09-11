@@ -20,6 +20,8 @@ class UserResource extends JsonResource
             'name' => $this->name,
             // Always include email for authenticated user viewing their own data
             'email' => $this->email,
+            // Include role field
+            'role' => $this->role,
             // Role as boolean abilities using Gates
             'abilities' => [
                 'is_admin' => $this->isAdmin(),

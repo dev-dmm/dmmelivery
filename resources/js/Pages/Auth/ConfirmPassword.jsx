@@ -13,7 +13,17 @@ export default function ConfirmPassword() {
     const submit = (e) => {
         e.preventDefault();
 
+        // Get CSRF token from meta tag
+        const token = document.head.querySelector('meta[name="csrf-token"]');
+        if (!token) {
+            console.error('CSRF token not found for password confirmation');
+            return;
+        }
+
         post(route('password.confirm'), {
+            headers: {
+                'X-CSRF-TOKEN': token.content,
+            },
             onFinish: () => reset('password'),
         });
     };

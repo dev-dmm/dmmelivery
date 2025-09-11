@@ -30,7 +30,7 @@
         'password.update',
         'password.confirm',
 
-        'profile.edit',
+        'profile.*',
 
         // App sections
         'shipments.*',
@@ -53,28 +53,8 @@
       $ziggy = new \Tighten\Ziggy\Ziggy();
       $ziggy = $ziggy->filter($routeFilters);
     @endphp
-    <script>
-      window.Ziggy = {!! $ziggy->toJson() !!};
-      
-      // Simple route function implementation
-      window.route = function(name, params = {}) {
-        const routes = window.Ziggy.routes;
-        if (!routes[name]) {
-          console.error('Route not found:', name);
-          return '#';
-        }
-        
-        let url = window.Ziggy.url + '/' + routes[name].uri;
-        
-        // Replace route parameters
-        Object.keys(params).forEach(key => {
-          url = url.replace('{' + key + '}', params[key]);
-          url = url.replace('{' + key + '?}', params[key]); // optional parameters
-        });
-        
-        return url;
-      };
-    </script>
+    <script>window.Ziggy = {!! $ziggy->toJson() !!};</script>
+    @routes  {{-- ✅ inject ziggy-js route() properly --}}
 
     @viteReactRefresh
     @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])

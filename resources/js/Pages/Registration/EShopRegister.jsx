@@ -97,7 +97,19 @@ export default function EShopRegister({ businessTypes, subscriptionPlans }) {
 
     const submit = (e) => {
         e.preventDefault();
-        post(route('registration.submit'));
+        
+        // Get CSRF token from meta tag
+        const token = document.head.querySelector('meta[name="csrf-token"]');
+        if (!token) {
+            console.error('CSRF token not found for eShop registration');
+            return;
+        }
+        
+        post(route('registration.submit'), {
+            headers: {
+                'X-CSRF-TOKEN': token.content,
+            },
+        });
     };
 
     const nextStep = () => {

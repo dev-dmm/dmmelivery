@@ -20,7 +20,18 @@ export default function Login({ status, canResetPassword }) {
         e.preventDefault();
         setLoginAttempted(true);
 
+        // Get CSRF token from meta tag
+        const token = document.head.querySelector('meta[name="csrf-token"]');
+        if (!token) {
+            console.error('CSRF token not found for login');
+            setLoginAttempted(false);
+            return;
+        }
+
         post(route('login'), {
+            headers: {
+                'X-CSRF-TOKEN': token.content,
+            },
             onStart: () => {
                 console.log('Login attempt starting...');
             },

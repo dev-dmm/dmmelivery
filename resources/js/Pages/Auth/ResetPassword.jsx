@@ -16,7 +16,17 @@ export default function ResetPassword({ token, email }) {
     const submit = (e) => {
         e.preventDefault();
 
+        // Get CSRF token from meta tag
+        const token = document.head.querySelector('meta[name="csrf-token"]');
+        if (!token) {
+            console.error('CSRF token not found for password reset');
+            return;
+        }
+
         post(route('password.store'), {
+            headers: {
+                'X-CSRF-TOKEN': token.content,
+            },
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };
