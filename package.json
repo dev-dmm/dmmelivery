@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "serve": "php artisan serve",
+        "start": "concurrently \"npm run serve\" \"npm run dev\" --names \"Laravel,Vite\" --prefix-colors \"blue,green\""
     },
     "devDependencies": {
         "@headlessui/react": "^2.2.4",

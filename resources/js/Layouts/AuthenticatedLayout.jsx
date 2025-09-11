@@ -15,8 +15,14 @@ export default function AuthenticatedLayout({ header, children }) {
   const [showingNavigationDropdown, setShowingNavigationDropdown] = useState(false);
 
   // Safe route-existence check using routes shared via HandleInertiaRequests
-  const hasRoute = (name) => !!ziggyRoutes[name];
-
+  const hasRoute = (name) => {
+    try {
+      if (typeof route().has === 'function') return route().has(name);
+    } catch (_) {
+      /* fall through */
+    }
+    return !!ziggyRoutes[name]; // ziggyRoutes = usePage().props?.ziggy?.routes || {}
+  };
   const isSuperAdmin = () => {
     if (!user) return false;
     return user.role === 'super_admin';

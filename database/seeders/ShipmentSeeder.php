@@ -17,15 +17,27 @@ class ShipmentSeeder extends Seeder
     public function run(): void
     {
         // Clear existing demo data to avoid conflicts
-        \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        \App\Models\NotificationLog::truncate();
-        \App\Models\ShipmentStatusHistory::truncate();
-        \App\Models\Shipment::truncate();
-        \App\Models\Customer::truncate();
-        \App\Models\Courier::truncate();
-        \App\Models\User::truncate();
-        \App\Models\Tenant::truncate();
-        \DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (\DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't support foreign key checks, so we can just truncate
+            \App\Models\NotificationLog::truncate();
+            \App\Models\ShipmentStatusHistory::truncate();
+            \App\Models\Shipment::truncate();
+            \App\Models\Customer::truncate();
+            \App\Models\Courier::truncate();
+            \App\Models\User::truncate();
+            \App\Models\Tenant::truncate();
+        } else {
+            // MySQL/PostgreSQL
+            \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            \App\Models\NotificationLog::truncate();
+            \App\Models\ShipmentStatusHistory::truncate();
+            \App\Models\Shipment::truncate();
+            \App\Models\Customer::truncate();
+            \App\Models\Courier::truncate();
+            \App\Models\User::truncate();
+            \App\Models\Tenant::truncate();
+            \DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        }
         
         // Create demo eShop tenants
         $demoTenants = [

@@ -12,8 +12,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Change the role column from ENUM to VARCHAR to support more roles
-        DB::statement("ALTER TABLE users MODIFY COLUMN role VARCHAR(50) NOT NULL DEFAULT 'user'");
+        // SQLite doesn't support MODIFY COLUMN, so we need to recreate the table
+        if (DB::getDriverName() === 'sqlite') {
+            // For SQLite, we need to recreate the table
+            Schema::table('users', function (Blueprint $table) {
+                $table->dropColumn('role');
+            });
+            
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('role', 50)->default('user')->after('phone');
+            });
+        } else {
+            // For MySQL/PostgreSQL
+            DB::statement("ALTER TABLE users MODIFY COLUMN role VARCHAR(50) NOT NULL DEFAULT 'user'");
+        }
     }
 
     /**
