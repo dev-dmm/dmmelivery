@@ -28,6 +28,10 @@ export default function Login({ status, canResetPassword }) {
             return;
         }
 
+        console.log('Using CSRF token:', token.content);
+        console.log('Current URL:', window.location.href);
+        console.log('Session cookie:', document.cookie);
+
         post(route('login'), {
             headers: {
                 'X-CSRF-TOKEN': token.content,

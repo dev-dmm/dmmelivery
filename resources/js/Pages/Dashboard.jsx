@@ -55,6 +55,15 @@ export default function Dashboard(props) {
   const [range, setRange] = useState({});
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // ---------- On first mount, fetch lazy props
   useEffect(() => {
@@ -186,15 +195,15 @@ export default function Dashboard(props) {
             <p className="text-sm text-gray-500 mt-1">Παρακολουθήστε την απόδοση των αποστολών και τις ειδοποιήσεις πελατών</p>
           </div>
 
-          <div className="flex items-end space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:space-x-4">
             {/* Period selector */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <label className="block text-sm font-medium text-gray-700 mb-1">📅 Χρονική Περίοδος</label>
               <select
                 value={selectedPeriod}
                 onChange={(e) => handlePeriodChange(e.target.value)}
                 disabled={isChangingPeriod}
-                className="block w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="block w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {Object.entries(periodOptions).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -211,7 +220,7 @@ export default function Dashboard(props) {
             </div>
 
             {/* Custom Range Picker */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 🗓️ Προσαρμοσμένη Περίοδος
               </label>
@@ -219,7 +228,7 @@ export default function Dashboard(props) {
               <button
                 type="button"
                 onClick={() => setIsPickerOpen((v) => !v)}
-                className="w-64 inline-flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm hover:bg-gray-50"
+                className="w-full sm:w-64 inline-flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm hover:bg-gray-50"
               >
                 <span className="truncate">{prettyRange()}</span>
                 <svg className={`w-4 h-4 transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -228,13 +237,13 @@ export default function Dashboard(props) {
               </button>
 
               {isPickerOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-[620px] bg-white border rounded-lg shadow-lg p-4">
+                <div className="absolute right-0 sm:right-0 left-0 sm:left-auto z-20 mt-2 w-full sm:w-[620px] bg-white border rounded-lg shadow-lg p-4">
                   <div className="flex flex-col lg:flex-row gap-4">
                     {/* Calendar */}
-                    <div className="border rounded-md p-2">
+                    <div className="border rounded-md p-2 overflow-x-auto">
                       <DayPicker
                         mode="range"
-                        numberOfMonths={2}
+                        numberOfMonths={isMobile ? 1 : 2}
                         selected={range}
                         onSelect={setRange}
                         weekStartsOn={1}
@@ -301,7 +310,7 @@ export default function Dashboard(props) {
 
             <Link
               href={route('shipments.index')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors w-full sm:w-auto"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
