@@ -126,10 +126,6 @@ class Order extends Model
         return $this->hasMany(Shipment::class, 'order_id');
     }
 
-    public function importLog(): BelongsTo
-    {
-        return $this->belongsTo(ImportLog::class);
-    }
 
     // Status Methods
     public function isPending(): bool
