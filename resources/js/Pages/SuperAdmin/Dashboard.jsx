@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Head, Link } from '@inertiajs/react';
-import { Inertia } from '@inertiajs/inertia';
+import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function SuperAdminDashboard({ auth, stats, recentOrders, topTenants }) {
@@ -9,7 +8,7 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
     const missing = [];
     if (typeof recentOrders === 'undefined') missing.push('recentOrders');
     if (typeof topTenants === 'undefined') missing.push('topTenants');
-    if (missing.length) Inertia.reload({ only: missing });
+    if (missing.length) router.reload({ only: missing });
   }, [recentOrders, topTenants]);
 
   // ---- Safe defaults / helpers ----
