@@ -125,7 +125,8 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                             </div>
                             <div className="p-6">
                                 <div className="space-y-4">
-                                    {recentOrders.map((order) => (
+                                    {recentOrders && Array.isArray(recentOrders) && recentOrders.length
+                                        ? recentOrders.map((order) => (
                                         <div key={order.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
@@ -151,12 +152,13 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                                                 </div>
                                                 {order.shipments && order.shipments.length > 0 && (
                                                     <div className="mt-2 text-xs text-gray-500">
-                                                        Shipments: {order.shipments.map(s => s.tracking_number).join(', ')}
+                                                        Shipments: {order.shipments && Array.isArray(order.shipments) ? order.shipments.map(s => s.tracking_number).join(', ') : 'No shipments'}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                    ))}
+                                        ))
+                                        : <p className="text-gray-500 text-center py-8">No recent orders</p>}
                                 </div>
                             </div>
                         </div>
@@ -176,7 +178,8 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                             </div>
                             <div className="p-6">
                                 <div className="space-y-4">
-                                    {topTenants.map((tenant, index) => (
+                                    {topTenants && Array.isArray(topTenants) && topTenants.length
+                                        ? topTenants.map((tenant, index) => (
                                         <div key={tenant.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                                             <div className="flex items-center">
                                                 <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -203,7 +206,8 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                                                 </Link>
                                             </div>
                                         </div>
-                                    ))}
+                                        ))
+                                        : <p className="text-gray-500 text-center py-8">No tenants data</p>}
                                 </div>
                             </div>
                         </div>
