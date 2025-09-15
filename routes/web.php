@@ -176,7 +176,29 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
             ->name('import.field-mapping');
     });
 
-        Route::middleware('throttle:30,1')->group(function () {
+    // Courier Reports Import (constrain params + throttle)
+    Route::prefix('courier-reports')->name('courier-reports.')->group(function () {
+        Route::get('/import',                 [\App\Http\Controllers\CourierReportImportController::class, 'index'])->name('import.index');
+        Route::post('/import/upload',         [\App\Http\Controllers\CourierReportImportController::class, 'uploadFile'])->name('import.upload');
+
+        Route::get('/import/{uuid}/status',   [\App\Http\Controllers\CourierReportImportController::class, 'getStatus'])
+            ->whereUuid('uuid')->name('import.status');
+
+        Route::get('/import/{uuid}/details',  [\App\Http\Controllers\CourierReportImportController::class, 'getDetails'])
+            ->whereUuid('uuid')->name('import.details');
+
+        Route::post('/import/{uuid}/cancel',  [\App\Http\Controllers\CourierReportImportController::class, 'cancel'])
+            ->whereUuid('uuid')->name('import.cancel');
+
+        Route::delete('/import/{uuid}',       [\App\Http\Controllers\CourierReportImportController::class, 'delete'])
+            ->whereUuid('uuid')->name('import.delete');
+
+        Route::get('/import/template/{format}', [\App\Http\Controllers\CourierReportImportController::class, 'downloadTemplate'])
+            ->whereIn('format', ['csv','xlsx','xls'])
+            ->name('import.template');
+    });
+
+    Route::middleware('throttle:30,1')->group(function () {
             Route::get('/test/courier-api', function () {
                 $sampleShipments = \App\Models\Shipment::query()
                     ->with('courier:id,name,code')
