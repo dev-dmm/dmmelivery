@@ -22,7 +22,10 @@ class OrderImportController extends Controller
      */
     public function index(): Response
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return redirect()->route('login')->with('error', 'Unable to identify your tenant. Please log in again.');
+        }
         
         // Get recent imports
         $recentImports = ImportLog::forTenant($tenant->id)
@@ -104,7 +107,13 @@ class OrderImportController extends Controller
         }
 
         try {
-            $tenant = Auth::user()->currentTenant();
+            $tenant = app()->has('tenant') ? app('tenant') : null;
+            if (!$tenant) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to identify your tenant. Please log in again.',
+                ], 403);
+            }
             $file = $request->file('file');
             
             // Generate unique filename
@@ -208,7 +217,13 @@ class OrderImportController extends Controller
         }
 
         try {
-            $tenant = Auth::user()->currentTenant();
+            $tenant = app()->has('tenant') ? app('tenant') : null;
+            if (!$tenant) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to identify your tenant. Please log in again.',
+                ], 403);
+            }
             $orders = $request->input('orders');
 
             // Create import log
@@ -262,7 +277,13 @@ class OrderImportController extends Controller
      */
     public function getStatus(string $importId): JsonResponse
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to identify your tenant. Please log in again.',
+            ], 403);
+        }
         
         $importLog = ImportLog::where('id', $importId)
             ->where('tenant_id', $tenant->id)
@@ -302,7 +323,13 @@ class OrderImportController extends Controller
      */
     public function getDetails(string $importId): JsonResponse
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to identify your tenant. Please log in again.',
+            ], 403);
+        }
         
         $importLog = ImportLog::where('id', $importId)
             ->where('tenant_id', $tenant->id)
@@ -354,7 +381,13 @@ class OrderImportController extends Controller
      */
     public function cancel(string $importId): JsonResponse
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to identify your tenant. Please log in again.',
+            ], 403);
+        }
         
         $importLog = ImportLog::where('id', $importId)
             ->where('tenant_id', $tenant->id)
@@ -387,7 +420,13 @@ class OrderImportController extends Controller
      */
     public function retry(string $importId): JsonResponse
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to identify your tenant. Please log in again.',
+            ], 403);
+        }
         
         $importLog = ImportLog::where('id', $importId)
             ->where('tenant_id', $tenant->id)
@@ -436,7 +475,13 @@ class OrderImportController extends Controller
      */
     public function delete(string $importId): JsonResponse
     {
-        $tenant = Auth::user()->currentTenant();
+        $tenant = app()->has('tenant') ? app('tenant') : null;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to identify your tenant. Please log in again.',
+            ], 403);
+        }
         
         $importLog = ImportLog::where('id', $importId)
             ->where('tenant_id', $tenant->id)
