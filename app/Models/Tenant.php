@@ -21,6 +21,7 @@ class Tenant extends Model
         'is_active',
         
         // Business Information
+        'business_name',
         'business_type',
         'description',
         'website_url',
@@ -40,6 +41,13 @@ class Tenant extends Model
         // Tax Information
         'vat_number',
         'tax_office',
+        
+        // Business Settings
+        'default_currency',
+        'tax_rate',
+        'shipping_cost',
+        'auto_create_shipments',
+        'send_notifications',
         
         // ACS API Credentials
         'acs_api_key',
@@ -105,6 +113,10 @@ class Tenant extends Model
         'integration_settings' => 'array',
         'onboarding_data' => 'array',
         'is_active' => 'boolean',
+        'auto_create_shipments' => 'boolean',
+        'send_notifications' => 'boolean',
+        'tax_rate' => 'decimal:2',
+        'shipping_cost' => 'decimal:2',
         'onboarding_started_at' => 'datetime',
         'onboarding_completed_at' => 'datetime',
         'email_verified_at' => 'datetime',
