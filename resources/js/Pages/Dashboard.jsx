@@ -345,7 +345,7 @@ export default function Dashboard(props) {
           <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6">
             <h3 className="text-base lg:text-lg font-semibold mb-3 lg:mb-4">📈 Δραστηριότητα Περιόδου</h3>
             <div className="space-y-2 lg:space-y-3 max-h-64 lg:max-h-80 overflow-y-auto">
-              {weeklyStats && weeklyStats.length
+              {weeklyStats && Array.isArray(weeklyStats) && weeklyStats.length
                 ? weeklyStats.map((day, idx) => (
                     <div key={idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors gap-2">
                       <span className="text-sm font-medium text-gray-600">{day.date}</span>
@@ -377,7 +377,7 @@ export default function Dashboard(props) {
             </div>
             <div className="p-4 lg:p-6">
               <div className="space-y-4">
-                {recentShipments?.length
+                {recentShipments && Array.isArray(recentShipments) && recentShipments.length
                   ? recentShipments.slice(0, 5).map((s) => (
                       <div key={s.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors gap-3">
                         <div className="flex items-center">
@@ -410,7 +410,7 @@ export default function Dashboard(props) {
             </div>
             <div className="p-4 lg:p-6">
               <div className="space-y-4">
-                {courierStats?.length
+                {courierStats && Array.isArray(courierStats) && courierStats.length
                   ? courierStats.slice(0, 4).map((c, i) => (
                       <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors gap-3">
                         <div className="flex items-center">

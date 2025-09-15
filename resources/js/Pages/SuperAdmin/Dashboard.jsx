@@ -133,9 +133,9 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                                                         <div className="text-sm font-medium text-gray-900">
                                                             Order #{order.order_number}
                                                         </div>
-                                        <div className="text-sm text-gray-500">
-                                            {order.tenant?.business_name ?? order.tenant?.name} (@{order.tenant?.subdomain})
-                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            {order.tenant?.business_name ?? order.tenant?.name} (@{order.tenant?.subdomain})
+                                                        </div>
                                                         <div className="text-sm text-gray-500">
                                                             {order.customer?.first_name} {order.customer?.last_name}
                                                         </div>
