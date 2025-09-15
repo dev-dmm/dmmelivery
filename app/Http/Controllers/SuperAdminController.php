@@ -125,7 +125,7 @@ class SuperAdminController extends Controller
         $recentOrdersQ = Order::withoutGlobalScopes([TenantScope::class])
             ->with([
                 'tenant:id,name,subdomain,business_name',
-                'customer:id,first_name,last_name,email',
+                'customer:id,name,email',
                 'shipments' => fn ($q) => $q->withoutGlobalScopes([TenantScope::class]),
                 'shipments.courier:id,name,code',
             ])

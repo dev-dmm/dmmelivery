@@ -218,7 +218,7 @@ export default function SuperAdminTenantDetails({ auth, tenant, stats }) {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <div className="text-sm font-medium text-gray-900">
-                                                            {order.customer?.first_name} {order.customer?.last_name}
+                                                            {order.customer?.name ?? '—'}
                                                         </div>
                                                         <div className="text-sm text-gray-500">
                                                             {order.customer?.email}
