@@ -6,19 +6,19 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 export default function SuperAdminDashboard({ auth, stats, recentOrders, topTenants }) {
   // ---- Lazy props: trigger fetch once if missing ----
   useEffect(() => {
-    const missing: string[] = [];
+    const missing = [];
     if (typeof recentOrders === 'undefined') missing.push('recentOrders');
-    if (typeof topTenants   === 'undefined') missing.push('topTenants');
+    if (typeof topTenants === 'undefined') missing.push('topTenants');
     if (missing.length) Inertia.reload({ only: missing });
   }, [recentOrders, topTenants]);
 
   // ---- Safe defaults / helpers ----
-  const s   = stats ?? {};
-  const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
-  const fmt = (v: unknown) => num(v).toLocaleString();
+  const s = stats ?? {};
+  const num = (v) => (typeof v === 'number' ? v : Number(v) || 0);
+  const fmt = (v) => num(v).toLocaleString();
 
   const isLoadingRecent = typeof recentOrders === 'undefined';
-  const isLoadingTop    = typeof topTenants   === 'undefined';
+  const isLoadingTop = typeof topTenants === 'undefined';
 
   const safeRecentOrders = useMemo(
     () => (Array.isArray(recentOrders) ? recentOrders : []),
@@ -30,10 +30,10 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
   );
 
   const hasRoute = typeof route === 'function';
-  const r = (name: string, ...args: any[]) => (hasRoute ? route(name, ...args) : '#');
+  const r = (name, ...args) => (hasRoute ? route(name, ...args) : '#');
 
-  const getStatusBadge = (status?: string) => {
-    const statusColors: Record<string, string> = {
+  const getStatusBadge = (status) => {
+    const statusColors = {
       pending: 'bg-yellow-100 text-yellow-800',
       processing: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
@@ -162,7 +162,7 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                       <LoadingCard /><LoadingCard /><LoadingCard />
                     </>
                   ) : safeRecentOrders.length ? (
-                    safeRecentOrders.map((order: any, index: number) => {
+                    safeRecentOrders.map((order, index) => {
                       const shipments = Array.isArray(order?.shipments) ? order.shipments : [];
                       const total = Number(order?.total_amount ?? 0);
                       return (
@@ -192,7 +192,7 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
 
                             {shipments.length > 0 && (
                               <div className="mt-2 text-xs text-gray-500">
-                                Shipments: {shipments.map((s: any) => s?.tracking_number).filter(Boolean).join(', ')}
+                                Shipments: {shipments.map((s) => s?.tracking_number).filter(Boolean).join(', ')}
                               </div>
                             )}
                           </div>
@@ -223,7 +223,7 @@ export default function SuperAdminDashboard({ auth, stats, recentOrders, topTena
                       <LoadingCard /><LoadingCard /><LoadingCard />
                     </>
                   ) : safeTopTenants.length ? (
-                    safeTopTenants.map((tenant: any, index: number) => (
+                    safeTopTenants.map((tenant, index) => (
                       <div key={tenant?.id ?? `${index}-tenant`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
