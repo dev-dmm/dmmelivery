@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Inertia } from '@inertiajs/inertia';
+import { router } from '@inertiajs/react';
 import { usePage, Link, Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
@@ -11,7 +11,7 @@ export default function SuperAdminDashboard({ auth }) {
     const missing = [];
     if (recentOrders === undefined) missing.push('recentOrders');
     if (topTenants   === undefined) missing.push('topTenants');
-    if (missing.length) Inertia.reload({ only: missing });
+    if (missing.length) router.reload({ only: missing });
   }, [recentOrders, topTenants]);
 
   // Safe helpers
