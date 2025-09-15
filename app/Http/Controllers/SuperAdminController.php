@@ -137,8 +137,7 @@ class SuperAdminController extends Controller
                 ->where('created_at', '>=', now()->subDays(30))])
             ->having('orders_count', '>', 0)
             ->orderBy('orders_count', 'desc')
-            ->limit(10)
-            ->select(['id','name','subdomain']);
+            ->limit(10);
     
         return Inertia::render('SuperAdmin/Dashboard', [
             'stats'        => $stats,                               // eager
