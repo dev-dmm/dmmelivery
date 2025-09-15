@@ -121,39 +121,31 @@ class SuperAdminController extends Controller
     public function dashboard()
     {
         $stats = $this->getOrderStats();
-
-        $recentOrders = Order::withoutGlobalScopes([TenantScope::class])
+    
+        $recentOrdersQ = Order::withoutGlobalScopes([TenantScope::class])
             ->with([
-                'tenant:id,name,subdomain',
-                'customer:id,name,email',
-                // match FE: plural + no scope
-                'shipments' => function ($q) {
-                    $q->withoutGlobalScopes([TenantScope::class]);
-                },
+                'tenant:id,name,subdomain,business_name',
+                'customer:id,first_name,last_name,email',
+                'shipments' => fn ($q) => $q->withoutGlobalScopes([TenantScope::class]),
                 'shipments.courier:id,name,code',
             ])
             ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get();
-
-        $topTenants = Tenant::withoutGlobalScopes([TenantScope::class])
-            ->withCount(['orders' => function ($q) {
-                $q->withoutGlobalScopes([TenantScope::class])
-                  ->where('created_at', '>=', now()->subDays(30));
-            }])
+            ->limit(10);
+    
+        $topTenantsQ = Tenant::withoutGlobalScopes([TenantScope::class])
+            ->withCount(['orders' => fn ($q) => $q->withoutGlobalScopes([TenantScope::class])
+                ->where('created_at', '>=', now()->subDays(30))])
             ->having('orders_count', '>', 0)
             ->orderBy('orders_count', 'desc')
             ->limit(10)
-            ->get(['id', 'name', 'subdomain']);
-
+            ->select(['id','name','subdomain']);
+    
         return Inertia::render('SuperAdmin/Dashboard', [
-            'stats'        => $stats,
-            // Lazy load heavy collections
-            'recentOrders' => Inertia::lazy(fn() => $recentOrders),
-            'topTenants'   => Inertia::lazy(fn() => $topTenants),
+            'stats'        => $stats,                               // eager
+            'recentOrders' => Inertia::lazy(fn() => $recentOrdersQ->get()),
+            'topTenants'   => Inertia::lazy(fn() => $topTenantsQ->get()),
         ]);
     }
-
     /**
      * Tenant details
      */
