@@ -35,8 +35,6 @@
         // App sections
         'shipments.*',
         'settings.*',
-        'onboarding.*',
-        'orders.import.*',
 
         // Courier performance (use the REAL name; change to 'courier-performance' if that's how it's defined)
         'courier.performance',

@@ -13,7 +13,6 @@ use App\Http\Controllers\TenantRegistrationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ACSTestController;
 use App\Http\Controllers\SettingsController;
-use App\Http\Controllers\OrderImportController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OrderController;
@@ -147,34 +146,6 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])
     ->middleware('can:view,shipment')  // ✅ Security maintained via policy
     ->name('shipments.show');
-    // Orders Import (constrain params + throttle)
-    Route::prefix('orders')->name('orders.')->group(function () {
-        Route::get('/import',                 [OrderImportController::class, 'index'])->name('import.index');
-        Route::post('/import/upload',         [OrderImportController::class, 'uploadFile'])->name('import.upload');
-        Route::post('/import/api',            [OrderImportController::class, 'importFromApi'])->name('import.api');
-
-        Route::get('/import/{importId}/status',  [OrderImportController::class, 'getStatus'])
-            ->whereUuid('importId')->name('import.status');
-
-        Route::get('/import/{importId}/details', [OrderImportController::class, 'getDetails'])
-            ->whereUuid('importId')->name('import.details');
-
-        Route::post('/import/{importId}/cancel', [OrderImportController::class, 'cancel'])
-            ->whereUuid('importId')->name('import.cancel');
-
-        Route::post('/import/{importId}/retry',  [OrderImportController::class, 'retry'])
-            ->whereUuid('importId')->name('import.retry');
-
-        Route::delete('/import/{importId}',      [OrderImportController::class, 'delete'])
-            ->whereUuid('importId')->name('import.delete');
-
-        Route::get('/import/template/{format}',  [OrderImportController::class, 'downloadTemplate'])
-            ->whereIn('format', ['csv','xlsx','excel','xml','json']) // ← add these
-            ->name('import.template');
-
-        Route::post('/import/field-mapping',     [OrderImportController::class, 'getFieldMapping'])
-            ->name('import.field-mapping');
-    });
 
     // Courier Reports Import (constrain params + throttle)
     Route::prefix('courier-reports')->name('courier-reports.')->group(function () {

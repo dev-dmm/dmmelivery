@@ -92,12 +92,6 @@ export default function AuthenticatedLayout({ header, children }) {
                   </NavLink>
                 )}
 
-                {hasRoute('orders.import.index') && (
-                  <NavLink href={route('orders.import.index')} active={route().current('orders.import.*')}>
-                    <span className="hidden lg:inline">📥 Order Import</span>
-                    <span className="lg:hidden">📥 Import</span>
-                  </NavLink>
-                )}
 
                 {hasRoute('courier-reports.import.index') && (
                   <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
@@ -253,11 +247,6 @@ export default function AuthenticatedLayout({ header, children }) {
               </ResponsiveNavLink>
             )}
 
-            {hasRoute('orders.import.index') && (
-              <ResponsiveNavLink href={route('orders.import.index')} active={route().current('orders.import.*')}>
-                📥 Order Import
-              </ResponsiveNavLink>
-            )}
 
             {hasRoute('courier-reports.import.index') && (
               <ResponsiveNavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
