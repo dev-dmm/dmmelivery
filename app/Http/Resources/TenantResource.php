@@ -17,6 +17,7 @@ class TenantResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'business_name' => $this->business_name,
             'subdomain' => $this->subdomain,
             'branding' => [
                 'primary_color' => $this->branding_config['primary_color'] ?? '#3B82F6',

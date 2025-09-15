@@ -258,7 +258,7 @@ export default function SuperAdminUsers({ auth, users, tenants, availableRoles, 
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <div className="text-sm font-medium text-gray-900">
-                                                        {user.tenant?.name || 'No Tenant'}
+                                                        {(user.tenant?.business_name ?? user.tenant?.name) || 'No Tenant'}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
                                                         @{user.tenant?.subdomain || 'N/A'}

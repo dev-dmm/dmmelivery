@@ -173,7 +173,7 @@ export default function AuthenticatedLayout({ header, children }) {
                         type="button"
                         className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 hover:text-gray-700"
                       >
-                        {tenant?.name ?? user?.name ?? 'Account'}
+                        {tenant?.business_name ?? tenant?.name ?? user?.name ?? 'Account'}
                         <svg className="-me-0.5 ms-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                           <path
                             fillRule="evenodd"
@@ -310,7 +310,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
           <div className="border-t border-gray-200 pb-1 pt-4">
             <div className="px-4">
-              <div className="text-base font-medium text-gray-800">{tenant?.name ?? user?.name}</div>
+              <div className="text-base font-medium text-gray-800">{tenant?.business_name ?? tenant?.name ?? user?.name}</div>
               <div className="text-sm font-medium text-gray-500">{user?.email}</div>
             </div>
 

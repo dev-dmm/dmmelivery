@@ -44,7 +44,7 @@ export default function Dashboard(props) {
   // Get shared tenant from page props as fallback
   const page = usePage();
   const sharedTenant = page.props.tenant?.data || page.props.tenant;
-  const effectiveTenantName = tenant?.name ?? sharedTenant?.name ?? 'Your eShop';
+  const effectiveTenantName = tenant?.business_name ?? tenant?.name ?? sharedTenant?.business_name ?? sharedTenant?.name ?? 'Your eShop';
 
   // Debug logging removed for production
 
