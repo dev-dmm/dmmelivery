@@ -9,10 +9,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Scopes\TenantScope;
 
 class Order extends Model
 {
     use HasUuids, HasFactory, SoftDeletes;
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new TenantScope);
+    }
 
     protected $fillable = [
         'tenant_id',

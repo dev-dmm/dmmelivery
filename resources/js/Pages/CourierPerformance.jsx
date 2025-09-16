@@ -13,6 +13,9 @@ export default function CourierPerformance({
 }) {
     const [isChangingFilters, setIsChangingFilters] = useState(false);
 
+    // Debug: Log areas to console
+    console.log('Areas received:', areas);
+
     const handleFilterChange = (newPeriod, newArea) => {
         if (newPeriod === selectedPeriod && newArea === selectedArea) return;
         

@@ -6,10 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Scopes\TenantScope;
 
 class OrderItem extends Model
 {
     use HasUuids, HasFactory;
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new TenantScope);
+    }
 
     protected $fillable = [
         'order_id',

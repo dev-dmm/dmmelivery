@@ -52,7 +52,7 @@
       $ziggy = $ziggy->filter($routeFilters);
     @endphp
     <script>window.Ziggy = {!! $ziggy->toJson() !!};</script>
-    @routes  {{-- ✅ inject ziggy-js route() properly --}}
+    @routes
 
     @viteReactRefresh
     @vite(['resources/js/app.jsx', "resources/js/Pages/{$page['component']}.jsx"])

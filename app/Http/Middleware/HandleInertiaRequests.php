@@ -20,44 +20,65 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
-        $user = $request->user();
-
+        // NOTE: use closures so props are only computed if accessed on the client
         return array_merge(parent::share($request), [
-            'auth' => [
-                'user' => $user ? new UserResource($user) : null,
-                'abilities' => $user ? [
-                    'manageUsers'      => Gate::allows('manage-users'),
-                    'manageTenants'    => Gate::allows('manage-tenants'),
-                    'viewReports'      => Gate::allows('view-reports'),
-                    'accessSuperAdmin' => Gate::allows('access-super-admin'),
-                    'manageSettings'   => Gate::allows('manage-settings'),
+            // Flash messages (harmless + useful)
+            'flash' => fn () => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+                'message' => $request->session()->get('message'),
+            ],
+
+            // Auth: share a VERY small shape. UserResource is fine if it's minimal (see below).
+            // If you don't need auth data on most pages, you can even switch this to null in production.
+            'auth' => fn () => [
+                'user' => $request->user() ? new UserResource($request->user()) : null,
+                // Only expose ability booleans that the FRONTEND actually checks.
+                // If the UI doesn't read them, remove this block entirely.
+                'abilities' => $request->user() ? [
+                    'viewReports' => Gate::allows('view-reports'),
                 ] : [],
             ],
 
-            // ✅ Share tenant - try container first, then user relationship
-            'tenant' => function () use ($user) {
-                // First try the bound tenant from container
-                if (app()->bound('tenant')) {
-                    return new TenantResource(app('tenant'));
-                }
-                
-                // Fallback to user's tenant if user is authenticated
-                if ($user && $user->tenant) {
-                    return new TenantResource($user->tenant);
-                }
-                
-                return null;
+            // Tenant: keep it tiny (id + display name). Use Resource that hides internals.
+            'tenant' => function () use ($request) {
+                $tenant = app()->bound('tenant') ? app('tenant') : optional($request->user())->tenant;
+                return $tenant ? new TenantResource($tenant) : null;
             },
 
-            'flash' => [
-                'message' => fn () => $request->session()->get('message'),
-                'error'   => fn () => $request->session()->get('error'),
-            ],
-
+            // Ziggy: avoid dumping ALL routes. Only include a small allowlist you actually call from the client.
+            // If you need more routes later, add them here, or configure ziggy.php.
             'ziggy' => function () use ($request) {
-                return array_merge((new Ziggy)->toArray(), [
-                    'location' => $request->url(),
-                ]);
+                $ziggy = new Ziggy;
+                $array = $ziggy->toArray();
+
+                // Allowlist of route names used in the SPA (adjust to your app)
+                $allow = [
+                    'dashboard',
+                    'shipments.index',
+                    'shipments.show',
+                    'orders.index',
+                    'orders.show',
+                    'settings.*', // wildcard if you actually use it
+                ];
+
+                // Filter routes by name
+                $array['routes'] = collect($array['routes'])
+                    ->filter(function ($route, $name) use ($allow) {
+                        foreach ($allow as $pattern) {
+                            if ($pattern === $name) return true;
+                            if (str_ends_with($pattern, '.*') && str_starts_with($name, rtrim($pattern, '.*'))) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    ->all();
+
+                // Keep current location (useful for Ziggy)
+                $array['location'] = $request->url();
+
+                return $array;
             },
         ]);
     }

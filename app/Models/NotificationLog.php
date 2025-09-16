@@ -6,10 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Scopes\TenantScope;
 
 class NotificationLog extends Model
 {
     use HasFactory, HasUuids;
+
+    protected static function booted()
+    {
+        static::addGlobalScope(new TenantScope);
+    }
 
     protected $fillable = [
         'tenant_id',

@@ -15,29 +15,12 @@ class TenantResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'business_name' => $this->business_name,
-            'subdomain' => $this->subdomain,
-            'branding' => [
-                'primary_color' => $this->branding_config['primary_color'] ?? '#3B82F6',
-                'logo_url' => $this->logo_url,
-                'favicon_url' => $this->favicon_url,
-            ],
-            // Only include onboarding info if not complete
-            'onboarding' => $this->when(
-                !$this->isOnboardingComplete(),
-                [
-                    'status' => $this->onboarding_status,
-                    'progress' => $this->getOnboardingProgress(),
-                    'next_step' => $this->getNextOnboardingStep(),
-                ]
-            ),
-            // Basic feature flags (not internal settings)
-            'features' => [
-                'can_create_shipments' => $this->canCreateShipments(),
-                'remaining_shipments' => $this->getRemainingShipments(),
-            ],
+            'id'            => $this->id,
+            'name'          => $this->name,
+            'business_name' => $this->business_name, // Dashboard uses this fallback
+            // DO NOT expose config, secrets, keys, or whole settings blobs here.
+            // Add branding fields ONLY if you render them on the UI:
+            // 'logo_url' => $this->logo_url,
         ];
     }
 }

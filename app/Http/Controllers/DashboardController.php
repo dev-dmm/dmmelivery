@@ -8,35 +8,31 @@ use App\Models\Courier;
 use App\Http\Resources\TenantResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-// ⬇️ add these two lines
 use Inertia\Response as InertiaResponse;
 use Illuminate\Http\RedirectResponse;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
     public function index(Request $request): InertiaResponse|RedirectResponse
     {
-        // Get the authenticated user and their tenant
         $user = $request->user();
-        
         if (!$user) {
             return redirect()->route('login');
         }
 
         $tenant = $user->tenant;
-        
         if (!$tenant || !$tenant->is_active) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-    
+
             return redirect()->route('login')
                 ->with('error', 'Your account is inactive or tenant not found.');
         }
 
-        // Bind tenant to container for this request if not already bound
         if (!app()->bound('tenant')) {
             app()->instance('tenant', $tenant);
         }
@@ -46,7 +42,6 @@ class DashboardController extends Controller
         $startDate = $this->getStartDateForPeriod($period, $request);
         $endDate   = $this->getEndDateForPeriod($period, $request);
 
-        // ---------- EAGER (first paint)
         $stats = [
             'total_shipments' => Shipment::where('tenant_id', $tenantId)
                 ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
@@ -104,64 +99,46 @@ class DashboardController extends Controller
             'custom'   => 'Προσαρμοσμένη Περίοδος',
         ];
 
-        // ---------- LAZY (heavy)
         $lazyWeekly        = fn() => $this->getShipmentTrends($period, $tenantId, $startDate, $endDate);
         $lazyChart         = fn() => $this->buildChartData($stats);
         $lazyCouriers      = fn() => $this->courierLeaderboard($tenantId, $startDate, $endDate);
-        $lazyNotifications = fn() => []; // plug in real data when available
+        $lazyNotifications = fn() => [];
 
         return Inertia::render('Dashboard', [
-            // eager
             'tenant'          => new TenantResource($tenant),
             'selectedPeriod'  => $period,
             'periodOptions'   => $periodOptions,
             'stats'           => $stats,
             'recentShipments' => $recentShipments,
-
-            // lazy
             'weeklyStats'         => Inertia::lazy($lazyWeekly),
             'chartData'           => Inertia::lazy($lazyChart),
             'courierStats'        => Inertia::lazy($lazyCouriers),
             'recentNotifications' => Inertia::lazy($lazyNotifications),
-
-            // passthrough for custom range (if you implement server-side)
             'customStart' => $request->get('start'),
             'customEnd'   => $request->get('end'),
         ]);
     }
 
-    /**
-     * Show courier performance page
-     */
     public function courierPerformance(Request $request): InertiaResponse|RedirectResponse
     {
-        // Get the authenticated user and their tenant
         $user = $request->user();
-        
-        if (!$user) {
-            return redirect()->route('login');
-        }
+        if (!$user) return redirect()->route('login');
 
         $tenant = $user->tenant;
-        
         if (!$tenant || !$tenant->is_active) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-    
-            return redirect()->route('login')
-                ->with('error', 'Your account is inactive or tenant not found.');
+            return redirect()->route('login')->with('error', 'Your account is inactive or tenant not found.');
         }
 
-        // Bind tenant to container for this request if not already bound
-        if (!app()->bound('tenant')) {
-            app()->instance('tenant', $tenant);
-        }
+        if (!app()->bound('tenant')) app()->instance('tenant', $tenant);
 
-        $tenantId = $tenant->id;
-        $period = $request->get('period', '30_days');
-        $startDate = $this->getStartDateForPeriod($period, $request);
-        $endDate = $this->getEndDateForPeriod($period, $request);
+        $tenantId     = $tenant->id;
+        $period       = $request->get('period', '30_days');
+        $startDate    = $this->getStartDateForPeriod($period, $request);
+        $endDate      = $this->getEndDateForPeriod($period, $request);
+        $selectedArea = $request->get('area', 'all');
 
         $periodOptions = [
             '24_hours' => 'Τελευταίες 24 Ώρες',
@@ -173,93 +150,164 @@ class DashboardController extends Controller
             'custom'   => 'Προσαρμοσμένη Περίοδος',
         ];
 
-        // Get detailed courier performance data
-        $courierStats = $this->courierLeaderboard($tenantId, $startDate, $endDate);
-        
-        // Calculate overall statistics
+        // Does the DB have a shipping_city column?
+        $hasCity = Schema::hasColumn('shipments', 'shipping_city');
+
+        // Reusable area filter closure
+        $applyArea = function ($q) use ($selectedArea, $hasCity) {
+            if ($selectedArea === 'all') return;
+            $q->where(function ($qq) use ($selectedArea, $hasCity) {
+                if ($hasCity) {
+                    $qq->where('shipping_city', $selectedArea);
+                }
+                // Match ", City," inside the address to avoid partials, plus a loose fallback
+                $qq->orWhere('shipping_address', 'LIKE', '%,' . $selectedArea . ',%')
+                   ->orWhere('shipping_address', 'LIKE', '%' . $selectedArea . '%');
+            });
+        };
+
+        // Detailed courier performance data
+        $courierStats = $this->courierLeaderboard($tenantId, $startDate, $endDate, $selectedArea, $applyArea, $hasCity);
+
+        // Overall stats with area filter
         $totalShipments = Shipment::where('tenant_id', $tenantId)
             ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('created_at', '<=', $endDate))
+            ->tap($applyArea)
             ->count();
 
         $deliveredShipments = Shipment::where('tenant_id', $tenantId)
             ->where('status', 'delivered')
             ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('created_at', '<=', $endDate))
+            ->tap($applyArea)
             ->count();
 
         $inTransitShipments = Shipment::where('tenant_id', $tenantId)
             ->whereIn('status', ['in_transit', 'out_for_delivery'])
             ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('created_at', '<=', $endDate))
+            ->tap($applyArea)
             ->count();
 
         $pendingShipments = Shipment::where('tenant_id', $tenantId)
             ->whereIn('status', ['pending', 'picked_up'])
             ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('created_at', '<=', $endDate))
+            ->tap($applyArea)
             ->count();
 
         $delayedShipments = Shipment::where('tenant_id', $tenantId)
             ->whereIn('status', ['failed', 'returned'])
             ->when($startDate, fn($q) => $q->where('created_at', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('created_at', '<=', $endDate))
+            ->tap($applyArea)
             ->count();
 
         $stats = [
-            'delivered_shipments' => $deliveredShipments,
-            'delivered_percentage' => $totalShipments > 0 ? round(($deliveredShipments / $totalShipments) * 100, 1) : 0,
-            'in_transit_shipments' => $inTransitShipments,
-            'in_transit_percentage' => $totalShipments > 0 ? round(($inTransitShipments / $totalShipments) * 100, 1) : 0,
-            'pending_shipments' => $pendingShipments,
-            'pending_percentage' => $totalShipments > 0 ? round(($pendingShipments / $totalShipments) * 100, 1) : 0,
-            'delayed_shipments' => $delayedShipments,
-            'delayed_percentage' => $totalShipments > 0 ? round(($delayedShipments / $totalShipments) * 100, 1) : 0,
+            'delivered_shipments'    => $deliveredShipments,
+            'delivered_percentage'   => $totalShipments > 0 ? round(($deliveredShipments / $totalShipments) * 100, 1) : 0,
+            'in_transit_shipments'   => $inTransitShipments,
+            'in_transit_percentage'  => $totalShipments > 0 ? round(($inTransitShipments / $totalShipments) * 100, 1) : 0,
+            'pending_shipments'      => $pendingShipments,
+            'pending_percentage'     => $totalShipments > 0 ? round(($pendingShipments / $totalShipments) * 100, 1) : 0,
+            'delayed_shipments'      => $delayedShipments,
+            'delayed_percentage'     => $totalShipments > 0 ? round(($delayedShipments / $totalShipments) * 100, 1) : 0,
         ];
 
-        // Transform courier stats to match component expectations
-        $transformedCourierStats = $courierStats->map(function ($courier) {
-            $totalShipments = $courier['total_shipments'];
-            $deliveredPercentage = $totalShipments > 0 ? round(($courier['delivered_shipments'] / $totalShipments) * 100, 1) : 0;
-            $failedPercentage = $totalShipments > 0 ? round(($courier['failed_shipments'] / $totalShipments) * 100, 1) : 0;
-            $otherPercentage = 100 - $deliveredPercentage - $failedPercentage;
+        // Build Areas list (cities)
+        $areasQuery = Shipment::where('tenant_id', $tenantId)
+            ->where(function ($q) use ($hasCity) {
+                if ($hasCity) {
+                    $q->whereNotNull('shipping_city');
+                }
+                $q->orWhere(function ($qq) {
+                    $qq->whereNotNull('shipping_address')
+                       ->where('shipping_address', '!=', '');
+                });
+            });
 
-            // Calculate grade based on success rate
-            $grade = match (true) {
-                $deliveredPercentage >= 95 => 'A+',
-                $deliveredPercentage >= 90 => 'A',
-                $deliveredPercentage >= 85 => 'B+',
-                $deliveredPercentage >= 80 => 'B',
-                $deliveredPercentage >= 70 => 'C+',
-                default => 'C'
-            };
+        $select = ['shipping_address'];
+        if ($hasCity) $select[] = 'shipping_city';
 
-            return [
-                'id' => $courier['code'],
-                'name' => $courier['name'],
-                'total_shipments' => $totalShipments,
-                'delivered_percentage' => $deliveredPercentage,
-                'returned_percentage' => $failedPercentage,
-                'other_percentage' => max(0, $otherPercentage),
-                'avg_delivery_time' => '2-3 ημέρες', // Placeholder - you can calculate this from your data
-                'grade' => $grade,
-            ];
-        });
+        $areas = $areasQuery->get($select)
+            ->map(function ($s) use ($hasCity) {
+                // Prefer explicit city column if present and non-empty
+                if ($hasCity && !empty($s->shipping_city)) {
+                    return trim($s->shipping_city);
+                }
+
+                // Fallback: parse from "Street, City, ZIP, Country"
+                $addr  = $s->shipping_address ?? '';
+                $parts = array_values(array_filter(array_map('trim', explode(',', $addr)), fn($p) => $p !== ''));
+
+                if (count($parts) >= 2) {
+                    $countries = ['greece','gr','united states','usa','us','uk','united kingdom','italy','de','germany','france','es','spain'];
+                    $lastLower = mb_strtolower(end($parts));
+
+                    if (in_array($lastLower, $countries, true) && count($parts) >= 2) {
+                        $city = $parts[count($parts) - 2];
+                    } else {
+                        $city = end($parts);
+                        if (preg_match('/^\d{3,6}(-\d{2,6})?$/', $city)) {
+                            $city = (count($parts) >= 2) ? $parts[count($parts) - 2] : $city;
+                        }
+                    }
+
+                    $city = trim($city);
+                    if ($city !== '' && !in_array(mb_strtolower($city), $countries, true)) {
+                        return $city;
+                    }
+                }
+                return null;
+            })
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->toArray();
+
+        if (empty($areas)) {
+            $areas = ['Athens', 'Thessaloniki', 'Patras', 'Larisa', 'Heraklion'];
+        }
 
         return Inertia::render('CourierPerformance', [
-            'tenant' => new TenantResource($tenant),
+            'tenant'         => new TenantResource($tenant),
             'selectedPeriod' => $period,
-            'selectedArea' => $request->get('area', 'all'),
-            'periodOptions' => $periodOptions,
-            'areas' => [], // Placeholder for areas - you can populate this with actual area data
-            'stats' => $stats,
-            'courierStats' => $transformedCourierStats,
-            'customStart' => $request->get('start'),
-            'customEnd' => $request->get('end'),
+            'selectedArea'   => $selectedArea,
+            'periodOptions'  => $periodOptions,
+            'areas'          => $areas,
+            'stats'          => $stats,
+            'courierStats'   => $courierStats->map(function ($courier) {
+                $totalShipments      = $courier['total_shipments'];
+                $deliveredPercentage = $totalShipments > 0 ? round(($courier['delivered_shipments'] / $totalShipments) * 100, 1) : 0;
+                $failedPercentage    = $totalShipments > 0 ? round(($courier['failed_shipments'] / $totalShipments) * 100, 1) : 0;
+                $otherPercentage     = max(0, 100 - $deliveredPercentage - $failedPercentage);
+
+                $grade = match (true) {
+                    $deliveredPercentage >= 95 => 'A+',
+                    $deliveredPercentage >= 90 => 'A',
+                    $deliveredPercentage >= 85 => 'B+',
+                    $deliveredPercentage >= 80 => 'B',
+                    $deliveredPercentage >= 70 => 'C+',
+                    default => 'C'
+                };
+
+                return [
+                    'id'                   => $courier['code'],
+                    'name'                 => $courier['name'],
+                    'total_shipments'      => $totalShipments,
+                    'delivered_percentage' => $deliveredPercentage,
+                    'returned_percentage'  => $failedPercentage,
+                    'other_percentage'     => $otherPercentage,
+                    'avg_delivery_time'    => '2-3 ημέρες',
+                    'grade'                => $grade,
+                ];
+            }),
+            'customStart'    => $request->get('start'),
+            'customEnd'      => $request->get('end'),
         ]);
     }
-
-    // ----- Helpers
 
     private function buildChartData(array $stats): array
     {
@@ -277,44 +325,63 @@ class DashboardController extends Controller
         ];
     }
 
-    private function courierLeaderboard(string|int $tenantId, ?Carbon $startDate, ?Carbon $endDate = null)
+    private function courierLeaderboard(string|int $tenantId, ?Carbon $startDate, ?Carbon $endDate = null, string $area = 'all', ?\Closure $applyArea = null, bool $hasCity = false)
     {
+        // Safe default area filter if not provided
+        $applyArea ??= function ($q) use ($area, $hasCity) {
+            if ($area === 'all') return;
+            $q->where(function ($qq) use ($area, $hasCity) {
+                if ($hasCity) {
+                    $qq->where('shipping_city', $area);
+                }
+                $qq->orWhere('shipping_address', 'LIKE', '%,' . $area . ',%')
+                   ->orWhere('shipping_address', 'LIKE', '%' . $area . '%');
+            });
+        };
+
         return Courier::where('tenant_id', $tenantId)
             ->withCount([
-                'shipments' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId);
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as delivered_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as delivered_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->where('status', 'delivered');
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as pending_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as pending_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->where('status', 'pending');
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as picked_up_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as picked_up_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->where('status', 'picked_up');
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as in_transit_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as in_transit_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->where('status', 'in_transit');
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as out_for_delivery_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as out_for_delivery_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->where('status', 'out_for_delivery');
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
-                'shipments as failed_count' => function ($q) use ($tenantId, $startDate, $endDate) {
+                'shipments as failed_count' => function ($q) use ($tenantId, $startDate, $endDate, $applyArea) {
                     $q->where('tenant_id', $tenantId)->whereIn('status', ['failed','returned']);
                     if ($startDate) $q->where('created_at', '>=', $startDate);
-                    if ($endDate) $q->where('created_at', '<=', $endDate);
+                    if ($endDate)   $q->where('created_at', '<=', $endDate);
+                    $applyArea($q);
                 },
             ])
             ->get()
@@ -349,7 +416,7 @@ class DashboardController extends Controller
             '3_months' => Carbon::now()->subMonths(3),
             '12_months'=> Carbon::now()->subMonths(12),
             '24_months'=> Carbon::now()->subMonths(24),
-            'custom'   => null, // fallback if no start param
+            'custom'   => null,
             default    => null,
         };
     }
@@ -360,22 +427,20 @@ class DashboardController extends Controller
             return Carbon::parse($request->get('end'));
         }
 
-        // For non-custom periods, end date is "now"
         return match ($period) {
             '24_hours', '7_days', '30_days', '3_months', '12_months', '24_months' => Carbon::now(),
-            'custom'   => null, // fallback if no end param
+            'custom'   => null,
             default    => null,
         };
     }
 
     private function getShipmentTrends(string $period, string|int $tenantId, ?Carbon $startDate = null, ?Carbon $endDate = null): array
     {
-        // For custom periods, use the actual date range
         if ($period === 'custom' && $startDate && $endDate) {
             $trends = [];
             $totalDays = $startDate->diffInDays($endDate) + 1;
             $step = $totalDays > 30 ? max(1, (int)($totalDays / 15)) : 1;
-            
+
             $currentDate = $startDate->copy();
             while ($currentDate <= $endDate) {
                 $trends[] = [
@@ -385,11 +450,10 @@ class DashboardController extends Controller
                 ];
                 $currentDate->addDays($step);
             }
-            
+
             return $trends;
         }
 
-        // Original logic for predefined periods
         $days = match ($period) {
             '24_hours' => 1,
             '7_days'   => 7,
