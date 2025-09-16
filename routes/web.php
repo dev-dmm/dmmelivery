@@ -44,10 +44,10 @@ Route::get('/', function () {
         return redirect()->route('dashboard');
     }
 
-    return Inertia::render('Welcome', [
+    return Inertia::render('Home', [
         'canLogin'    => Route::has('login'),
         'canRegister' => Route::has('register'),
-        // Don’t leak versions in production
+        // Don't leak versions in production
         'meta'        => app()->isLocal()
             ? ['laravel' => Application::VERSION, 'php' => PHP_VERSION]
             : null,
