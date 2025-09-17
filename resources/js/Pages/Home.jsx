@@ -51,9 +51,6 @@ const Home = () => {
               <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
                 Χαρακτηριστικά
               </a>
-              <a href="#about" className="text-muted-foreground hover:text-foreground transition-colors">
-                Σχετικά
-              </a>
               <Link href="/login">
                 <Button variant="outline">Σύνδεση</Button>
               </Link>

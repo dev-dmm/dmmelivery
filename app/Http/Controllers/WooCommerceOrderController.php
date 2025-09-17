@@ -16,16 +16,24 @@ class WooCommerceOrderController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        // Log incoming request
+        \Log::info('WooCommerce order received', [
+            'headers' => $request->headers->all(),
+            'payload' => $request->all()
+        ]);
+
         // Read headers
         $headerKey = $request->header('X-Api-Key');
         $tenantId  = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
 
         if (!$headerKey) {
+            \Log::warning('WooCommerce order rejected: No API key provided');
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $tenant = Tenant::find($tenantId);
         if (!$tenant) {
+            \Log::warning('WooCommerce order rejected: Invalid tenant ID', ['tenant_id' => $tenantId]);
             return response()->json(['success' => false, 'message' => 'Invalid tenant'], 422);
         }
 
@@ -35,6 +43,12 @@ class WooCommerceOrderController extends Controller
         $isTenantTokenValid = $tenant->isApiTokenValid((string) $headerKey);
 
         if (!$isGlobalKeyValid && !$isTenantTokenValid) {
+            \Log::warning('WooCommerce order rejected: Invalid API key', [
+                'tenant_id' => $tenantId,
+                'api_key_provided' => !empty($headerKey),
+                'global_key_valid' => $isGlobalKeyValid,
+                'tenant_token_valid' => $isTenantTokenValid
+            ]);
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
@@ -50,6 +64,11 @@ class WooCommerceOrderController extends Controller
         ]);
 
         if ($v->fails()) {
+            \Log::error('WooCommerce order validation failed', [
+                'errors' => $v->errors()->toArray(),
+                'request_data' => $request->all(),
+                'tenant_id' => $tenantId
+            ]);
             return response()->json(['success'=>false, 'message'=>'Validation failed', 'errors'=>$v->errors()], 422);
         }
 
@@ -114,6 +133,10 @@ class WooCommerceOrderController extends Controller
                 ->first() ?? Courier::where('tenant_id', $tenant->id)->first();
 
             if (!$courier) {
+                \Log::error('WooCommerce order failed: No courier configured for tenant', [
+                    'tenant_id' => $tenant->id,
+                    'order_id' => $order->id
+                ]);
                 return response()->json(['success'=>false,'message'=>'No courier configured for tenant'], 422);
             }
 
@@ -148,6 +171,13 @@ class WooCommerceOrderController extends Controller
                 'courier_response'    => null,
             ]);
         }
+
+        \Log::info('WooCommerce order processed successfully', [
+            'tenant_id' => $tenant->id,
+            'order_id' => $order->id,
+            'shipment_id' => $shipment?->id,
+            'external_order_id' => $externalId
+        ]);
 
         return response()->json([
             'success'     => true,
