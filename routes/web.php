@@ -411,6 +411,7 @@ Route::prefix('super-admin')
     ->group(function () {
         Route::get('/dashboard', [SuperAdminController::class, 'dashboard'])->name('dashboard');
         Route::get('/orders', [SuperAdminController::class, 'orders'])->name('orders');
+        Route::get('/order-items', [SuperAdminController::class, 'orderItems'])->name('order-items');
         Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
         Route::get('/tenants/{tenant}', [SuperAdminController::class, 'tenantDetails'])->name('tenants.show');
         

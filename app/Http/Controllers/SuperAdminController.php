@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Shipment;
@@ -96,6 +97,71 @@ class SuperAdminController extends Controller
     }
 
     /**
+     * Display all order items across all tenants (E-Shop Products)
+     */
+    public function orderItems(Request $request)
+    {
+        $perPage       = $request->get('per_page', 24);
+        $search        = $request->get('search');
+        $tenant_filter = $request->get('tenant');
+
+        $query = OrderItem::query()
+            // IMPORTANT: bypass tenant scope for super-admin views
+            ->withoutGlobalScopes([TenantScope::class])
+            ->with([
+                'tenant:id,name,subdomain,business_name',
+                'order:id,order_number,external_order_id',
+            ])
+            ->whereNotNull('product_images') // Only show items with images
+            ->where('product_images', '!=', '[]')
+            ->where('product_images', '!=', 'null')
+            ->select(['order_items.*']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('product_name', 'like', "%{$search}%")
+                  ->orWhere('product_sku', 'like', "%{$search}%")
+                  ->orWhere('product_description', 'like', "%{$search}%")
+                  ->orWhere('product_brand', 'like', "%{$search}%")
+                  ->orWhere('product_category', 'like', "%{$search}%")
+                  ->orWhereHas('tenant', function ($tq) use ($search) {
+                      $tq->where('name', 'like', "%{$search}%")
+                         ->orWhere('business_name', 'like', "%{$search}%")
+                         ->orWhere('subdomain', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        if ($tenant_filter) {
+            $query->where('tenant_id', $tenant_filter);
+        }
+
+        $orderItems = $query->orderBy('created_at', 'desc')
+                           ->paginate($perPage)
+                           ->withQueryString();
+
+        // Tenants for filters — no scope so you see *all* tenants
+        $tenants = Tenant::query()
+            ->withoutGlobalScopes([TenantScope::class])
+            ->select('id', 'name', 'subdomain', 'business_name')
+            ->orderBy('name')
+            ->get();
+
+        $stats = $this->getOrderItemStats();
+
+        return Inertia::render('SuperAdmin/OrderItems', [
+            'orderItems' => $orderItems,
+            'tenants'    => $tenants,
+            'filters'    => [
+                'search'   => $search,
+                'tenant'   => $tenant_filter,
+                'per_page' => $perPage,
+            ],
+            'stats'      => $stats,
+        ]);
+    }
+
+    /**
      * Dashboard stats across all tenants
      */
     private function getOrderStats()
@@ -113,6 +179,31 @@ class SuperAdminController extends Controller
                     $q->withoutGlobalScopes([TenantScope::class])
                       ->where('created_at', '>=', now()->subDays(30));
                 })->count(),
+        ];
+    }
+
+    /**
+     * Order items stats for e-shop products
+     */
+    private function getOrderItemStats()
+    {
+        return [
+            'total_items'        => OrderItem::withoutGlobalScopes([TenantScope::class])->count(),
+            'items_with_images'  => OrderItem::withoutGlobalScopes([TenantScope::class])
+                ->whereNotNull('product_images')
+                ->where('product_images', '!=', '[]')
+                ->where('product_images', '!=', 'null')
+                ->count(),
+            'active_tenants'     => Tenant::withoutGlobalScopes([TenantScope::class])
+                ->whereHas('orders', function ($q) {
+                    $q->withoutGlobalScopes([TenantScope::class])
+                      ->where('created_at', '>=', now()->subDays(30));
+                })->count(),
+            'total_value'        => OrderItem::withoutGlobalScopes([TenantScope::class])
+                ->whereNotNull('product_images')
+                ->where('product_images', '!=', '[]')
+                ->where('product_images', '!=', 'null')
+                ->sum(DB::raw('final_unit_price * quantity')),
         ];
     }
 

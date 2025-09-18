@@ -130,6 +130,9 @@ export default function AuthenticatedLayout({ header, children }) {
                         {hasRoute('super-admin.orders') && (
                           <Dropdown.Link href={route('super-admin.orders')}>📦 All Orders</Dropdown.Link>
                         )}
+                        {hasRoute('super-admin.order-items') && (
+                          <Dropdown.Link href={route('super-admin.order-items')}>🛍️ E-Shop Products</Dropdown.Link>
+                        )}
                         {hasRoute('super-admin.tenants') && (
                           <Dropdown.Link href={route('super-admin.tenants')}>🏢 All Tenants</Dropdown.Link>
                         )}
@@ -270,6 +273,11 @@ export default function AuthenticatedLayout({ header, children }) {
                 {hasRoute('super-admin.orders') && (
                   <ResponsiveNavLink href={route('super-admin.orders')} active={route().current('super-admin.orders')}>
                     📦 All Orders
+                  </ResponsiveNavLink>
+                )}
+                {hasRoute('super-admin.order-items') && (
+                  <ResponsiveNavLink href={route('super-admin.order-items')} active={route().current('super-admin.order-items')}>
+                    🛍️ E-Shop Products
                   </ResponsiveNavLink>
                 )}
                 {hasRoute('super-admin.tenants') && (
