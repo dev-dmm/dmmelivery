@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use App\Models\Tenant;
 use App\Models\Customer;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Shipment;
 use App\Models\Courier;
 
@@ -81,15 +82,23 @@ class WooCommerceOrderController extends Controller
         if ($existing) {
             // Update customer information if it's missing
             if (empty($existing->customer_name) || empty($existing->customer_email)) {
+                // Get customer data from request for update
+                $customerName = trim(implode(' ', array_filter([
+                    data_get($request, 'customer.first_name'),
+                    data_get($request, 'customer.last_name'),
+                ])));
+                $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
+                $customerPhone = data_get($request, 'customer.phone');
+                
                 $existing->update([
-                    'customer_name'  => $customer->name,
-                    'customer_email' => $customer->email,
-                    'customer_phone' => $customer->phone,
+                    'customer_name'  => $customerName,
+                    'customer_email' => $customerEmail,
+                    'customer_phone' => $customerPhone,
                 ]);
                 \Log::info('Updated customer information for existing order', [
                     'order_id' => $existing->id,
-                    'customer_name' => $customer->name,
-                    'customer_email' => $customer->email
+                    'customer_name' => $customerName,
+                    'customer_email' => $customerEmail
                 ]);
             }
             
