@@ -19,6 +19,7 @@ class UserResource extends JsonResource
             'id'    => $this->id,
             'name'  => $this->name,
             'email' => $this->email, // Required to match existing PageProps type
+            'role'  => $this->role, // Include role for super admin detection
         ];
     }
 }
