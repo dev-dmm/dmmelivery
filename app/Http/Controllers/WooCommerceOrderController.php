@@ -72,13 +72,27 @@ class WooCommerceOrderController extends Controller
             return response()->json(['success'=>false, 'message'=>'Validation failed', 'errors'=>$v->errors()], 422);
         }
 
-        // If order already exists, return it (idempotency)
+        // If order already exists, update customer info and return it (idempotency)
         $externalId = data_get($request, 'order.external_order_id');
         $existing = Order::where('tenant_id', $tenant->id)
             ->where('external_order_id', $externalId)
             ->first();
 
         if ($existing) {
+            // Update customer information if it's missing
+            if (empty($existing->customer_name) || empty($existing->customer_email)) {
+                $existing->update([
+                    'customer_name'  => $customer->name,
+                    'customer_email' => $customer->email,
+                    'customer_phone' => $customer->phone,
+                ]);
+                \Log::info('Updated customer information for existing order', [
+                    'order_id' => $existing->id,
+                    'customer_name' => $customer->name,
+                    'customer_email' => $customer->email
+                ]);
+            }
+            
             return response()->json([
                 'success'     => true,
                 'message'     => 'Order already exists',
@@ -129,6 +143,9 @@ class WooCommerceOrderController extends Controller
             'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
             'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
         ]);
+
+        // Create order items if provided
+        $this->createOrderItems($order, $request);
 
         // Create shipment (default true)
         $shipment = null;
@@ -208,6 +225,65 @@ class WooCommerceOrderController extends Controller
             $a['email'] ?? null,
         ];
         return implode(', ', array_filter($parts));
+    }
+    
+    /**
+     * Create order items from request data
+     */
+    private function createOrderItems($order, $request)
+    {
+        $items = data_get($request, 'order.items', []);
+        
+        if (empty($items)) {
+            // If no items provided, create a generic item based on order total
+            $this->createGenericOrderItem($order, $request);
+            return;
+        }
+        
+        foreach ($items as $itemData) {
+            OrderItem::create([
+                'order_id' => $order->id,
+                'tenant_id' => $order->tenant_id,
+                'product_sku' => data_get($itemData, 'sku', 'N/A'),
+                'product_name' => data_get($itemData, 'name', 'Product'),
+                'quantity' => (int) data_get($itemData, 'quantity', 1),
+                'unit_price' => (float) data_get($itemData, 'price', 0),
+                'final_unit_price' => (float) data_get($itemData, 'price', 0),
+                'total_price' => (float) data_get($itemData, 'total', 0),
+                'weight' => (float) data_get($itemData, 'weight', 0),
+                'is_digital' => false,
+                'is_fragile' => false,
+            ]);
+        }
+    }
+    
+    /**
+     * Create a generic order item when no specific items are provided
+     */
+    private function createGenericOrderItem($order, $request)
+    {
+        $totalAmount = (float) data_get($request, 'order.total_amount', 0);
+        $subtotal = (float) data_get($request, 'order.subtotal', $totalAmount);
+        
+        OrderItem::create([
+            'order_id' => $order->id,
+            'tenant_id' => $order->tenant_id,
+            'product_sku' => 'ORDER-' . $order->external_order_id,
+            'product_name' => 'Order Items',
+            'quantity' => 1,
+            'unit_price' => $subtotal,
+            'final_unit_price' => $subtotal,
+            'total_price' => $subtotal,
+            'weight' => (float) data_get($request, 'shipping.weight', 0),
+            'is_digital' => false,
+            'is_fragile' => false,
+        ]);
+        
+        \Log::info('Created generic order item', [
+            'order_id' => $order->id,
+            'total_amount' => $totalAmount,
+            'subtotal' => $subtotal
+        ]);
     }
 }
 
