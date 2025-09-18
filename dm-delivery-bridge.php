@@ -97,6 +97,8 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_test_connection', [$this, 'ajax_test_connection']);
         add_action('wp_ajax_dmm_resend_order', [$this, 'ajax_resend_order']);
         add_action('wp_ajax_dmm_refresh_meta_fields', [$this, 'ajax_refresh_meta_fields']);
+        add_action('wp_ajax_dmm_check_logs', [$this, 'ajax_check_logs']);
+        add_action('wp_ajax_dmm_create_log_table', [$this, 'ajax_create_log_table']);
     }
     
     /**
@@ -299,6 +301,18 @@ class DMM_Delivery_Bridge {
                 <div id="dmm-test-result" style="margin-top: 10px;"></div>
             </div>
             
+            <div class="dmm-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f9f9f9;">
+                <h3><?php _e('Debug & Maintenance', 'dmm-delivery-bridge'); ?></h3>
+                <p><?php _e('Debug logging and maintenance tools.', 'dmm-delivery-bridge'); ?></p>
+                <button type="button" id="dmm-check-logs" class="button button-secondary">
+                    <?php _e('Check Log Table', 'dmm-delivery-bridge'); ?>
+                </button>
+                <button type="button" id="dmm-create-log-table" class="button button-secondary">
+                    <?php _e('Recreate Log Table', 'dmm-delivery-bridge'); ?>
+                </button>
+                <div id="dmm-debug-result" style="margin-top: 10px;"></div>
+            </div>
+            
             <?php $this->render_logs_section(); ?>
         </div>
         
@@ -333,6 +347,70 @@ class DMM_Delivery_Bridge {
                     }
                 });
             });
+            
+            $('#dmm-check-logs').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-debug-result');
+                
+                button.prop('disabled', true).text('<?php _e('Checking...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_check_logs',
+                        nonce: '<?php echo wp_create_nonce('dmm_check_logs'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Check failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('Check Log Table', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-create-log-table').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-debug-result');
+                
+                if (!confirm('<?php _e('Are you sure you want to recreate the log table? This will not delete existing logs.', 'dmm-delivery-bridge'); ?>')) {
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('Creating...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_create_log_table',
+                        nonce: '<?php echo wp_create_nonce('dmm_create_log_table'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Table creation failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('Recreate Log Table', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
         });
         </script>
         <?php
@@ -354,6 +432,7 @@ class DMM_Delivery_Bridge {
                 <thead>
                     <tr>
                         <th><?php _e('Order ID', 'dmm-delivery-bridge'); ?></th>
+                        <th><?php _e('Customer', 'dmm-delivery-bridge'); ?></th>
                         <th><?php _e('Status', 'dmm-delivery-bridge'); ?></th>
                         <th><?php _e('Date', 'dmm-delivery-bridge'); ?></th>
                         <th><?php _e('Actions', 'dmm-delivery-bridge'); ?></th>
@@ -362,15 +441,33 @@ class DMM_Delivery_Bridge {
                 <tbody>
                     <?php if (empty($logs)): ?>
                         <tr>
-                            <td colspan="4"><?php _e('No logs found.', 'dmm-delivery-bridge'); ?></td>
+                            <td colspan="5"><?php _e('No logs found.', 'dmm-delivery-bridge'); ?></td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($logs as $log): ?>
+                            <?php
+                            // Extract customer data from request_data
+                            $request_data = json_decode($log->request_data, true);
+                            $customer_email = isset($request_data['customer']['email']) ? $request_data['customer']['email'] : '';
+                            $customer_phone = isset($request_data['customer']['phone']) ? $request_data['customer']['phone'] : '';
+                            $customer_name = trim((isset($request_data['customer']['first_name']) ? $request_data['customer']['first_name'] : '') . ' ' . (isset($request_data['customer']['last_name']) ? $request_data['customer']['last_name'] : ''));
+                            ?>
                             <tr>
                                 <td>
                                     <a href="<?php echo admin_url('post.php?post=' . $log->order_id . '&action=edit'); ?>">
                                         #<?php echo $log->order_id; ?>
                                     </a>
+                                </td>
+                                <td>
+                                    <div style="font-weight: bold; margin-bottom: 2px;">
+                                        <?php echo $customer_name ? esc_html($customer_name) : '—'; ?>
+                                    </div>
+                                    <div style="font-size: 12px; color: #666;">
+                                        <?php echo $customer_email ? esc_html($customer_email) : '—'; ?>
+                                    </div>
+                                    <div style="font-size: 12px; color: #666;">
+                                        <?php echo $customer_phone ? esc_html($customer_phone) : '—'; ?>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="status-<?php echo $log->status; ?>">
@@ -403,6 +500,21 @@ class DMM_Delivery_Bridge {
                 content += '<p><strong>Order ID:</strong> ' + log.order_id + '</p>';
                 content += '<p><strong>Status:</strong> ' + log.status + '</p>';
                 content += '<p><strong>Date:</strong> ' + log.created_at + '</p>';
+                
+                // Extract and display customer information
+                if (log.request_data) {
+                    try {
+                        var requestData = JSON.parse(log.request_data);
+                        if (requestData.customer) {
+                            content += '<h4>Customer Information:</h4>';
+                            content += '<p><strong>Name:</strong> ' + (requestData.customer.first_name || '') + ' ' + (requestData.customer.last_name || '') + '</p>';
+                            content += '<p><strong>Email:</strong> ' + (requestData.customer.email || 'Not provided') + '</p>';
+                            content += '<p><strong>Phone:</strong> ' + (requestData.customer.phone || 'Not provided') + '</p>';
+                        }
+                    } catch (e) {
+                        // JSON parse error, continue without customer info
+                    }
+                }
                 
                 if (log.error_message) {
                     content += '<p><strong>Error:</strong> ' + log.error_message + '</p>';
@@ -715,18 +827,47 @@ class DMM_Delivery_Bridge {
      */
     public function process_order($order) {
         $order_id = $order->get_id();
+        $order_data = null;
+        $response = null;
         
-        // Prepare order data
-        $order_data = $this->prepare_order_data($order);
+        try {
+            // Prepare order data
+            $order_data = $this->prepare_order_data($order);
+            
+            // Debug logging
+            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+                error_log('DMM Delivery Bridge - Processing Order ID: ' . $order_id);
+                error_log('DMM Delivery Bridge - Order Data: ' . print_r($order_data, true));
+                error_log('DMM Delivery Bridge - Customer Email: ' . $order->get_billing_email());
+                error_log('DMM Delivery Bridge - Customer Phone: ' . $order->get_billing_phone());
+            }
+            
+            // Send to API
+            $response = $this->send_to_api($order_data);
+            
+            // Debug API response
+            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+                error_log('DMM Delivery Bridge - API Response: ' . print_r($response, true));
+            }
+            
+        } catch (Exception $e) {
+            // Handle any exceptions during processing
+            error_log('DMM Delivery Bridge - Exception during order processing: ' . $e->getMessage());
+            
+            $response = [
+                'success' => false,
+                'message' => 'Exception during processing: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
         
-        // Send to API
-        $response = $this->send_to_api($order_data);
-        
-        // Log the result
-        $this->log_request($order_id, $order_data, $response);
+        // Always log the result, even if there was an exception
+        if ($order_data && $response) {
+            $this->log_request($order_id, $order_data, $response);
+        }
         
         // Update order meta
-        if ($response['success']) {
+        if ($response && $response['success']) {
             update_post_meta($order_id, '_dmm_delivery_sent', 'yes');
             update_post_meta($order_id, '_dmm_delivery_order_id', $response['data']['order_id'] ?? '');
             update_post_meta($order_id, '_dmm_delivery_shipment_id', $response['data']['shipment_id'] ?? '');
@@ -737,8 +878,9 @@ class DMM_Delivery_Bridge {
             update_post_meta($order_id, '_dmm_delivery_sent', 'error');
             
             // Add order note with error
+            $error_message = $response ? $response['message'] : 'Unknown error occurred';
             $order->add_order_note(
-                sprintf(__('Failed to send order to DMM Delivery system: %s', 'dmm-delivery-bridge'), $response['message'])
+                sprintf(__('Failed to send order to DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
             );
         }
     }
@@ -750,6 +892,20 @@ class DMM_Delivery_Bridge {
         $shipping_address = $order->get_address('shipping');
         if (empty($shipping_address['address_1'])) {
             $shipping_address = $order->get_address('billing');
+        }
+        
+        // Debug customer data extraction
+        $billing_email = $order->get_billing_email();
+        $billing_phone = $order->get_billing_phone();
+        $billing_first_name = $order->get_billing_first_name();
+        $billing_last_name = $order->get_billing_last_name();
+        
+        if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+            error_log('DMM Delivery Bridge - Debug Customer Data:');
+            error_log('  Billing Email: ' . ($billing_email ?: 'EMPTY'));
+            error_log('  Billing Phone: ' . ($billing_phone ?: 'EMPTY'));
+            error_log('  Billing First Name: ' . ($billing_first_name ?: 'EMPTY'));
+            error_log('  Billing Last Name: ' . ($billing_last_name ?: 'EMPTY'));
         }
         
         return [
@@ -768,23 +924,23 @@ class DMM_Delivery_Bridge {
                 'payment_method' => $order->get_payment_method(),
             ],
             'customer' => [
-                'first_name' => $order->get_billing_first_name(),
-                'last_name' => $order->get_billing_last_name(),
-                'email' => $order->get_billing_email(),
-                'phone' => $order->get_billing_phone(),
+                'first_name' => $billing_first_name,
+                'last_name' => $billing_last_name,
+                'email' => $billing_email,
+                'phone' => $billing_phone,
             ],
             'shipping' => [
                 'address' => [
-                    'first_name' => $shipping_address['first_name'] ?? $order->get_billing_first_name(),
-                    'last_name' => $shipping_address['last_name'] ?? $order->get_billing_last_name(),
+                    'first_name' => $shipping_address['first_name'] ?? $billing_first_name,
+                    'last_name' => $shipping_address['last_name'] ?? $billing_last_name,
                     'company' => $shipping_address['company'] ?? '',
                     'address_1' => $shipping_address['address_1'] ?? '',
                     'address_2' => $shipping_address['address_2'] ?? '',
                     'city' => $shipping_address['city'] ?? '',
                     'postcode' => $shipping_address['postcode'] ?? '',
                     'country' => $shipping_address['country'] ?? 'GR',
-                    'phone' => $shipping_address['phone'] ?? $order->get_billing_phone(),
-                    'email' => $order->get_billing_email(),
+                    'phone' => $shipping_address['phone'] ?? $billing_phone,
+                    'email' => $billing_email,
                 ],
                 'weight' => $this->calculate_order_weight($order),
             ],
@@ -873,18 +1029,66 @@ class DMM_Delivery_Bridge {
         
         $table_name = $wpdb->prefix . 'dmm_delivery_logs';
         
-        $wpdb->insert(
+        // Ensure table exists
+        $this->ensure_log_table_exists();
+        
+        // Prepare data for logging
+        $log_data = [
+            'order_id' => $order_id,
+            'status' => $response['success'] ? 'success' : 'error',
+            'request_data' => json_encode($request_data, JSON_PRETTY_PRINT),
+            'response_data' => json_encode($response, JSON_PRETTY_PRINT),
+            'error_message' => $response['success'] ? null : $response['message'],
+            'created_at' => current_time('mysql')
+        ];
+        
+        // Insert log entry
+        $result = $wpdb->insert(
             $table_name,
-            [
-                'order_id' => $order_id,
-                'status' => $response['success'] ? 'success' : 'error',
-                'request_data' => json_encode($request_data, JSON_PRETTY_PRINT),
-                'response_data' => json_encode($response, JSON_PRETTY_PRINT),
-                'error_message' => $response['success'] ? null : $response['message'],
-                'created_at' => current_time('mysql')
-            ],
+            $log_data,
             ['%d', '%s', '%s', '%s', '%s', '%s']
         );
+        
+        // Debug logging if enabled
+        if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+            if ($result === false) {
+                error_log('DMM Delivery Bridge - Log insert failed: ' . $wpdb->last_error);
+                error_log('DMM Delivery Bridge - Log data: ' . print_r($log_data, true));
+            } else {
+                error_log('DMM Delivery Bridge - Log inserted successfully (ID: ' . $wpdb->insert_id . ')');
+            }
+        }
+        
+        // If insert failed, try to create table and retry
+        if ($result === false) {
+            error_log('DMM Delivery Bridge - Logging failed, attempting to recreate table');
+            $this->create_log_table();
+            
+            // Retry insert
+            $result = $wpdb->insert(
+                $table_name,
+                $log_data,
+                ['%d', '%s', '%s', '%s', '%s', '%s']
+            );
+            
+            if ($result === false) {
+                error_log('DMM Delivery Bridge - Log insert failed after table recreation: ' . $wpdb->last_error);
+            }
+        }
+    }
+    
+    /**
+     * Ensure log table exists
+     */
+    private function ensure_log_table_exists() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            $this->create_log_table();
+        }
     }
     
     /**
@@ -1302,6 +1506,85 @@ class DMM_Delivery_Bridge {
         wp_send_json_success([
             'message' => __('Meta fields refreshed successfully.', 'dmm-delivery-bridge')
         ]);
+    }
+    
+    /**
+     * AJAX: Check logs
+     */
+    public function ajax_check_logs() {
+        check_ajax_referer('dmm_check_logs', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+        
+        if (!$table_exists) {
+            wp_send_json_error([
+                'message' => __('Log table does not exist. Please recreate it.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Get log count
+        $log_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+        
+        // Get recent logs
+        $recent_logs = $wpdb->get_results("SELECT * FROM $table_name ORDER BY created_at DESC LIMIT 5");
+        
+        $message = sprintf(__('Log table exists. Total logs: %d. Recent logs:', 'dmm-delivery-bridge'), $log_count);
+        
+        if (!empty($recent_logs)) {
+            $message .= '<ul>';
+            foreach ($recent_logs as $log) {
+                $message .= '<li>Order #' . $log->order_id . ' - ' . $log->status . ' - ' . $log->created_at . '</li>';
+            }
+            $message .= '</ul>';
+        } else {
+            $message .= ' ' . __('No recent logs found.', 'dmm-delivery-bridge');
+        }
+        
+        wp_send_json_success([
+            'message' => $message
+        ]);
+    }
+    
+    /**
+     * AJAX: Create log table
+     */
+    public function ajax_create_log_table() {
+        check_ajax_referer('dmm_create_log_table', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        try {
+            $this->create_log_table();
+            
+            // Verify table was created
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") == $table_name;
+            
+            if ($table_exists) {
+                wp_send_json_success([
+                    'message' => __('Log table created successfully.', 'dmm-delivery-bridge')
+                ]);
+            } else {
+                wp_send_json_error([
+                    'message' => __('Failed to create log table.', 'dmm-delivery-bridge')
+                ]);
+            }
+        } catch (Exception $e) {
+            wp_send_json_error([
+                'message' => sprintf(__('Error creating log table: %s', 'dmm-delivery-bridge'), $e->getMessage())
+            ]);
+        }
     }
     
     /**

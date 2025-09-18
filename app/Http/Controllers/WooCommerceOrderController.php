@@ -118,6 +118,11 @@ class WooCommerceOrderController extends Controller
             'payment_method'   => data_get($request, 'order.payment_method'),
             'customer_id'      => $customer->id,
             
+            // Customer Information (populate for admin panel display)
+            'customer_name'    => $customer->name,
+            'customer_email'   => $customer->email,
+            'customer_phone'   => $customer->phone,
+            
             // Shipping address
             'shipping_address'     => data_get($request, 'shipping.address.address_1'),
             'shipping_city'        => data_get($request, 'shipping.address.city'),
