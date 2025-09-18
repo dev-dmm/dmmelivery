@@ -319,6 +319,17 @@ class WooCommerceOrderController extends Controller
         }
         
         foreach ($items as $itemData) {
+            // Handle product images
+            $productImages = [];
+            $imageUrl = data_get($itemData, 'image_url');
+            if ($imageUrl) {
+                $productImages[] = $imageUrl;
+                \Log::info('Product image added to order item', [
+                    'product_name' => data_get($itemData, 'name'),
+                    'image_url' => $imageUrl
+                ]);
+            }
+            
             OrderItem::create([
                 'order_id' => $order->id,
                 'tenant_id' => $order->tenant_id,
@@ -333,6 +344,7 @@ class WooCommerceOrderController extends Controller
                 'is_fragile' => false,
                 'external_product_id' => data_get($itemData, 'product_id', null),
                 'variation_id' => data_get($itemData, 'variation_id', null),
+                'product_images' => $productImages,
             ]);
         }
     }
@@ -364,6 +376,125 @@ class WooCommerceOrderController extends Controller
             'total_amount' => $totalAmount,
             'subtotal' => $subtotal
         ]);
+    }
+
+    /**
+     * Update existing order with latest data (sync)
+     */
+    public function update(Request $request): JsonResponse
+    {
+        // Log incoming sync request
+        \Log::info('WooCommerce order sync received', [
+            'headers' => $request->headers->all(),
+            'payload' => $request->all()
+        ]);
+
+        // Read headers
+        $headerKey = $request->header('X-Api-Key');
+        $tenantId  = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
+
+        if (!$headerKey) {
+            return response()->json(['success' => false, 'message' => 'API key required'], 401);
+        }
+
+        // Validate tenant
+        $tenant = Tenant::where('api_key', $headerKey)->first();
+        if (!$tenant) {
+            return response()->json(['success' => false, 'message' => 'Invalid API key'], 401);
+        }
+
+        // Get the DMM order ID from the request
+        $dmmOrderId = $request->input('dmm_order_id');
+        if (!$dmmOrderId) {
+            return response()->json(['success' => false, 'message' => 'DMM order ID required for sync'], 400);
+        }
+
+        // Find the existing order
+        $order = Order::where('id', $dmmOrderId)
+                     ->where('tenant_id', $tenant->id)
+                     ->first();
+
+        if (!$order) {
+            return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        }
+
+        // Update order data
+        $order->update([
+            'status' => $this->mapOrderStatus(data_get($request, 'order.status', $order->status)),
+            'total_amount' => (float) data_get($request, 'order.total_amount', $order->total_amount),
+            'subtotal' => (float) data_get($request, 'order.subtotal', $order->subtotal),
+            'tax_amount' => (float) data_get($request, 'order.tax_amount', $order->tax_amount),
+            'shipping_cost' => (float) data_get($request, 'order.shipping_cost', $order->shipping_cost),
+            'discount_amount' => (float) data_get($request, 'order.discount_amount', $order->discount_amount),
+            'payment_status' => data_get($request, 'order.payment_status', $order->payment_status),
+            'payment_method' => data_get($request, 'order.payment_method', $order->payment_method),
+        ]);
+
+        // Update order items with latest data (including images)
+        $this->updateOrderItems($order, $request);
+
+        \Log::info('WooCommerce order synced successfully', [
+            'tenant_id' => $tenant->id,
+            'order_id' => $order->id,
+            'external_order_id' => $order->external_order_id
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order synced successfully',
+            'data' => [
+                'success' => true,
+                'message' => 'Order synced successfully',
+                'order_id' => $order->id,
+                'shipment_id' => $order->shipment_id
+            ]
+        ], 200);
+    }
+
+    /**
+     * Update order items with latest data
+     */
+    private function updateOrderItems($order, $request)
+    {
+        $items = data_get($request, 'order.items', []);
+        
+        if (empty($items)) {
+            return;
+        }
+
+        // Delete existing order items
+        $order->orderItems()->delete();
+
+        // Create updated order items
+        foreach ($items as $itemData) {
+            // Handle product images
+            $productImages = [];
+            $imageUrl = data_get($itemData, 'image_url');
+            if ($imageUrl) {
+                $productImages[] = $imageUrl;
+                \Log::info('Product image updated in order item', [
+                    'product_name' => data_get($itemData, 'name'),
+                    'image_url' => $imageUrl
+                ]);
+            }
+
+            OrderItem::create([
+                'order_id' => $order->id,
+                'tenant_id' => $order->tenant_id,
+                'product_sku' => data_get($itemData, 'sku', 'N/A'),
+                'product_name' => data_get($itemData, 'name', 'Product'),
+                'quantity' => (int) data_get($itemData, 'quantity', 1),
+                'unit_price' => (float) data_get($itemData, 'price', 0),
+                'final_unit_price' => (float) data_get($itemData, 'price', 0),
+                'total_price' => (float) data_get($itemData, 'total', 0),
+                'weight' => (float) data_get($itemData, 'weight', 0),
+                'is_digital' => false,
+                'is_fragile' => false,
+                'external_product_id' => data_get($itemData, 'product_id', null),
+                'variation_id' => data_get($itemData, 'variation_id', null),
+                'product_images' => $productImages,
+            ]);
+        }
     }
 }
 

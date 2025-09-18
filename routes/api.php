@@ -9,4 +9,6 @@ Route::prefix('woocommerce')
     ->group(function () {
         Route::post('/order', [WooCommerceOrderController::class, 'store'])
             ->name('order');
+        Route::put('/order', [WooCommerceOrderController::class, 'update'])
+            ->name('order.update');
     });

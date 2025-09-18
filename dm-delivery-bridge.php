@@ -96,6 +96,7 @@ class DMM_Delivery_Bridge {
         // AJAX handlers
         add_action('wp_ajax_dmm_test_connection', [$this, 'ajax_test_connection']);
         add_action('wp_ajax_dmm_resend_order', [$this, 'ajax_resend_order']);
+        add_action('wp_ajax_dmm_sync_order', [$this, 'ajax_sync_order']);
         add_action('wp_ajax_dmm_refresh_meta_fields', [$this, 'ajax_refresh_meta_fields']);
         add_action('wp_ajax_dmm_check_logs', [$this, 'ajax_check_logs']);
         add_action('wp_ajax_dmm_create_log_table', [$this, 'ajax_create_log_table']);
@@ -1027,6 +1028,13 @@ class DMM_Delivery_Bridge {
                 error_log('DMM Delivery Bridge - Order Data: ' . print_r($order_data, true));
                 error_log('DMM Delivery Bridge - Customer Email: ' . $order->get_billing_email());
                 error_log('DMM Delivery Bridge - Customer Phone: ' . $order->get_billing_phone());
+                
+                // Log product images for debugging
+                if (isset($order_data['order']['items'])) {
+                    foreach ($order_data['order']['items'] as $index => $item) {
+                        error_log('DMM Delivery Bridge - Product ' . ($index + 1) . ' Image: ' . ($item['image_url'] ?? 'No image'));
+                    }
+                }
             }
             
             // Send to API
@@ -1099,6 +1107,29 @@ class DMM_Delivery_Bridge {
         $order_items = [];
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
+            
+            // Get product image URL
+            $image_url = '';
+            if ($product) {
+                $image_id = $product->get_image_id();
+                if ($image_id) {
+                    $image_url = wp_get_attachment_image_url($image_id, 'full');
+                }
+                
+                // If no main image, try to get the first gallery image
+                if (!$image_url) {
+                    $gallery_ids = $product->get_gallery_image_ids();
+                    if (!empty($gallery_ids)) {
+                        $image_url = wp_get_attachment_image_url($gallery_ids[0], 'full');
+                    }
+                }
+                
+                // If still no image, try to get placeholder image
+                if (!$image_url) {
+                    $image_url = wc_placeholder_img_src('full');
+                }
+            }
+            
             $order_items[] = [
                 'sku' => $product ? $product->get_sku() : '',
                 'name' => $item->get_name(),
@@ -1108,6 +1139,7 @@ class DMM_Delivery_Bridge {
                 'weight' => $product && $product->has_weight() ? (float) $product->get_weight() : 0,
                 'product_id' => $product ? $product->get_id() : 0,
                 'variation_id' => $item->get_variation_id(),
+                'image_url' => $image_url,
             ];
         }
         
@@ -1183,8 +1215,11 @@ class DMM_Delivery_Bridge {
             ];
         }
         
+        // Determine HTTP method based on sync flag
+        $method = isset($data['sync_update']) && $data['sync_update'] ? 'PUT' : 'POST';
+        
         $args = [
-            'method' => 'POST',
+            'method' => $method,
             'timeout' => 30,
             'headers' => [
                 'Content-Type' => 'application/json',
@@ -1364,6 +1399,14 @@ class DMM_Delivery_Bridge {
                 <?php if ($dmm_shipment_id): ?>
                     <p><small><?php _e('Shipment ID:', 'dmm-delivery-bridge'); ?> <?php echo esc_html($dmm_shipment_id); ?></small></p>
                 <?php endif; ?>
+                <div style="margin-top: 10px;">
+                    <button type="button" class="button button-small dmm-sync-order" data-order-id="<?php echo $post->ID; ?>">
+                        🔄 <?php _e('Sync Up', 'dmm-delivery-bridge'); ?>
+                    </button>
+                    <p style="font-size: 11px; color: #666; margin: 5px 0 0 0;">
+                        <?php _e('Update order with latest data (images, status, etc.)', 'dmm-delivery-bridge'); ?>
+                    </p>
+                </div>
             <?php elseif ($sent_status === 'error'): ?>
                 <p><strong style="color: red;">✗ <?php _e('Failed to send', 'dmm-delivery-bridge'); ?></strong></p>
                 <button type="button" class="button button-small dmm-resend-order" data-order-id="<?php echo $post->ID; ?>">
@@ -1405,6 +1448,42 @@ class DMM_Delivery_Bridge {
                     },
                     complete: function() {
                         button.prop('disabled', false).text('<?php _e('Retry', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            // Sync order handler
+            $('.dmm-sync-order').on('click', function() {
+                var button = $(this);
+                var orderId = button.data('order-id');
+                
+                if (!confirm('<?php _e('This will update the order in DMM Delivery with the latest data (images, status, etc.). Continue?', 'dmm-delivery-bridge'); ?>')) {
+                    return;
+                }
+                
+                button.prop('disabled', true).text('🔄 <?php _e('Syncing...', 'dmm-delivery-bridge'); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_sync_order',
+                        order_id: orderId,
+                        nonce: '<?php echo wp_create_nonce('dmm_sync_order'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('<?php _e('Order synced successfully!', 'dmm-delivery-bridge'); ?>');
+                            location.reload();
+                        } else {
+                            alert('<?php _e('Sync failed:', 'dmm-delivery-bridge'); ?> ' + response.data.message);
+                        }
+                    },
+                    error: function() {
+                        alert('<?php _e('Failed to sync order.', 'dmm-delivery-bridge'); ?>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('🔄 <?php _e('Sync Up', 'dmm-delivery-bridge'); ?>');
                     }
                 });
             });
@@ -1508,6 +1587,65 @@ class DMM_Delivery_Bridge {
         } else {
             wp_send_json_error([
                 'message' => __('Failed to send order. Check the logs for details.', 'dmm-delivery-bridge')
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Sync order (update existing order with latest data)
+     */
+    public function ajax_sync_order() {
+        check_ajax_referer('dmm_sync_order', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error([
+                'message' => __('Order not found.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Check if order was previously sent
+        $dmm_order_id = get_post_meta($order_id, '_dmm_delivery_order_id', true);
+        if (!$dmm_order_id) {
+            wp_send_json_error([
+                'message' => __('Order has not been sent to DMM Delivery yet. Use "Send Now" instead.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Prepare updated order data
+        $order_data = $this->prepare_order_data($order);
+        
+        // Add sync flag to indicate this is an update
+        $order_data['sync_update'] = true;
+        $order_data['dmm_order_id'] = $dmm_order_id;
+        
+        // Send update to API
+        $response = $this->send_to_api($order_data);
+        
+        // Log the sync attempt
+        $this->log_request($order_id, $order_data, $response);
+        
+        if ($response && $response['success']) {
+            // Update order note
+            $order->add_order_note(__('Order synced with DMM Delivery system successfully.', 'dmm-delivery-bridge'));
+            
+            wp_send_json_success([
+                'message' => __('Order synced successfully!', 'dmm-delivery-bridge')
+            ]);
+        } else {
+            $error_message = $response ? $response['message'] : 'Unknown error occurred';
+            $order->add_order_note(
+                sprintf(__('Failed to sync order with DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
+            );
+            
+            wp_send_json_error([
+                'message' => sprintf(__('Sync failed: %s', 'dmm-delivery-bridge'), $error_message)
             ]);
         }
     }
