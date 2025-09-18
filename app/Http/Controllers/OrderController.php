@@ -33,7 +33,8 @@ class OrderController extends Controller
         // Apply filters
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', "%{$search}%")
+                $q->where('id', 'like', "%{$search}%")
+                  ->orWhere('order_number', 'like', "%{$search}%")
                   ->orWhere('external_order_id', 'like', "%{$search}%")
                   ->orWhere('customer_name', 'like', "%{$search}%")
                   ->orWhere('customer_email', 'like', "%{$search}%");

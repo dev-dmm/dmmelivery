@@ -37,7 +37,8 @@ class SuperAdminController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('external_order_id', 'like', "%{$search}%")
+                $q->where('id', 'like', "%{$search}%")
+                  ->orWhere('external_order_id', 'like', "%{$search}%")
                   ->orWhere('order_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
                       $cq->where('name', 'like', "%{$search}%")

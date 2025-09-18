@@ -85,7 +85,7 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                             id="search"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            placeholder="Order ID, customer name, email..."
+                                            placeholder="Order ID, order number, customer name, email..."
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                                         />
                                     </div>
@@ -203,7 +203,10 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                         #{order.order_number}
                                                     </div>
                                                     <div className="text-sm text-gray-500">
-                                                        ID: {order.external_order_id}
+                                                        External: {order.external_order_id}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 font-mono">
+                                                        Internal: {order.id}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">

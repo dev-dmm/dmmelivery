@@ -173,7 +173,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                             id="search"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            placeholder="Order number, customer name, email..."
+                                            placeholder="Order ID, order number, customer name, email..."
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         />
                                     </div>
@@ -266,7 +266,10 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                                         #{order.order_number}
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        ID: {order.external_order_id}
+                                                        External: {order.external_order_id}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 font-mono">
+                                                        Internal: {order.id}
                                                     </div>
                                                 </td>
                                                 <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
