@@ -21,11 +21,17 @@ export default function AuthenticatedLayout({ header, children }) {
     } catch (_) {
       /* fall through */
     }
-    return !!ziggyRoutes[name]; // ziggyRoutes = usePage().props?.ziggy?.routes || {}
+    const result = !!ziggyRoutes[name]; // ziggyRoutes = usePage().props?.ziggy?.routes || {}
+    if (name.startsWith('super-admin')) {
+      console.log('hasRoute check:', { name, result, ziggyRoutes: Object.keys(ziggyRoutes) });
+    }
+    return result;
   };
   const isSuperAdmin = () => {
     if (!user) return false;
-    return user.role === 'super_admin';
+    const result = user.role === 'super_admin';
+    console.log('isSuperAdmin check:', { user: user?.email, role: user?.role, result });
+    return result;
   };
 
   function handleLogout(e) {
