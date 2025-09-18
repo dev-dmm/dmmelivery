@@ -15,6 +15,75 @@ use App\Models\Courier;
 
 class WooCommerceOrderController extends Controller
 {
+    /**
+     * Map WordPress/WooCommerce statuses to our internal statuses
+     */
+    private function mapOrderStatus(string $wooStatus): string
+    {
+        $statusMapping = [
+            // WordPress/WooCommerce statuses -> Our statuses
+            'pending' => 'pending',
+            'processing' => 'processing', 
+            'on-hold' => 'pending',        // Map on-hold to pending
+            'completed' => 'processing',   // Map completed to processing (ready to ship)
+            'cancelled' => 'cancelled',
+            'refunded' => 'cancelled',     // Map refunded to cancelled
+            'failed' => 'failed',
+            'checkout-draft' => 'pending',
+            'auto-draft' => 'pending',
+            'trash' => 'cancelled',
+            
+            // Common custom statuses
+            'ready-to-ship' => 'ready_to_ship',
+            'ready_to_ship' => 'ready_to_ship',
+            'shipped' => 'shipped',
+            'delivered' => 'delivered',
+            'returned' => 'returned',
+            'partially-shipped' => 'processing',
+            'backorder' => 'pending',
+            'pre-order' => 'pending',
+            
+            // Greek statuses (common in Greek e-commerce)
+            'σε αναμονή' => 'pending',
+            'σε επεξεργασία' => 'processing',
+            'ολοκληρωμένη' => 'processing',
+            'ακυρωμένη' => 'cancelled',
+            'αποστολή' => 'shipped',
+            'παραδόθηκε' => 'delivered',
+            'επιστροφή' => 'returned',
+            
+            // Default fallback
+            'default' => 'pending'
+        ];
+        
+        $normalizedStatus = strtolower(trim($wooStatus));
+        $mappedStatus = $statusMapping[$normalizedStatus] ?? $statusMapping['default'];
+        
+        // Log status mapping for debugging
+        if ($normalizedStatus !== $mappedStatus) {
+            \Log::info('Order status mapped', [
+                'original_status' => $wooStatus,
+                'normalized_status' => $normalizedStatus,
+                'mapped_status' => $mappedStatus
+            ]);
+        }
+        
+        return $mappedStatus;
+    }
+
+    /**
+     * Add custom status mapping (can be called from WordPress plugin if needed)
+     */
+    public function addStatusMapping(string $wooStatus, string $internalStatus): void
+    {
+        // This could be extended to store custom mappings in database
+        // For now, it's handled in the mapOrderStatus method
+        \Log::info('Custom status mapping requested', [
+            'woo_status' => $wooStatus,
+            'internal_status' => $internalStatus
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         // Log incoming request
@@ -130,7 +199,7 @@ class WooCommerceOrderController extends Controller
             'tenant_id'        => $tenant->id,
             'external_order_id'=> $externalId,
             'order_number'     => data_get($request, 'order.order_number'),
-            'status'           => data_get($request, 'order.status', 'pending'),
+            'status'           => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
             'total_amount'     => (float) data_get($request, 'order.total_amount', 0),
             'subtotal'         => (float) data_get($request, 'order.subtotal', 0),
             'tax_amount'       => (float) data_get($request, 'order.tax_amount', 0),
