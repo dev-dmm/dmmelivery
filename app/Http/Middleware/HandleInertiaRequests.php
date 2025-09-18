@@ -60,6 +60,11 @@ class HandleInertiaRequests extends Middleware
                     'orders.index',
                     'orders.show',
                     'settings.*', // wildcard if you actually use it
+                    'super-admin.*', // super admin routes
+                    'profile.*', // profile routes
+                    'courier.performance',
+                    'courier-reports.*',
+                    'test.*',
                 ];
 
                 // Filter routes by name
