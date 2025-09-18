@@ -253,6 +253,8 @@ class WooCommerceOrderController extends Controller
                 'weight' => (float) data_get($itemData, 'weight', 0),
                 'is_digital' => false,
                 'is_fragile' => false,
+                'external_product_id' => data_get($itemData, 'product_id', null),
+                'variation_id' => data_get($itemData, 'variation_id', null),
             ]);
         }
     }

@@ -908,6 +908,22 @@ class DMM_Delivery_Bridge {
             error_log('  Billing Last Name: ' . ($billing_last_name ?: 'EMPTY'));
         }
         
+        // Prepare order items
+        $order_items = [];
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            $order_items[] = [
+                'sku' => $product ? $product->get_sku() : '',
+                'name' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'price' => (float) $item->get_total() / $item->get_quantity(), // Unit price
+                'total' => (float) $item->get_total(),
+                'weight' => $product && $product->has_weight() ? (float) $product->get_weight() : 0,
+                'product_id' => $product ? $product->get_id() : 0,
+                'variation_id' => $item->get_variation_id(),
+            ];
+        }
+        
         return [
             'source' => 'woocommerce',
             'order' => [
@@ -922,6 +938,7 @@ class DMM_Delivery_Bridge {
                 'currency' => $order->get_currency(),
                 'payment_status' => $order->is_paid() ? 'paid' : 'pending',
                 'payment_method' => $order->get_payment_method(),
+                'items' => $order_items,
             ],
             'customer' => [
                 'first_name' => $billing_first_name,
