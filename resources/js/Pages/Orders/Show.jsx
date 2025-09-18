@@ -160,8 +160,10 @@ export default function OrdersShow({ order }) {
                                 <div>
                                     <h4 className="text-sm font-medium text-gray-700 mb-2">External Order ID</h4>
                                     <p className="text-sm text-gray-600">{order.external_order_id}</p>
-                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Internal Order ID</h4>
-                                    <p className="text-sm text-gray-600">{order.id}</p>
+                                    <div className="mt-4">
+                                        <h4 className="text-sm font-medium text-gray-700 mb-2">Internal Order ID</h4>
+                                        <p className="text-sm text-gray-600">{order.id}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
