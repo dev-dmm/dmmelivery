@@ -101,6 +101,7 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_check_logs', [$this, 'ajax_check_logs']);
         add_action('wp_ajax_dmm_create_log_table', [$this, 'ajax_create_log_table']);
         add_action('wp_ajax_dmm_bulk_send_orders', [$this, 'ajax_bulk_send_orders']);
+        add_action('wp_ajax_dmm_bulk_sync_orders', [$this, 'ajax_bulk_sync_orders']);
         add_action('wp_ajax_dmm_get_bulk_progress', [$this, 'ajax_get_bulk_progress']);
         add_action('wp_ajax_dmm_cancel_bulk_send', [$this, 'ajax_cancel_bulk_send']);
         
@@ -328,6 +329,9 @@ class DMM_Delivery_Bridge {
                 <div id="dmm-bulk-controls">
                     <button type="button" id="dmm-start-bulk-send" class="button button-primary">
                         <?php _e('🚀 Start Bulk Send', 'dmm-delivery-bridge'); ?>
+                    </button>
+                    <button type="button" id="dmm-start-bulk-sync" class="button button-secondary">
+                        <?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>
                     </button>
                     <button type="button" id="dmm-cancel-bulk-send" class="button button-secondary" style="display: none;">
                         <?php _e('⏹️ Cancel', 'dmm-delivery-bridge'); ?>
@@ -666,6 +670,49 @@ class DMM_Delivery_Bridge {
                 });
             });
             
+            // Bulk sync handler
+            $('#dmm-start-bulk-sync').on('click', function() {
+                if (isBulkProcessing) return;
+                
+                if (!confirm('<?php _e('This will sync all sent orders with their latest data (images, status, etc.). This may take a long time for large numbers of orders. Continue?', 'dmm-delivery-bridge'); ?>')) {
+                    return;
+                }
+                
+                var button = $(this);
+                button.prop('disabled', true).text('<?php _e('🔄 Starting...', 'dmm-delivery-bridge'); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_bulk_sync_orders',
+                        nonce: '<?php echo wp_create_nonce('dmm_bulk_sync_orders'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            isBulkProcessing = true;
+                            $('#dmm-bulk-progress').show();
+                            $('#dmm-cancel-bulk-send').show();
+                            button.hide();
+                            
+                            // Start processing batches via AJAX polling
+                            startBulkProcessing();
+                            
+                            // Start progress monitoring
+                            bulkProgressInterval = setInterval(updateBulkProgress, 1000);
+                            updateBulkProgress();
+                        } else {
+                            alert(response.data.message);
+                            button.prop('disabled', false).text('<?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>');
+                        }
+                    },
+                    error: function() {
+                        alert('<?php _e('Failed to start bulk sync.', 'dmm-delivery-bridge'); ?>');
+                        button.prop('disabled', false).text('<?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
             $('#dmm-cancel-bulk-send').on('click', function() {
                 if (!confirm('<?php _e('Are you sure you want to cancel the bulk processing?', 'dmm-delivery-bridge'); ?>')) {
                     return;
@@ -717,7 +764,11 @@ class DMM_Delivery_Bridge {
             function updateProgressBar(data) {
                 var percentage = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
                 
-                $('#dmm-progress-text').text(data.status_text || '<?php _e('Processing orders...', 'dmm-delivery-bridge'); ?>');
+                var defaultText = data.operation === 'sync' ? 
+                    '<?php _e('Syncing orders...', 'dmm-delivery-bridge'); ?>' : 
+                    '<?php _e('Processing orders...', 'dmm-delivery-bridge'); ?>';
+                
+                $('#dmm-progress-text').text(data.status_text || defaultText);
                 $('#dmm-progress-percentage').text(percentage + '%');
                 $('#dmm-progress-bar').css('width', percentage + '%');
                 $('#dmm-total-orders').text(data.total || 0);
@@ -762,6 +813,7 @@ class DMM_Delivery_Bridge {
                     bulkProcessingInterval = null;
                 }
                 $('#dmm-start-bulk-send').prop('disabled', false).text('<?php _e('🚀 Start Bulk Send', 'dmm-delivery-bridge'); ?>').show();
+                $('#dmm-start-bulk-sync').prop('disabled', false).text('<?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>').show();
                 $('#dmm-cancel-bulk-send').hide();
             }
         });
@@ -2051,6 +2103,34 @@ class DMM_Delivery_Bridge {
     }
     
     /**
+     * AJAX: Start bulk sync (update all sent orders)
+     */
+    public function ajax_bulk_sync_orders() {
+        check_ajax_referer('dmm_bulk_sync_orders', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        // Get all orders that have been sent to DMM Delivery
+        $sent_orders = $this->get_sent_orders();
+        
+        if (empty($sent_orders)) {
+            wp_send_json_success([
+                'message' => __('No sent orders found to sync.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Initialize bulk sync processing
+        $this->init_bulk_sync_processing($sent_orders);
+        
+        wp_send_json_success([
+            'message' => sprintf(__('Started syncing %d orders.', 'dmm-delivery-bridge'), count($sent_orders)),
+            'total_orders' => count($sent_orders)
+        ]);
+    }
+    
+    /**
      * AJAX: Get bulk processing progress
      */
     public function ajax_get_bulk_progress() {
@@ -2133,6 +2213,46 @@ class DMM_Delivery_Bridge {
     }
     
     /**
+     * Get all orders that have been sent to DMM Delivery
+     */
+    private function get_sent_orders() {
+        global $wpdb;
+        
+        $query = "
+            SELECT p.ID 
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_dmm_delivery_sent'
+            WHERE p.post_type = 'shop_order'
+            AND p.post_status IN ('wc-processing', 'wc-completed', 'wc-pending', 'wc-on-hold', 'wc-cancelled')
+            AND pm.meta_value = 'yes'
+            ORDER BY p.post_date ASC
+        ";
+        
+        return $wpdb->get_col($query);
+    }
+    
+    /**
+     * Initialize bulk sync processing
+     */
+    private function init_bulk_sync_processing($order_ids) {
+        $batch_size = 3; // Process 3 orders at a time for sync (smaller batches for updates)
+        $batches = array_chunk($order_ids, $batch_size);
+        
+        // Initialize progress
+        update_option('dmm_bulk_progress', [
+            'status' => 'syncing',
+            'total' => count($order_ids),
+            'processed' => 0,
+            'successful' => 0,
+            'failed' => 0,
+            'current_batch' => 0,
+            'total_batches' => count($batches),
+            'batches' => $batches,
+            'operation' => 'sync'
+        ]);
+    }
+    
+    /**
      * Initialize bulk processing
      */
     private function init_bulk_processing($order_ids) {
@@ -2158,7 +2278,7 @@ class DMM_Delivery_Bridge {
     private function process_bulk_batch() {
         $progress = get_option('dmm_bulk_progress');
         
-        if ($progress['status'] !== 'processing') {
+        if (!in_array($progress['status'], ['processing', 'syncing'])) {
             return;
         }
         
@@ -2190,18 +2310,33 @@ class DMM_Delivery_Bridge {
             }
             
             try {
-                $this->process_order($order);
-                
-                // Check if it was successful
-                $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
-                if ($sent_status === 'yes') {
-                    $batch_successful++;
+                if ($progress['status'] === 'syncing') {
+                    // Sync existing order
+                    $this->sync_order($order);
+                    
+                    // Check if sync was successful (order should still be marked as sent)
+                    $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
+                    if ($sent_status === 'yes') {
+                        $batch_successful++;
+                    } else {
+                        $batch_failed++;
+                    }
                 } else {
-                    $batch_failed++;
+                    // Process new order
+                    $this->process_order($order);
+                    
+                    // Check if it was successful
+                    $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
+                    if ($sent_status === 'yes') {
+                        $batch_successful++;
+                    } else {
+                        $batch_failed++;
+                    }
                 }
             } catch (Exception $e) {
                 $batch_failed++;
-                error_log('DMM Delivery Bridge - Bulk processing error for order ' . $order_id . ': ' . $e->getMessage());
+                $operation = $progress['status'] === 'syncing' ? 'sync' : 'processing';
+                error_log('DMM Delivery Bridge - Bulk ' . $operation . ' error for order ' . $order_id . ': ' . $e->getMessage());
             }
         }
         
@@ -2218,6 +2353,40 @@ class DMM_Delivery_Bridge {
         );
         
         update_option('dmm_bulk_progress', $progress);
+    }
+    
+    /**
+     * Sync a single order (used by bulk sync)
+     */
+    private function sync_order($order) {
+        $order_id = $order->get_id();
+        
+        // Check if order was previously sent
+        $dmm_order_id = get_post_meta($order_id, '_dmm_delivery_order_id', true);
+        if (!$dmm_order_id) {
+            throw new Exception('Order has not been sent to DMM Delivery yet');
+        }
+        
+        // Prepare updated order data
+        $order_data = $this->prepare_order_data($order);
+        
+        // Add sync flag to indicate this is an update
+        $order_data['sync_update'] = true;
+        $order_data['dmm_order_id'] = $dmm_order_id;
+        
+        // Send update to API
+        $response = $this->send_to_api($order_data);
+        
+        // Log the sync attempt
+        $this->log_request($order_id, $order_data, $response);
+        
+        if (!$response || !$response['success']) {
+            $error_message = $response ? $response['message'] : 'Unknown error occurred';
+            throw new Exception('Sync failed: ' . $error_message);
+        }
+        
+        // Add order note
+        $order->add_order_note(__('Order synced with DMM Delivery system successfully.', 'dmm-delivery-bridge'));
     }
 }
 
