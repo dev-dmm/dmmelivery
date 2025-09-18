@@ -53,7 +53,7 @@ class OrderController extends Controller
             'pending' => Order::where('tenant_id', $tenant->id)->where('status', 'pending')->count(),
             'processing' => Order::where('tenant_id', $tenant->id)->where('status', 'processing')->count(),
             'shipped' => Order::where('tenant_id', $tenant->id)->whereIn('status', ['shipped', 'delivered'])->count(),
-            'completed' => Order::where('tenant_id', $tenant->id)->where('status', 'delivered')->count(),
+            'completed' => Order::where('tenant_id', $tenant->id)->whereIn('status', ['delivered', 'completed'])->count(),
         ];
 
         // Status options
@@ -63,6 +63,7 @@ class OrderController extends Controller
             'ready_to_ship' => 'Ready to Ship',
             'shipped' => 'Shipped',
             'delivered' => 'Delivered',
+            'completed' => 'Completed',
             'cancelled' => 'Cancelled',
             'failed' => 'Failed',
             'returned' => 'Returned',
