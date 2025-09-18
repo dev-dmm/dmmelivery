@@ -214,6 +214,9 @@ export default function OrdersShow({ order }) {
                                         <thead className="bg-gray-50">
                                             <tr>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Image
+                                                </th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Product
                                                 </th>
                                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -236,6 +239,35 @@ export default function OrdersShow({ order }) {
                                         <tbody className="bg-white divide-y divide-gray-200">
                                             {order.items.map((item) => (
                                                 <tr key={item.id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {(() => {
+                                                            // Get the first image from product_images array or fallback to image_url
+                                                            const imageUrl = (item.product_images && item.product_images.length > 0) 
+                                                                ? item.product_images[0] 
+                                                                : item.image_url;
+                                                            
+                                                            return imageUrl ? (
+                                                                <div className="flex items-center">
+                                                                    <img 
+                                                                        src={imageUrl} 
+                                                                        alt={item.product_name}
+                                                                        className="w-12 h-12 rounded object-cover border border-gray-200"
+                                                                        onError={(e) => {
+                                                                            e.target.style.display = 'none';
+                                                                            e.target.nextSibling.style.display = 'flex';
+                                                                        }}
+                                                                    />
+                                                                    <div className="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs" style={{display: 'none'}}>
+                                                                        ❌
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                                                                    📷
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <div className="text-sm font-medium text-gray-900">
                                                             {item.product_name}

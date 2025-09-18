@@ -191,6 +191,9 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                 Shipment
                                             </th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Images
+                                            </th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Created
                                             </th>
                                         </tr>
@@ -250,6 +253,41 @@ export default function SuperAdminOrders({ auth, orders, tenants, orderStatuses,
                                                         </div>
                                                     ) : (
                                                         <span className="text-sm text-gray-500">No shipment</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {order.order_items && order.order_items.length > 0 ? (
+                                                        <div className="text-sm">
+                                                            {order.order_items.map((item, index) => (
+                                                                <div key={index} className="mb-1">
+                                                                    {(() => {
+                                                                        // Get the first image from product_images array or fallback to image_url
+                                                                        const imageUrl = (item.product_images && item.product_images.length > 0) 
+                                                                            ? item.product_images[0] 
+                                                                            : item.image_url;
+                                                                        
+                                                                        return imageUrl ? (
+                                                                            <div className="flex items-center space-x-2">
+                                                                                <img 
+                                                                                    src={imageUrl} 
+                                                                                    alt={item.name || item.product_name}
+                                                                                    className="w-8 h-8 rounded object-cover"
+                                                                                    onError={(e) => {
+                                                                                        e.target.style.display = 'none';
+                                                                                        e.target.nextSibling.style.display = 'inline';
+                                                                                    }}
+                                                                                />
+                                                                                <span className="text-xs text-gray-500" style={{display: 'none'}}>❌</span>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-xs text-gray-400">❌ No image</span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-500">No items</span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
