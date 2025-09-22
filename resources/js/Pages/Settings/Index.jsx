@@ -448,6 +448,39 @@ export default function SettingsIndex({
     }
   }, [testApiKey, tenantId, wooEndpoint, canMakeCall, recordCall, setLoading, showMessage]);
 
+  const downloadPlugin = useCallback(async () => {
+    if (!canMakeCall()) {
+      showMessage('download', 'Too many requests. Please wait a moment.', 'error');
+      return;
+    }
+
+    setLoading('download', true);
+    recordCall();
+
+    try {
+      const result = await apiService.post(route('settings.download.plugin'), {});
+
+      if (result?.success && result.download_url) {
+        // Create a temporary link to trigger download
+        const link = document.createElement('a');
+        link.href = result.download_url;
+        link.download = 'dmm-delivery-bridge.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage('download', 'Plugin download started! Check your downloads folder.', 'success');
+      } else {
+        showMessage('download', result?.message || 'Download failed', 'error');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      showMessage('download', error instanceof Error ? error.message : 'Download failed', 'error');
+    } finally {
+      setLoading('download', false);
+    }
+  }, [apiService, canMakeCall, recordCall, setLoading, showMessage]);
+
   /* --------- UI Helpers --------- */
   const getCourierStatusBadge = useCallback((status) => {
     const statusConfig = {
@@ -490,6 +523,7 @@ export default function SettingsIndex({
     { name: '🏢 Business', icon: BuildingOfficeIcon },
     { name: '🚚 Couriers', icon: TruckIcon },
     { name: '🔗 API & Webhooks', icon: GlobeAltIcon },
+    { name: '📦 Download Plugin', icon: ClipboardDocumentIcon },
   ];
 
   const maskedToken = apiToken === 'configured' ? '••••••••••••••••' : (apiToken ? `${apiToken.slice(0, 4)}••••${apiToken.slice(-4)}` : '—');
@@ -1043,6 +1077,129 @@ export default function SettingsIndex({
                               {tenant?.current_month_shipments || 0} / {tenant?.monthly_shipment_limit || '∞'} shipments
                             </span>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabPanel>
+
+                {/* Download Plugin Tab */}
+                <TabPanel className="p-4 lg:p-6">
+                  <div className="space-y-4 lg:space-y-6">
+                    <div>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Download WordPress Plugin</h3>
+                      <p className="text-xs lg:text-sm text-gray-600 mb-4 lg:mb-6">
+                        Download the complete DMM Delivery Bridge plugin as a zip file for installation on other WordPress sites.
+                      </p>
+                    </div>
+
+                    {getMessageAlert('download')}
+
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 lg:p-6">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          <ClipboardDocumentIcon className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-green-900 mb-2">Plugin Package</h4>
+                          <p className="text-sm text-green-700 mb-4">
+                            The downloaded zip file contains the complete WordPress plugin that can be installed on any WordPress site with WooCommerce.
+                          </p>
+                          
+                          <div className="bg-white rounded-md p-3 mb-4">
+                            <h5 className="text-xs font-medium text-gray-900 mb-2">What's included:</h5>
+                            <ul className="text-xs text-gray-600 space-y-1">
+                              <li>• Complete WordPress plugin file (dm-delivery-bridge.php)</li>
+                              <li>• Automatic order synchronization with DMM Delivery</li>
+                              <li>• WooCommerce integration</li>
+                              <li>• Admin interface for configuration</li>
+                              <li>• Bulk order processing tools</li>
+                              <li>• Debug and logging features</li>
+                            </ul>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <PrimaryButton 
+                              onClick={downloadPlugin} 
+                              disabled={loading.download}
+                              className="w-full sm:w-auto"
+                            >
+                              {loading.download ? (
+                                <>
+                                  <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                  Creating Zip...
+                                </>
+                              ) : (
+                                <>
+                                  <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                  Download Plugin Zip
+                                </>
+                              )}
+                            </PrimaryButton>
+                            
+                            <SecondaryButton 
+                              onClick={() => copyToClipboard(wooEndpoint, 'download')}
+                              className="w-full sm:w-auto"
+                            >
+                              <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                              Copy API Endpoint
+                            </SecondaryButton>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">Installation Instructions</h4>
+                      <div className="text-sm text-blue-700 space-y-2">
+                        <p>1. Download the plugin zip file using the button above</p>
+                        <p>2. Go to your WordPress admin → Plugins → Add New → Upload Plugin</p>
+                        <p>3. Upload the downloaded zip file and activate the plugin</p>
+                        <p>4. Configure the plugin with your API endpoint and credentials</p>
+                        <p>5. The plugin will automatically sync WooCommerce orders to DMM Delivery</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">API Configuration</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-white px-2 py-1 rounded border break-all flex-1">
+                            API Endpoint: {wooEndpoint}
+                          </code>
+                          <SecondaryButton onClick={() => copyToClipboard(wooEndpoint, 'download')} size="sm">
+                            <ClipboardDocumentIcon className="h-3 w-3" />
+                          </SecondaryButton>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-white px-2 py-1 rounded border break-all flex-1">
+                            API Key: {maskedToken}
+                          </code>
+                          {apiToken && (
+                            <SecondaryButton 
+                              onClick={() => {
+                                if (unmaskedApiToken) {
+                                  copyToClipboard(unmaskedApiToken, 'download');
+                                } else {
+                                  showMessage('download', 'Generate a new token to get a copyable value', 'error');
+                                }
+                              }} 
+                              size="sm"
+                              disabled={!unmaskedApiToken}
+                            >
+                              <ClipboardDocumentIcon className="h-3 w-3" />
+                            </SecondaryButton>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-white px-2 py-1 rounded border break-all flex-1">
+                            Tenant ID: {tenantId || '—'}
+                          </code>
+                          {tenantId && (
+                            <SecondaryButton onClick={() => copyToClipboard(tenantId, 'download')} size="sm">
+                              <ClipboardDocumentIcon className="h-3 w-3" />
+                            </SecondaryButton>
+                          )}
                         </div>
                       </div>
                     </div>

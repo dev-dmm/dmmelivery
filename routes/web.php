@@ -131,6 +131,8 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     Route::delete('/settings/courier/delete',               [SettingsController::class, 'deleteCourierCredentials'])->name('settings.courier.delete');
     // Route::post('/settings/api/generate',                   [SettingsController::class, 'generateApiToken'])->name('settings.api.generate'); // Moved to auth-only group for local dev
     Route::post('/settings/webhooks',                       [SettingsController::class, 'updateWebhooks'])->name('settings.webhooks.update');
+    Route::post('/settings/download/plugin',                [SettingsController::class, 'downloadPlugin'])->name('settings.download.plugin');
+    Route::get('/settings/download/plugin/{filename}',      [SettingsController::class, 'downloadPluginFile'])->name('settings.download.plugin.file');
 
     // Performance view
     Route::get('/courier-performance', [DashboardController::class, 'courierPerformance'])

@@ -6,8 +6,11 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 use Inertia\Inertia;
 use Inertia\Response;
+use ZipArchive;
 
 class SettingsController extends Controller
 {
@@ -394,5 +397,143 @@ class SettingsController extends Controller
             'success' => true,
             'message' => ucfirst($courier) . ' credentials removed successfully',
         ]);
+    }
+
+    /**
+     * Download WordPress plugin as zip file
+     */
+    public function downloadPlugin(Request $request): JsonResponse
+    {
+        try {
+            $tenant = Auth::user()->currentTenant();
+            
+            // Create a temporary directory for the plugin files
+            $tempDir = storage_path('app/temp/plugin-' . uniqid());
+            File::makeDirectory($tempDir, 0755, true);
+            
+            // Copy the plugin file to the temp directory
+            $pluginSourcePath = base_path('dm-delivery-bridge.php');
+            $pluginDestPath = $tempDir . '/dm-delivery-bridge.php';
+            
+            if (!File::exists($pluginSourcePath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Plugin file not found',
+                ], 404);
+            }
+            
+            File::copy($pluginSourcePath, $pluginDestPath);
+            
+            // Create a README file with installation instructions
+            $readmeContent = $this->generatePluginReadme($tenant);
+            File::put($tempDir . '/README.txt', $readmeContent);
+            
+            // Create zip file
+            $zipFileName = 'dmm-delivery-bridge-' . date('Y-m-d') . '.zip';
+            $zipPath = storage_path('app/temp/' . $zipFileName);
+            
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE) !== TRUE) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create zip file',
+                ], 500);
+            }
+            
+            // Add files to zip
+            $zip->addFile($pluginDestPath, 'dm-delivery-bridge.php');
+            $zip->addFile($tempDir . '/README.txt', 'README.txt');
+            
+            $zip->close();
+            
+            // Clean up temp directory
+            File::deleteDirectory($tempDir);
+            
+            // Generate a temporary download URL
+            $downloadUrl = route('settings.download.plugin.file', ['filename' => $zipFileName]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Plugin zip file created successfully',
+                'download_url' => $downloadUrl,
+                'filename' => $zipFileName,
+            ]);
+            
+        } catch (\Exception $e) {
+            // Clean up on error
+            if (isset($tempDir) && File::exists($tempDir)) {
+                File::deleteDirectory($tempDir);
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create plugin zip: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
+     * Generate README content for the plugin
+     */
+    private function generatePluginReadme($tenant): string
+    {
+        $apiEndpoint = url('/api/woocommerce/order');
+        
+        return "DMM Delivery Bridge WordPress Plugin
+============================================
+
+INSTALLATION:
+1. Upload the dm-delivery-bridge.php file to your WordPress plugins directory
+2. Activate the plugin in your WordPress admin
+3. Go to WooCommerce > DMM Delivery to configure the plugin
+
+CONFIGURATION:
+- API Endpoint: {$apiEndpoint}
+- Tenant ID: {$tenant->id}
+- API Key: [Generate from your DMM Delivery dashboard]
+
+FEATURES:
+- Automatic order synchronization with DMM Delivery
+- WooCommerce integration
+- Admin interface for configuration
+- Bulk order processing tools
+- Debug and logging features
+- Support for multiple courier services
+
+SUPPORT:
+For support and updates, visit your DMM Delivery dashboard.
+
+Generated on: " . date('Y-m-d H:i:s');
+    }
+    
+    /**
+     * Serve the plugin zip file for download
+     */
+    public function downloadPluginFile(Request $request, string $filename)
+    {
+        $tenant = Auth::user()->currentTenant();
+        
+        // Validate filename to prevent directory traversal
+        if (!preg_match('/^dmm-delivery-bridge-\d{4}-\d{2}-\d{2}\.zip$/', $filename)) {
+            abort(400, 'Invalid filename');
+        }
+        
+        $filePath = storage_path('app/temp/' . $filename);
+        
+        if (!File::exists($filePath)) {
+            abort(404, 'File not found');
+        }
+        
+        // Clean up the file after serving (optional - you might want to keep it for a while)
+        $response = response()->download($filePath, 'dmm-delivery-bridge.zip');
+        
+        // Schedule cleanup after response is sent
+        register_shutdown_function(function() use ($filePath) {
+            if (File::exists($filePath)) {
+                File::delete($filePath);
+            }
+        });
+        
+        return $response;
     }
 } 
