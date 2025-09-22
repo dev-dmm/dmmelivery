@@ -73,16 +73,16 @@ class FetchCourierStatuses implements ShouldQueue
      */
     private function fetchShipmentStatus(Courier $courier, Shipment $shipment): void
     {
-        switch (strtolower($courier->code)) {
-            case 'acs':
+        switch (strtoupper($courier->code)) {
+            case 'ACS':
                 $this->fetchACSStatus($courier, $shipment);
                 break;
-            case 'elt':
-            case 'elta':
+            case 'ELT':
+            case 'ELTA':
                 $this->fetchELTAStatus($courier, $shipment);
                 break;
-            case 'spx':
-            case 'speedex':
+            case 'SPX':
+            case 'SPEEDEX':
                 $this->fetchSpeedexStatus($courier, $shipment);
                 break;
             default:

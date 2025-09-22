@@ -266,7 +266,7 @@ class SettingsController extends Controller
                     }
 
                     // Test ACS connection using the service
-                    $courier = \App\Models\Courier::where('code', 'acs')->first();
+                    $courier = \App\Models\Courier::where('code', 'ACS')->first();
                     if (!$courier) {
                         return response()->json([
                             'success' => false,
