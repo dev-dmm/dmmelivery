@@ -43,12 +43,15 @@ class RegisteredUserController extends Controller
         $lastName = $nameParts[1] ?? '';
 
         // Create or get a default tenant for new users
-        $defaultTenant = Tenant::firstOrCreate([
-            'name' => 'Default Company',
-            'subdomain' => 'default',
-        ], [
-            'is_active' => true,
-        ]);
+        $defaultTenant = Tenant::where('subdomain', 'default')->first();
+        
+        if (!$defaultTenant) {
+            $defaultTenant = Tenant::create([
+                'name' => 'Default Company',
+                'subdomain' => 'default',
+                'is_active' => true,
+            ]);
+        }
 
         $user = User::create([
             'first_name' => $firstName,
