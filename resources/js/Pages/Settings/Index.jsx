@@ -156,6 +156,7 @@ export default function SettingsIndex({
     send_notifications: tenant?.send_notifications ?? true,
 
     // ACS Credentials
+    acs_api_key: tenant?.acs_api_key || '',
     acs_company_id: tenant?.acs_company_id || '',
     acs_company_password: '',
     acs_user_id: tenant?.acs_user_id || '',
@@ -270,6 +271,7 @@ export default function SettingsIndex({
 
     try {
       const payload = {
+        acs_api_key: sanitizeInput(formData.acs_api_key),
         acs_company_id: sanitizeInput(formData.acs_company_id),
         acs_company_password: formData.acs_company_password,
         acs_user_id: sanitizeInput(formData.acs_user_id),
@@ -294,6 +296,7 @@ export default function SettingsIndex({
   }, [apiService, formData, canMakeCall, recordCall, setLoading, showMessage]);
 
   const fillDemoCredentials = useCallback(() => {
+    updateFormData('acs_api_key', 'demo');
     updateFormData('acs_company_id', 'demo');
     updateFormData('acs_company_password', 'demo');
     updateFormData('acs_user_id', 'demo');
@@ -755,6 +758,17 @@ export default function SettingsIndex({
                               {getMessageAlert('acs')}
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
+                                <div>
+                                  <InputLabel htmlFor="acs_api_key" value="ACS API Key" />
+                                  <TextInput
+                                    id="acs_api_key"
+                                    value={formData.acs_api_key}
+                                    onChange={(e) => updateFormData('acs_api_key', e.target.value)}
+                                    className="mt-1 block w-full"
+                                    placeholder="Enter your ACS API key"
+                                  />
+                                </div>
+
                                 <div>
                                   <InputLabel htmlFor="acs_company_id" value="Company ID" />
                                   <TextInput

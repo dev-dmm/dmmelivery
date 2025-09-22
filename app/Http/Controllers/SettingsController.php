@@ -33,6 +33,7 @@ class SettingsController extends Controller
                 
                 // Courier API Settings
                 'has_acs_credentials' => $tenant->hasACSCredentials(),
+                'acs_api_key' => $tenant->acs_api_key ? '••••••••' : null,
                 'acs_company_id' => $tenant->acs_company_id,
                 'acs_company_password' => $tenant->acs_company_password ? '••••••••' : null,
                 'acs_user_id' => $tenant->acs_user_id,
@@ -164,6 +165,7 @@ class SettingsController extends Controller
         $tenant = Auth::user()->currentTenant();
         
         $validator = Validator::make($request->all(), [
+            'acs_api_key' => 'required|string|max:100',
             'acs_company_id' => 'required|string|max:50',
             'acs_company_password' => 'required|string|max:100',
             'acs_user_id' => 'required|string|max:50',
@@ -179,6 +181,7 @@ class SettingsController extends Controller
         }
 
         $tenant->update([
+            'acs_api_key' => $request->input('acs_api_key'),
             'acs_company_id' => $request->input('acs_company_id'),
             'acs_company_password' => $request->input('acs_company_password'),
             'acs_user_id' => $request->input('acs_user_id'),
@@ -263,7 +266,15 @@ class SettingsController extends Controller
                     }
 
                     // Test ACS connection using the service
-                    $acsService = new \App\Services\ACSCourierService();
+                    $courier = \App\Models\Courier::where('code', 'acs')->first();
+                    if (!$courier) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'ACS courier not found in database',
+                        ], 400);
+                    }
+                    
+                    $acsService = new \App\Services\ACSCourierService($courier);
                     $testResult = $acsService->getStations(); // Simple API test
                     
                     return response()->json([
@@ -365,6 +376,7 @@ class SettingsController extends Controller
         switch ($courier) {
             case 'acs':
                 $updateData = [
+                    'acs_api_key' => null,
                     'acs_company_id' => null,
                     'acs_company_password' => null,
                     'acs_user_id' => null,
