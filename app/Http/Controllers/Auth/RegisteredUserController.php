@@ -42,23 +42,31 @@ class RegisteredUserController extends Controller
         $firstName = $nameParts[0];
         $lastName = $nameParts[1] ?? '';
 
-        // Create or get a default tenant for new users
-        $defaultTenant = Tenant::where('subdomain', 'default')->first();
+        // Create a unique tenant for this user based on their name
+        $companyName = $request->name . "'s Company";
+        $subdomain = strtolower(str_replace(' ', '-', preg_replace('/[^a-zA-Z0-9\s]/', '', $request->name)));
         
-        if (!$defaultTenant) {
-            $defaultTenant = Tenant::create([
-                'name' => 'Default Company',
-                'subdomain' => 'default',
-                'is_active' => true,
-            ]);
+        // Ensure subdomain is unique by appending a number if needed
+        $originalSubdomain = $subdomain;
+        $counter = 1;
+        while (Tenant::where('subdomain', $subdomain)->exists()) {
+            $subdomain = $originalSubdomain . '-' . $counter;
+            $counter++;
         }
+        
+        $userTenant = Tenant::create([
+            'name' => $companyName,
+            'subdomain' => $subdomain,
+            'is_active' => true,
+            'onboarding_status' => 'pending',
+        ]);
 
         $user = User::create([
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'tenant_id' => $defaultTenant->id,
+            'tenant_id' => $userTenant->id,
             'role' => 'admin', // First user becomes admin
             'is_active' => true,
         ]);

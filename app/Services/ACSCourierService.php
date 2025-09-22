@@ -20,10 +20,28 @@ class ACSCourierService
     {
         $this->apiEndpoint = $courier->api_endpoint;
         $this->apiKey = $courier->api_key;
-        $this->companyId = config('app.acs_company_id');
-        $this->companyPassword = config('app.acs_company_password');
-        $this->userId = config('app.acs_user_id');
-        $this->userPassword = config('app.acs_user_password');
+        
+        // Get credentials from current tenant if available, otherwise fall back to config
+        try {
+            $tenant = app('tenant');
+            if ($tenant && $tenant->hasACSCredentials()) {
+                $this->companyId = $tenant->acs_company_id;
+                $this->companyPassword = $tenant->acs_company_password;
+                $this->userId = $tenant->acs_user_id;
+                $this->userPassword = $tenant->acs_user_password;
+            } else {
+                $this->companyId = config('app.acs_company_id');
+                $this->companyPassword = config('app.acs_company_password');
+                $this->userId = config('app.acs_user_id');
+                $this->userPassword = config('app.acs_user_password');
+            }
+        } catch (\Exception $e) {
+            // Fall back to config if tenant is not available
+            $this->companyId = config('app.acs_company_id');
+            $this->companyPassword = config('app.acs_company_password');
+            $this->userId = config('app.acs_user_id');
+            $this->userPassword = config('app.acs_user_password');
+        }
     }
 
     /**
@@ -178,7 +196,7 @@ class ACSCourierService
 
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'AcsApiKey' => $this->apiKey
+                'ACSApiKey' => $this->apiKey
             ])->timeout(30)->post($this->apiEndpoint, $payload);
 
             if ($response->successful()) {
