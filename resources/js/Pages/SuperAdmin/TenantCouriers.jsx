@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
-import { Label } from '@/Components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/Components/ui/dialog';
-import { Alert, AlertDescription } from '@/Components/ui/alert';
-import { Plus, Edit, Trash2, Package, ArrowLeft } from 'lucide-react';
 
 export default function TenantCouriers({ tenant, couriers, filters }) {
     const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -97,7 +89,7 @@ export default function TenantCouriers({ tenant, couriers, filters }) {
                                         href={route('super-admin.tenants.show', tenant.id)}
                                         className="text-gray-500 hover:text-gray-700"
                                     >
-                                        <ArrowLeft className="h-5 w-5" />
+                                        ← Back
                                     </Link>
                                     <div>
                                         <h1 className="text-2xl font-bold text-gray-900">
@@ -110,204 +102,81 @@ export default function TenantCouriers({ tenant, couriers, filters }) {
                                 </div>
                                 
                                 <div className="flex space-x-2">
-                                    <Button
+                                    <button
                                         onClick={handleCreateACS}
                                         disabled={creatingACS}
-                                        variant="outline"
+                                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
                                     >
-                                        <Package className="h-4 w-4 mr-2" />
-                                        Add ACS Courier
-                                    </Button>
+                                        {creatingACS ? 'Creating...' : 'Add ACS Courier'}
+                                    </button>
                                     
-                                    <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-                                        <DialogTrigger asChild>
-                                            <Button>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add Courier
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Create New Courier</DialogTitle>
-                                                <DialogDescription>
-                                                    Add a new courier service for this tenant.
-                                                </DialogDescription>
-                                            </DialogHeader>
-                                            <form onSubmit={handleCreateCourier}>
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <Label htmlFor="name">Name</Label>
-                                                        <Input
-                                                            id="name"
-                                                            value={createData.name}
-                                                            onChange={(e) => setCreateData('name', e.target.value)}
-                                                            placeholder="e.g., DHL, FedEx"
-                                                            required
-                                                        />
-                                                        {createErrors.name && (
-                                                            <p className="text-red-500 text-sm mt-1">{createErrors.name}</p>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div>
-                                                        <Label htmlFor="code">Code</Label>
-                                                        <Input
-                                                            id="code"
-                                                            value={createData.code}
-                                                            onChange={(e) => setCreateData('code', e.target.value)}
-                                                            placeholder="e.g., dhl, fedex"
-                                                            required
-                                                        />
-                                                        {createErrors.code && (
-                                                            <p className="text-red-500 text-sm mt-1">{createErrors.code}</p>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div>
-                                                        <Label htmlFor="api_endpoint">API Endpoint</Label>
-                                                        <Input
-                                                            id="api_endpoint"
-                                                            type="url"
-                                                            value={createData.api_endpoint}
-                                                            onChange={(e) => setCreateData('api_endpoint', e.target.value)}
-                                                            placeholder="https://api.example.com"
-                                                        />
-                                                        {createErrors.api_endpoint && (
-                                                            <p className="text-red-500 text-sm mt-1">{createErrors.api_endpoint}</p>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div>
-                                                        <Label htmlFor="api_key">API Key</Label>
-                                                        <Input
-                                                            id="api_key"
-                                                            type="password"
-                                                            value={createData.api_key}
-                                                            onChange={(e) => setCreateData('api_key', e.target.value)}
-                                                            placeholder="Enter API key"
-                                                        />
-                                                        {createErrors.api_key && (
-                                                            <p className="text-red-500 text-sm mt-1">{createErrors.api_key}</p>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div>
-                                                        <Label htmlFor="tracking_url_template">Tracking URL Template</Label>
-                                                        <Input
-                                                            id="tracking_url_template"
-                                                            value={createData.tracking_url_template}
-                                                            onChange={(e) => setCreateData('tracking_url_template', e.target.value)}
-                                                            placeholder="https://track.example.com/{tracking_number}"
-                                                        />
-                                                        {createErrors.tracking_url_template && (
-                                                            <p className="text-red-500 text-sm mt-1">{createErrors.tracking_url_template}</p>
-                                                        )}
-                                                    </div>
-                                                    
-                                                    <div className="flex items-center space-x-4">
-                                                        <label className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={createData.is_active}
-                                                                onChange={(e) => setCreateData('is_active', e.target.checked)}
-                                                                className="mr-2"
-                                                            />
-                                                            Active
-                                                        </label>
-                                                        
-                                                        <label className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={createData.is_default}
-                                                                onChange={(e) => setCreateData('is_default', e.target.checked)}
-                                                                className="mr-2"
-                                                            />
-                                                            Default
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                                
-                                                <DialogFooter>
-                                                    <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                                                        Cancel
-                                                    </Button>
-                                                    <Button type="submit" disabled={creating}>
-                                                        {creating ? 'Creating...' : 'Create Courier'}
-                                                    </Button>
-                                                </DialogFooter>
-                                            </form>
-                                        </DialogContent>
-                                    </Dialog>
+                                    <button
+                                        onClick={() => setShowCreateDialog(true)}
+                                        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                    >
+                                        + Add Courier
+                                    </button>
                                 </div>
                             </div>
 
                             {/* Couriers List */}
-                            <div className="grid gap-4">
+                            <div className="space-y-4">
                                 {couriers.data.length === 0 ? (
-                                    <Card>
-                                        <CardContent className="p-6 text-center">
-                                            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                            <h3 className="text-lg font-medium text-gray-900 mb-2">No couriers found</h3>
-                                            <p className="text-gray-600 mb-4">
-                                                This tenant doesn't have any couriers configured yet.
-                                            </p>
-                                            <Button onClick={() => setShowCreateDialog(true)}>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add First Courier
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
+                                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                                        <div className="text-gray-400 text-6xl mb-4">📦</div>
+                                        <h3 className="text-lg font-medium text-gray-900 mb-2">No couriers found</h3>
+                                        <p className="text-gray-600 mb-4">
+                                            This tenant doesn't have any couriers configured yet.
+                                        </p>
+                                        <button 
+                                            onClick={() => setShowCreateDialog(true)}
+                                            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                        >
+                                            + Add First Courier
+                                        </button>
+                                    </div>
                                 ) : (
                                     couriers.data.map((courier) => (
-                                        <Card key={courier.id}>
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <CardTitle className="flex items-center space-x-2">
-                                                            <span>{courier.name}</span>
-                                                            {courier.is_default && (
-                                                                <Badge variant="default">Default</Badge>
-                                                            )}
-                                                            {!courier.is_active && (
-                                                                <Badge variant="secondary">Inactive</Badge>
-                                                            )}
-                                                        </CardTitle>
-                                                        <CardDescription>
-                                                            Code: {courier.code}
-                                                        </CardDescription>
-                                                    </div>
-                                                    <div className="flex space-x-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleEdit(courier)}
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleDelete(courier)}
-                                                            className="text-red-600 hover:text-red-700"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
+                                        <div key={courier.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-lg font-medium text-gray-900 flex items-center space-x-2">
+                                                        <span>{courier.name}</span>
+                                                        {courier.is_default && (
+                                                            <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">Default</span>
+                                                        )}
+                                                        {!courier.is_active && (
+                                                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">Inactive</span>
+                                                        )}
+                                                    </h3>
+                                                    <p className="text-gray-600">Code: {courier.code}</p>
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                                    <div>
-                                                        <strong>API Endpoint:</strong>
-                                                        <p className="text-gray-600">{courier.api_endpoint || 'Not configured'}</p>
-                                                    </div>
-                                                    <div>
-                                                        <strong>Tracking URL:</strong>
-                                                        <p className="text-gray-600">{courier.tracking_url_template || 'Not configured'}</p>
-                                                    </div>
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => handleEdit(courier)}
+                                                        className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(courier)}
+                                                        className="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                                    >
+                                                        Delete
+                                                    </button>
                                                 </div>
-                                            </CardContent>
-                                        </Card>
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+                                                <div>
+                                                    <strong>API Endpoint:</strong>
+                                                    <p className="text-gray-600">{courier.api_endpoint || 'Not configured'}</p>
+                                                </div>
+                                                <div>
+                                                    <strong>Tracking URL:</strong>
+                                                    <p className="text-gray-600">{courier.tracking_url_template || 'Not configured'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ))
                                 )}
                             </div>
@@ -336,115 +205,228 @@ export default function TenantCouriers({ tenant, couriers, filters }) {
                 </div>
             </div>
 
-            {/* Edit Dialog */}
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Courier</DialogTitle>
-                        <DialogDescription>
-                            Update the courier information.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleUpdateCourier}>
-                        <div className="space-y-4">
-                            <div>
-                                <Label htmlFor="edit_name">Name</Label>
-                                <Input
-                                    id="edit_name"
-                                    value={editData.name}
-                                    onChange={(e) => setEditData('name', e.target.value)}
-                                    required
-                                />
-                                {editErrors.name && (
-                                    <p className="text-red-500 text-sm mt-1">{editErrors.name}</p>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor="edit_code">Code</Label>
-                                <Input
-                                    id="edit_code"
-                                    value={editData.code}
-                                    onChange={(e) => setEditData('code', e.target.value)}
-                                    required
-                                />
-                                {editErrors.code && (
-                                    <p className="text-red-500 text-sm mt-1">{editErrors.code}</p>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor="edit_api_endpoint">API Endpoint</Label>
-                                <Input
-                                    id="edit_api_endpoint"
-                                    type="url"
-                                    value={editData.api_endpoint}
-                                    onChange={(e) => setEditData('api_endpoint', e.target.value)}
-                                />
-                                {editErrors.api_endpoint && (
-                                    <p className="text-red-500 text-sm mt-1">{editErrors.api_endpoint}</p>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor="edit_api_key">API Key</Label>
-                                <Input
-                                    id="edit_api_key"
-                                    type="password"
-                                    value={editData.api_key}
-                                    onChange={(e) => setEditData('api_key', e.target.value)}
-                                />
-                                {editErrors.api_key && (
-                                    <p className="text-red-500 text-sm mt-1">{editErrors.api_key}</p>
-                                )}
-                            </div>
-                            
-                            <div>
-                                <Label htmlFor="edit_tracking_url_template">Tracking URL Template</Label>
-                                <Input
-                                    id="edit_tracking_url_template"
-                                    value={editData.tracking_url_template}
-                                    onChange={(e) => setEditData('tracking_url_template', e.target.value)}
-                                />
-                                {editErrors.tracking_url_template && (
-                                    <p className="text-red-500 text-sm mt-1">{editErrors.tracking_url_template}</p>
-                                )}
-                            </div>
-                            
-                            <div className="flex items-center space-x-4">
-                                <label className="flex items-center">
+            {/* Create Dialog */}
+            {showCreateDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                        <h2 className="text-lg font-medium mb-4">Create New Courier</h2>
+                        <form onSubmit={handleCreateCourier}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Name</label>
                                     <input
-                                        type="checkbox"
-                                        checked={editData.is_active}
-                                        onChange={(e) => setEditData('is_active', e.target.checked)}
-                                        className="mr-2"
+                                        type="text"
+                                        value={createData.name}
+                                        onChange={(e) => setCreateData('name', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        placeholder="e.g., DHL, FedEx"
+                                        required
                                     />
-                                    Active
-                                </label>
+                                    {createErrors.name && (
+                                        <p className="text-red-500 text-sm mt-1">{createErrors.name}</p>
+                                    )}
+                                </div>
                                 
-                                <label className="flex items-center">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Code</label>
                                     <input
-                                        type="checkbox"
-                                        checked={editData.is_default}
-                                        onChange={(e) => setEditData('is_default', e.target.checked)}
-                                        className="mr-2"
+                                        type="text"
+                                        value={createData.code}
+                                        onChange={(e) => setCreateData('code', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        placeholder="e.g., dhl, fedex"
+                                        required
                                     />
-                                    Default
-                                </label>
+                                    {createErrors.code && (
+                                        <p className="text-red-500 text-sm mt-1">{createErrors.code}</p>
+                                    )}
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">API Endpoint</label>
+                                    <input
+                                        type="url"
+                                        value={createData.api_endpoint}
+                                        onChange={(e) => setCreateData('api_endpoint', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        placeholder="https://api.example.com"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">API Key</label>
+                                    <input
+                                        type="password"
+                                        value={createData.api_key}
+                                        onChange={(e) => setCreateData('api_key', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        placeholder="Enter API key"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Tracking URL Template</label>
+                                    <input
+                                        type="text"
+                                        value={createData.tracking_url_template}
+                                        onChange={(e) => setCreateData('tracking_url_template', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        placeholder="https://track.example.com/{tracking_number}"
+                                    />
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={createData.is_active}
+                                            onChange={(e) => setCreateData('is_active', e.target.checked)}
+                                            className="mr-2"
+                                        />
+                                        Active
+                                    </label>
+                                    
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={createData.is_default}
+                                            onChange={(e) => setCreateData('is_default', e.target.checked)}
+                                            className="mr-2"
+                                        />
+                                        Default
+                                    </label>
+                                </div>
                             </div>
-                        </div>
-                        
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={updating}>
-                                {updating ? 'Updating...' : 'Update Courier'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+                            
+                            <div className="flex justify-end space-x-2 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateDialog(false)}
+                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={creating}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                                >
+                                    {creating ? 'Creating...' : 'Create Courier'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Dialog */}
+            {showEditDialog && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                        <h2 className="text-lg font-medium mb-4">Edit Courier</h2>
+                        <form onSubmit={handleUpdateCourier}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Name</label>
+                                    <input
+                                        type="text"
+                                        value={editData.name}
+                                        onChange={(e) => setEditData('name', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        required
+                                    />
+                                    {editErrors.name && (
+                                        <p className="text-red-500 text-sm mt-1">{editErrors.name}</p>
+                                    )}
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Code</label>
+                                    <input
+                                        type="text"
+                                        value={editData.code}
+                                        onChange={(e) => setEditData('code', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                        required
+                                    />
+                                    {editErrors.code && (
+                                        <p className="text-red-500 text-sm mt-1">{editErrors.code}</p>
+                                    )}
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">API Endpoint</label>
+                                    <input
+                                        type="url"
+                                        value={editData.api_endpoint}
+                                        onChange={(e) => setEditData('api_endpoint', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">API Key</label>
+                                    <input
+                                        type="password"
+                                        value={editData.api_key}
+                                        onChange={(e) => setEditData('api_key', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Tracking URL Template</label>
+                                    <input
+                                        type="text"
+                                        value={editData.tracking_url_template}
+                                        onChange={(e) => setEditData('tracking_url_template', e.target.value)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                    />
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={editData.is_active}
+                                            onChange={(e) => setEditData('is_active', e.target.checked)}
+                                            className="mr-2"
+                                        />
+                                        Active
+                                    </label>
+                                    
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={editData.is_default}
+                                            onChange={(e) => setEditData('is_default', e.target.checked)}
+                                            className="mr-2"
+                                        />
+                                        Default
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div className="flex justify-end space-x-2 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEditDialog(false)}
+                                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={updating}
+                                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                                >
+                                    {updating ? 'Updating...' : 'Update Courier'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }
