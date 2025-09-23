@@ -417,6 +417,13 @@ Route::prefix('super-admin')
         Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
         Route::get('/tenants/{tenant}', [SuperAdminController::class, 'tenantDetails'])->name('tenants.show');
         
+        // Courier Management
+        Route::get('/tenants/{tenant}/couriers', [SuperAdminController::class, 'tenantCouriers'])->name('tenants.couriers');
+        Route::post('/tenants/{tenant}/couriers', [SuperAdminController::class, 'createCourier'])->name('tenants.couriers.create');
+        Route::post('/tenants/{tenant}/couriers/acs', [SuperAdminController::class, 'createACSCourier'])->name('tenants.couriers.create-acs');
+        Route::put('/tenants/{tenant}/couriers/{courier}', [SuperAdminController::class, 'updateCourier'])->name('tenants.couriers.update');
+        Route::delete('/tenants/{tenant}/couriers/{courier}', [SuperAdminController::class, 'deleteCourier'])->name('tenants.couriers.delete');
+        
         // User Management
         Route::get('/users', [UserManagementController::class, 'index'])->name('users');
         Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');

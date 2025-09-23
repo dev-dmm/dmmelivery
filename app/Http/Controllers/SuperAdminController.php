@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Shipment;
+use App\Models\Courier;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -303,5 +304,161 @@ class SuperAdminController extends Controller
                 'per_page' => $perPage,
             ],
         ]);
+    }
+
+    /**
+     * Display couriers for a specific tenant
+     */
+    public function tenantCouriers(Tenant $tenant, Request $request)
+    {
+        $perPage = $request->get('per_page', 25);
+        $search = $request->get('search');
+
+        $query = $tenant->couriers()
+            ->withoutGlobalScopes([TenantScope::class])
+            ->select(['couriers.*']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        $couriers = $query->orderBy('created_at', 'desc')
+                         ->paginate($perPage)
+                         ->withQueryString();
+
+        return Inertia::render('SuperAdmin/TenantCouriers', [
+            'tenant' => $tenant,
+            'couriers' => $couriers,
+            'filters' => [
+                'search' => $search,
+                'per_page' => $perPage,
+            ],
+        ]);
+    }
+
+    /**
+     * Create a new courier for a tenant
+     */
+    public function createCourier(Tenant $tenant, Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:50',
+            'api_endpoint' => 'nullable|url',
+            'api_key' => 'nullable|string',
+            'is_active' => 'boolean',
+            'is_default' => 'boolean',
+            'tracking_url_template' => 'nullable|string',
+        ]);
+
+        // If this is being set as default, unset other defaults for this tenant
+        if ($request->is_default) {
+            $tenant->couriers()
+                ->withoutGlobalScopes([TenantScope::class])
+                ->update(['is_default' => false]);
+        }
+
+        $courier = $tenant->couriers()->create([
+            'name' => $request->name,
+            'code' => $request->code,
+            'api_endpoint' => $request->api_endpoint,
+            'api_key' => $request->api_key,
+            'is_active' => $request->is_active ?? true,
+            'is_default' => $request->is_default ?? false,
+            'tracking_url_template' => $request->tracking_url_template,
+        ]);
+
+        return redirect()->back()->with('success', 'Courier created successfully.');
+    }
+
+    /**
+     * Update a courier
+     */
+    public function updateCourier(Tenant $tenant, Courier $courier, Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => 'required|string|max:50',
+            'api_endpoint' => 'nullable|url',
+            'api_key' => 'nullable|string',
+            'is_active' => 'boolean',
+            'is_default' => 'boolean',
+            'tracking_url_template' => 'nullable|string',
+        ]);
+
+        // If this is being set as default, unset other defaults for this tenant
+        if ($request->is_default) {
+            $tenant->couriers()
+                ->withoutGlobalScopes([TenantScope::class])
+                ->where('id', '!=', $courier->id)
+                ->update(['is_default' => false]);
+        }
+
+        $courier->update([
+            'name' => $request->name,
+            'code' => $request->code,
+            'api_endpoint' => $request->api_endpoint,
+            'api_key' => $request->api_key,
+            'is_active' => $request->is_active,
+            'is_default' => $request->is_default,
+            'tracking_url_template' => $request->tracking_url_template,
+        ]);
+
+        return redirect()->back()->with('success', 'Courier updated successfully.');
+    }
+
+    /**
+     * Delete a courier
+     */
+    public function deleteCourier(Tenant $tenant, Courier $courier)
+    {
+        // Check if courier has any shipments
+        $shipmentCount = Shipment::withoutGlobalScopes([TenantScope::class])
+            ->where('courier_id', $courier->id)
+            ->count();
+
+        if ($shipmentCount > 0) {
+            return redirect()->back()->with('error', 'Cannot delete courier with existing shipments.');
+        }
+
+        $courier->delete();
+
+        return redirect()->back()->with('success', 'Courier deleted successfully.');
+    }
+
+    /**
+     * Create ACS courier for tenant (quick setup)
+     */
+    public function createACSCourier(Tenant $tenant)
+    {
+        // Check if ACS courier already exists
+        $existingACS = $tenant->couriers()
+            ->withoutGlobalScopes([TenantScope::class])
+            ->where('code', 'acs')
+            ->first();
+
+        if ($existingACS) {
+            return redirect()->back()->with('error', 'ACS courier already exists for this tenant.');
+        }
+
+        // Set other couriers as non-default
+        $tenant->couriers()
+            ->withoutGlobalScopes([TenantScope::class])
+            ->update(['is_default' => false]);
+
+        // Create ACS courier
+        $courier = $tenant->couriers()->create([
+            'name' => 'ACS Courier',
+            'code' => 'acs',
+            'api_endpoint' => 'https://api.acscourier.gr',
+            'is_active' => true,
+            'is_default' => true,
+            'tracking_url_template' => 'https://www.acscourier.gr/el/track/{tracking_number}',
+        ]);
+
+        return redirect()->back()->with('success', 'ACS courier created successfully.');
     }
 }
