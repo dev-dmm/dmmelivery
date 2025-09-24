@@ -405,6 +405,56 @@ Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:30,1'])->gro
 });
 
 // -----------------------------
+// Predictive ETA Routes
+// -----------------------------
+Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:60,1'])
+    ->prefix('predictive-eta')
+    ->name('predictive-eta.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\PredictiveEtaController::class, 'index'])->name('index');
+        Route::post('/generate/{shipment}', [App\Http\Controllers\PredictiveEtaController::class, 'generate'])->name('generate');
+        Route::post('/update-all', [App\Http\Controllers\PredictiveEtaController::class, 'updateAll'])->name('update-all');
+        Route::get('/{id}', [App\Http\Controllers\PredictiveEtaController::class, 'show'])->name('show');
+    });
+
+// -----------------------------
+// Alert System Routes
+// -----------------------------
+Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:60,1'])
+    ->prefix('alerts')
+    ->name('alerts.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\AlertController::class, 'index'])->name('index');
+        Route::get('/rules', [App\Http\Controllers\AlertController::class, 'rules'])->name('rules');
+        Route::post('/rules', [App\Http\Controllers\AlertController::class, 'createRule'])->name('rules.create');
+        Route::put('/rules/{id}', [App\Http\Controllers\AlertController::class, 'updateRule'])->name('rules.update');
+        Route::delete('/rules/{id}', [App\Http\Controllers\AlertController::class, 'deleteRule'])->name('rules.delete');
+        Route::post('/{id}/acknowledge', [App\Http\Controllers\AlertController::class, 'acknowledge'])->name('acknowledge');
+        Route::post('/{id}/resolve', [App\Http\Controllers\AlertController::class, 'resolve'])->name('resolve');
+        Route::post('/{id}/escalate', [App\Http\Controllers\AlertController::class, 'escalate'])->name('escalate');
+        Route::post('/check', [App\Http\Controllers\AlertController::class, 'checkAlerts'])->name('check');
+        Route::get('/{id}', [App\Http\Controllers\AlertController::class, 'show'])->name('show');
+    });
+
+// -----------------------------
+// Chatbot Routes
+// -----------------------------
+Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:60,1'])
+    ->prefix('chatbot')
+    ->name('chatbot.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\ChatbotController::class, 'index'])->name('index');
+        Route::post('/sessions', [App\Http\Controllers\ChatbotController::class, 'startSession'])->name('sessions.start');
+        Route::post('/sessions/{session}/messages', [App\Http\Controllers\ChatbotController::class, 'sendMessage'])->name('sessions.send-message');
+        Route::get('/sessions/{session}/messages', [App\Http\Controllers\ChatbotController::class, 'getMessages'])->name('sessions.messages');
+        Route::post('/sessions/{session}/escalate', [App\Http\Controllers\ChatbotController::class, 'escalateSession'])->name('sessions.escalate');
+        Route::post('/sessions/{session}/resolve', [App\Http\Controllers\ChatbotController::class, 'resolveSession'])->name('sessions.resolve');
+        Route::get('/sessions/{session}', [App\Http\Controllers\ChatbotController::class, 'show'])->name('sessions.show');
+        Route::get('/chat/{session}', [App\Http\Controllers\ChatbotController::class, 'chat'])->name('chat');
+        Route::get('/stats', [App\Http\Controllers\ChatbotController::class, 'stats'])->name('stats');
+    });
+
+// -----------------------------
 // Super Admin Routes
 // -----------------------------
 Route::prefix('super-admin')

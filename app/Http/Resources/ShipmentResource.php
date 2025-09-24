@@ -58,6 +58,24 @@ class ShipmentResource extends JsonResource
                     ];
                 });
             }),
+
+            // Predictive ETA data
+            'predictive_eta' => $this->whenLoaded('predictiveEta', function () {
+                return [
+                    'id' => $this->predictiveEta->id,
+                    'predicted_eta' => $this->predictiveEta->predicted_eta?->format('Y-m-d H:i:s'),
+                    'confidence_score' => $this->predictiveEta->confidence_score,
+                    'delay_risk_level' => $this->predictiveEta->delay_risk_level,
+                    'delay_risk_color' => $this->predictiveEta->delay_risk_color,
+                    'delay_risk_icon' => $this->predictiveEta->delay_risk_icon,
+                    'delay_factors' => $this->predictiveEta->delay_factors,
+                    'weather_impact' => $this->predictiveEta->weather_impact,
+                    'traffic_impact' => $this->predictiveEta->traffic_impact,
+                    'has_significant_delay' => $this->predictiveEta->hasSignificantDelay(),
+                    'delay_explanation' => $this->predictiveEta->getDelayExplanation(),
+                    'last_updated_at' => $this->predictiveEta->last_updated_at?->format('Y-m-d H:i:s'),
+                ];
+            }),
         ];
     }
 }

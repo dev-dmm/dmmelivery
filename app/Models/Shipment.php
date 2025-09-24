@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Models\Scopes\TenantScope;
 
 class Shipment extends Model
@@ -77,6 +78,16 @@ class Shipment extends Model
     public function notifications(): HasMany
     {
         return $this->hasMany(NotificationLog::class);
+    }
+
+    public function predictiveEta(): HasOne
+    {
+        return $this->hasOne(PredictiveEta::class);
+    }
+
+    public function alerts(): HasMany
+    {
+        return $this->hasMany(Alert::class);
     }
 
     public function getCurrentStatusAttribute(): ?ShipmentStatusHistory

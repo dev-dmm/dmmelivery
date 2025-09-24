@@ -138,13 +138,16 @@ class ShipmentSeeder extends Seeder
                 for ($i = 0; $i < $numShipments; $i++) {
                     $courier = $couriers->random();
                     
+                    // Generate a more realistic order ID
+                    $orderId = 'ORD-' . strtoupper(fake()->bothify('######'));
+                    
                     $shipment = Shipment::create([
                         'tenant_id' => $tenant->id,
                         'customer_id' => $customer->id,
                         'courier_id' => $courier->id,
-                        'order_id' => 'ORD-' . strtoupper(fake()->bothify('######')),
-                        'tracking_number' => strtoupper(fake()->bothify('??######')),
-                        'courier_tracking_id' => fake()->numerify('############'),
+                        'order_id' => $orderId,
+                        'tracking_number' => $this->generateRealisticTrackingNumber($courier->code),
+                        'courier_tracking_id' => $this->generateCourierTrackingId($courier->code),
                         'status' => 'pending',
                         'weight' => fake()->randomFloat(2, 0.1, 25.0),
                         'dimensions' => [
@@ -173,6 +176,32 @@ class ShipmentSeeder extends Seeder
         foreach ($demoTenants as $tenant) {
             $this->command->info('- ' . $tenant['name'] . ': ' . strtolower($tenant['subdomain']) . '@demo.com / password');
         }
+    }
+
+    /**
+     * Generate realistic tracking number based on courier code
+     */
+    private function generateRealisticTrackingNumber(string $courierCode): string
+    {
+        $date = now()->format('Ymd');
+        $random = strtoupper(substr(md5(uniqid()), 0, 8));
+        return $courierCode . $date . $random;
+    }
+
+    /**
+     * Generate courier-specific tracking ID
+     */
+    private function generateCourierTrackingId(string $courierCode): string
+    {
+        // Generate courier-specific tracking IDs
+        $patterns = [
+            'ACS' => 'ACS' . fake()->numerify('########'),
+            'SPX' => 'SPX' . fake()->numerify('########'),
+            'ELT' => 'ELT' . fake()->numerify('########'),
+            'GTX' => 'GTX' . fake()->numerify('########'),
+        ];
+
+        return $patterns[$courierCode] ?? $courierCode . fake()->numerify('########');
     }
 
     private function createStatusHistory(Shipment $shipment): void

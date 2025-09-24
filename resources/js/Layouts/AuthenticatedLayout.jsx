@@ -92,6 +92,27 @@ export default function AuthenticatedLayout({ header, children }) {
                   </NavLink>
                 )}
 
+                {hasRoute('predictive-eta.index') && (
+                  <NavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
+                    <span className="hidden lg:inline">🤖 Predictive ETAs</span>
+                    <span className="lg:hidden">🤖 ETAs</span>
+                  </NavLink>
+                )}
+
+                {hasRoute('alerts.index') && (
+                  <NavLink href={route('alerts.index')} active={route().current('alerts.*')}>
+                    <span className="hidden lg:inline">🚨 Alerts</span>
+                    <span className="lg:hidden">🚨 Alerts</span>
+                  </NavLink>
+                )}
+
+                {hasRoute('chatbot.index') && (
+                  <NavLink href={route('chatbot.index')} active={route().current('chatbot.*')}>
+                    <span className="hidden lg:inline">💬 AI Chatbot</span>
+                    <span className="lg:hidden">💬 Chatbot</span>
+                  </NavLink>
+                )}
+
 
                 {hasRoute('courier-reports.import.index') && (
                   <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
@@ -247,6 +268,24 @@ export default function AuthenticatedLayout({ header, children }) {
             {hasRoute('shipments.index') && (
               <ResponsiveNavLink href={route('shipments.index')} active={route().current('shipments.*')}>
                 Shipments
+              </ResponsiveNavLink>
+            )}
+
+            {hasRoute('predictive-eta.index') && (
+              <ResponsiveNavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
+                🤖 Predictive ETAs
+              </ResponsiveNavLink>
+            )}
+
+            {hasRoute('alerts.index') && (
+              <ResponsiveNavLink href={route('alerts.index')} active={route().current('alerts.*')}>
+                🚨 Alerts
+              </ResponsiveNavLink>
+            )}
+
+            {hasRoute('chatbot.index') && (
+              <ResponsiveNavLink href={route('chatbot.index')} active={route().current('chatbot.*')}>
+                💬 AI Chatbot
               </ResponsiveNavLink>
             )}
 

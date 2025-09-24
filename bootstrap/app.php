@@ -38,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->job(new \App\Jobs\FetchCourierStatuses)->everyTenMinutes();
+        $schedule->job(new \App\Jobs\UpdatePredictiveEtas)->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

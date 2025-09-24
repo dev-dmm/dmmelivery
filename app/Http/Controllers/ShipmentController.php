@@ -40,6 +40,7 @@ class ShipmentController extends Controller
             ->with([
                 'customer:id,name,email,phone',
                 'courier:id,name,code,tracking_url_template',
+                'predictiveEta:id,shipment_id,predicted_eta,confidence_score,delay_risk_level,delay_factors,weather_impact,traffic_impact,has_significant_delay',
             ])
             ->allowedFilters([
                 AllowedFilter::partial('tracking_number'),
@@ -74,6 +75,21 @@ class ShipmentController extends Controller
     public function show(Shipment $shipment): Response
     {
         $shipment->load(['customer', 'courier']);
+
+        // Try to sync with real DMM Delivery data if available
+        try {
+            $dmmService = app(\App\Services\DMMDeliveryService::class);
+            $dmmService->updateShipmentWithRealData($shipment);
+            
+            // Refresh the shipment to get updated data
+            $shipment->refresh();
+        } catch (\Exception $e) {
+            // Log error but don't break the page
+            \Log::warning('Failed to sync shipment with DMM Delivery data', [
+                'shipment_id' => $shipment->id,
+                'error' => $e->getMessage()
+            ]);
+        }
 
         return Inertia::render('Shipments/Show', [
             'shipment' => new ShipmentResource($shipment),

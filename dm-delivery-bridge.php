@@ -127,7 +127,8 @@ class DMM_Delivery_Bridge {
             'auto_send' => 'yes',
             'order_statuses' => ['processing', 'completed'],
             'create_shipment' => 'yes',
-            'debug_mode' => 'no'
+            'debug_mode' => 'no',
+            'performance_mode' => 'balanced'
         ];
         
         if (!get_option('dmm_delivery_bridge_options')) {
@@ -283,6 +284,14 @@ class DMM_Delivery_Bridge {
             'dmm_delivery_bridge_settings',
             'dmm_delivery_bridge_behavior_section'
         );
+        
+        add_settings_field(
+            'performance_mode',
+            __('Performance Mode', 'dmm-delivery-bridge'),
+            [$this, 'performance_mode_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_behavior_section'
+        );
     }
     
     /**
@@ -332,6 +341,22 @@ class DMM_Delivery_Bridge {
             <div class="dmm-bulk-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff;">
                 <h3><?php _e('Bulk Order Processing', 'dmm-delivery-bridge'); ?></h3>
                 <p><?php _e('Send all unsent orders to DMM Delivery system in the background. This process runs safely without timeouts.', 'dmm-delivery-bridge'); ?></p>
+                
+                <div style="background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 8px 0; color: #333;"><?php _e('Performance Information', 'dmm-delivery-bridge'); ?></h4>
+                    <div style="font-size: 12px; color: #666;">
+                        <?php
+                        $memory_limit = ini_get('memory_limit');
+                        $batch_size = $this->get_optimal_batch_size();
+                        $performance_mode = isset($this->options['performance_mode']) ? $this->options['performance_mode'] : 'balanced';
+                        ?>
+                        <strong><?php _e('Current Settings:', 'dmm-delivery-bridge'); ?></strong><br>
+                        • <?php _e('Performance Mode:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo ucfirst($performance_mode); ?></span><br>
+                        • <?php _e('Batch Size:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $batch_size; ?> <?php _e('orders per batch', 'dmm-delivery-bridge'); ?></span><br>
+                        • <?php _e('Server Memory:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $memory_limit; ?></span><br>
+                        • <?php _e('Processing Speed:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo round($batch_size / 1.5, 1); ?> <?php _e('orders per second', 'dmm-delivery-bridge'); ?></span>
+                    </div>
+                </div>
                 
                 <div id="dmm-bulk-controls">
                     <button type="button" id="dmm-start-bulk-send" class="button button-primary">
@@ -943,7 +968,7 @@ class DMM_Delivery_Bridge {
             }
             
             function startBulkProcessing() {
-                // Process batches every 3 seconds via AJAX
+                // Process batches every 1.5 seconds via AJAX (faster processing)
                 bulkProcessingInterval = setInterval(function() {
                     if (!isBulkProcessing) {
                         clearInterval(bulkProcessingInterval);
@@ -964,7 +989,7 @@ class DMM_Delivery_Bridge {
                             // Continue trying even if this request fails
                         }
                     });
-                }, 3000);
+                }, 1500); // Reduced from 3000ms to 1500ms
             }
             
             function stopBulkProcessing() {
@@ -1199,6 +1224,22 @@ class DMM_Delivery_Bridge {
         $value = isset($this->options['debug_mode']) ? $this->options['debug_mode'] : 'no';
         echo '<label><input type="checkbox" name="dmm_delivery_bridge_options[debug_mode]" value="yes" ' . checked($value, 'yes', false) . ' /> ' . __('Enable debug logging', 'dmm-delivery-bridge') . '</label>';
         echo '<p class="description">' . __('Log detailed information for troubleshooting.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function performance_mode_callback() {
+        $value = isset($this->options['performance_mode']) ? $this->options['performance_mode'] : 'balanced';
+        
+        echo '<select name="dmm_delivery_bridge_options[performance_mode]">';
+        echo '<option value="conservative" ' . selected($value, 'conservative', false) . '>' . __('Conservative (Slower, More Stable)', 'dmm-delivery-bridge') . '</option>';
+        echo '<option value="balanced" ' . selected($value, 'balanced', false) . '>' . __('Balanced (Recommended)', 'dmm-delivery-bridge') . '</option>';
+        echo '<option value="fast" ' . selected($value, 'fast', false) . '>' . __('Fast (Higher Server Load)', 'dmm-delivery-bridge') . '</option>';
+        echo '</select>';
+        
+        echo '<p class="description">';
+        echo __('<strong>Conservative:</strong> 3-7 orders per batch, longer delays<br>', 'dmm-delivery-bridge');
+        echo __('<strong>Balanced:</strong> 7-15 orders per batch, optimized for most servers<br>', 'dmm-delivery-bridge');
+        echo __('<strong>Fast:</strong> 15-25 orders per batch, requires powerful server', 'dmm-delivery-bridge');
+        echo '</p>';
     }
     
     /**
@@ -2521,45 +2562,18 @@ class DMM_Delivery_Bridge {
         $failed = 0;
         $total = count($all_orders);
         
-        // Process orders in batches of 5
-        $batches = array_chunk($all_orders, 5);
+        // Process orders in optimized batches
+        $batch_size = $this->get_optimal_batch_size();
+        $batches = array_chunk($all_orders, $batch_size);
         
         foreach ($batches as $batch) {
-            foreach ($batch as $order_id) {
-                $order = wc_get_order($order_id);
-                if (!$order) {
-                    $failed++;
-                    continue;
-                }
-                
-                try {
-                    // Clear existing meta and resend
-                    delete_post_meta($order_id, '_dmm_delivery_sent');
-                    delete_post_meta($order_id, '_dmm_delivery_order_id');
-                    delete_post_meta($order_id, '_dmm_delivery_shipment_id');
-                    
-                    // Process order
-                    $this->process_order($order);
-                    
-                    // Check if successful
-                    $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
-                    if ($sent_status === 'yes') {
-                        $successful++;
-                    } else {
-                        $failed++;
-                    }
-                    
-                    // Small delay to avoid overwhelming the server
-                    usleep(100000); // 0.1 second delay
-                    
-                } catch (Exception $e) {
-                    $failed++;
-                    error_log('DMM Delivery Bridge - Simple send error for order ' . $order_id . ': ' . $e->getMessage());
-                }
-            }
+            // Process batch with parallel optimization
+            $batch_results = $this->process_batch_optimized($batch);
+            $successful += $batch_results['successful'];
+            $failed += $batch_results['failed'];
             
-            // Longer delay between batches
-            sleep(1); // 1 second delay between batches
+            // Minimal delay between batches to prevent server overload
+            usleep(50000); // 0.05 second delay (reduced from 1 second)
         }
         
         wp_send_json_success([
@@ -2676,7 +2690,8 @@ class DMM_Delivery_Bridge {
      * Initialize bulk sync processing
      */
     private function init_bulk_sync_processing($order_ids) {
-        $batch_size = 3; // Process 3 orders at a time for sync (smaller batches for updates)
+        // Use optimized batch size for sync operations
+        $batch_size = max(5, $this->get_optimal_batch_size() - 2); // Slightly smaller for updates
         $batches = array_chunk($order_ids, $batch_size);
         
         // Initialize progress
@@ -2697,7 +2712,8 @@ class DMM_Delivery_Bridge {
      * Initialize force resend processing
      */
     private function init_force_resend_processing($order_ids) {
-        $batch_size = 3; // Process 3 orders at a time for force resend
+        // Use optimized batch size for force resend
+        $batch_size = $this->get_optimal_batch_size();
         $batches = array_chunk($order_ids, $batch_size);
         
         // Initialize progress
@@ -2718,7 +2734,8 @@ class DMM_Delivery_Bridge {
      * Initialize bulk processing
      */
     private function init_bulk_processing($order_ids) {
-        $batch_size = 5; // Process 5 orders at a time
+        // Dynamic batch size based on server capabilities
+        $batch_size = $this->get_optimal_batch_size();
         $batches = array_chunk($order_ids, $batch_size);
         
         // Initialize progress
@@ -2873,6 +2890,149 @@ class DMM_Delivery_Bridge {
         
         // Add order note
         $order->add_order_note(__('Order synced with DMM Delivery system successfully.', 'dmm-delivery-bridge'));
+    }
+    
+    /**
+     * Get optimal batch size based on server capabilities
+     */
+    private function get_optimal_batch_size() {
+        // Check server memory and capabilities
+        $memory_limit = ini_get('memory_limit');
+        $memory_bytes = $this->parse_memory_limit($memory_limit);
+        
+        // Base batch size on available memory
+        if ($memory_bytes >= 512 * 1024 * 1024) { // 512MB+
+            $base_size = 15;
+        } elseif ($memory_bytes >= 256 * 1024 * 1024) { // 256MB+
+            $base_size = 10;
+        } else {
+            $base_size = 7;
+        }
+        
+        // Check if we have performance settings
+        $performance_mode = isset($this->options['performance_mode']) ? $this->options['performance_mode'] : 'balanced';
+        
+        switch ($performance_mode) {
+            case 'fast':
+                return min($base_size * 2, 25); // Up to 25 orders per batch
+            case 'conservative':
+                return max($base_size / 2, 3); // Minimum 3 orders per batch
+            case 'balanced':
+            default:
+                return $base_size;
+        }
+    }
+    
+    /**
+     * Parse memory limit string to bytes
+     */
+    private function parse_memory_limit($memory_limit) {
+        if ($memory_limit == -1) {
+            return PHP_INT_MAX;
+        }
+        
+        $unit = strtolower(substr($memory_limit, -1));
+        $value = (int) $memory_limit;
+        
+        switch ($unit) {
+            case 'g':
+                return $value * 1024 * 1024 * 1024;
+            case 'm':
+                return $value * 1024 * 1024;
+            case 'k':
+                return $value * 1024;
+            default:
+                return $value;
+        }
+    }
+    
+    /**
+     * Process batch with optimizations
+     */
+    private function process_batch_optimized($order_ids) {
+        $successful = 0;
+        $failed = 0;
+        
+        // Pre-load all orders to reduce database queries
+        $orders = [];
+        foreach ($order_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $orders[$order_id] = $order;
+            }
+        }
+        
+        // Process orders with minimal delays
+        foreach ($order_ids as $order_id) {
+            if (!isset($orders[$order_id])) {
+                $failed++;
+                continue;
+            }
+            
+            try {
+                $order = $orders[$order_id];
+                
+                // Clear existing meta efficiently
+                $this->clear_order_meta_efficiently($order_id);
+                
+                // Process order
+                $this->process_order($order);
+                
+                // Check if successful
+                $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
+                if ($sent_status === 'yes') {
+                    $successful++;
+                } else {
+                    $failed++;
+                }
+                
+                // Minimal delay only if needed
+                if (count($order_ids) > 10) {
+                    usleep(10000); // 0.01 second delay for large batches
+                }
+                
+            } catch (Exception $e) {
+                $failed++;
+                error_log('DMM Delivery Bridge - Batch processing error for order ' . $order_id . ': ' . $e->getMessage());
+            }
+        }
+        
+        return [
+            'successful' => $successful,
+            'failed' => $failed
+        ];
+    }
+    
+    /**
+     * Clear order meta efficiently
+     */
+    private function clear_order_meta_efficiently($order_id) {
+        global $wpdb;
+        
+        // Use single query to delete multiple meta keys
+        $wpdb->delete(
+            $wpdb->postmeta,
+            [
+                'post_id' => $order_id,
+                'meta_key' => '_dmm_delivery_sent'
+            ]
+        );
+        
+        $wpdb->delete(
+            $wpdb->postmeta,
+            [
+                'post_id' => $order_id,
+                'meta_key' => '_dmm_delivery_order_id'
+            ]
+        );
+        
+        $wpdb->delete(
+            $wpdb->postmeta,
+            [
+                'post_id' => $order_id,
+                'meta_key' => '_dmm_delivery_shipment_id'
+            ]
+        );
     }
 }
 

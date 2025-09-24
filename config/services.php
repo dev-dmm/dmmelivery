@@ -39,4 +39,21 @@ return [
         'key' => env('DM_BRIDGE_API_KEY', ''),
     ],
 
+    'openweather' => [
+        'key' => env('OPENWEATHER_API_KEY'),
+    ],
+
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'endpoint' => env('OPENAI_ENDPOINT', 'https://api.openai.com/v1/chat/completions'),
+    ],
+
+    'ml_model' => [
+        'endpoint' => env('ML_MODEL_ENDPOINT'),
+    ],
+
 ];

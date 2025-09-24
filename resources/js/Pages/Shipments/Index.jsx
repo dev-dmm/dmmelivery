@@ -310,7 +310,34 @@ export default function Index({
                     
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="text-xs text-gray-500 mb-1">ETA</p>
-                      <p className="text-sm text-gray-900">{formatDate(shipmentData.estimated_delivery)}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-900">
+                          {shipmentData.predictive_eta?.predicted_eta 
+                            ? formatDate(shipmentData.predictive_eta.predicted_eta)
+                            : formatDate(shipmentData.estimated_delivery)
+                          }
+                        </p>
+                        {shipmentData.predictive_eta && (
+                          <div className="flex items-center space-x-1">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              shipmentData.predictive_eta.delay_risk_level === 'low' ? 'bg-green-100 text-green-800' :
+                              shipmentData.predictive_eta.delay_risk_level === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              shipmentData.predictive_eta.delay_risk_level === 'high' ? 'bg-orange-100 text-orange-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {shipmentData.predictive_eta.delay_risk_icon} {shipmentData.predictive_eta.delay_risk_level}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {Math.round(shipmentData.predictive_eta.confidence_score * 100)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      {shipmentData.predictive_eta?.has_significant_delay && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          ⚠️ Possible delay detected
+                        </p>
+                      )}
                     </div>
                   </div>
                   );

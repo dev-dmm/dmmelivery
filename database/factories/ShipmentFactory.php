@@ -25,8 +25,8 @@ class ShipmentFactory extends Factory
 
         return [
             'order_id' => 'ORD-' . Str::upper($this->faker->bothify('######')),
-            'tracking_number' => Str::upper($this->faker->bothify('??######')),
-            'courier_tracking_id' => $this->faker->numerify('############'),
+            'tracking_number' => $this->generateRealisticTrackingNumber(),
+            'courier_tracking_id' => $this->generateCourierTrackingId(),
             'status' => $status,
             'weight' => $this->faker->randomFloat(2, 0.1, 25.0),
             'dimensions' => [
@@ -46,5 +46,27 @@ class ShipmentFactory extends Factory
             'created_at' => $createdAt,
             'updated_at' => $this->faker->dateTimeBetween($createdAt, 'now'),
         ];
+    }
+
+    /**
+     * Generate realistic tracking number
+     */
+    private function generateRealisticTrackingNumber(): string
+    {
+        $couriers = ['ACS', 'SPX', 'ELT', 'GTX', 'DHL', 'FDX', 'UPS'];
+        $courier = $this->faker->randomElement($couriers);
+        $date = now()->format('Ymd');
+        $random = strtoupper(substr(md5(uniqid()), 0, 8));
+        return $courier . $date . $random;
+    }
+
+    /**
+     * Generate courier tracking ID
+     */
+    private function generateCourierTrackingId(): string
+    {
+        $couriers = ['ACS', 'SPX', 'ELT', 'GTX', 'DHL', 'FDX', 'UPS'];
+        $courier = $this->faker->randomElement($couriers);
+        return $courier . $this->faker->numerify('########');
     }
 }
