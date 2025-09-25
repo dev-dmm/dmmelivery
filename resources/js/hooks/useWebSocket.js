@@ -13,8 +13,8 @@ export const useWebSocket = (tenantId, userId) => {
     }
 
     // Check if Pusher configuration is available
-    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
-    const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
+    const pusherKey = import.meta.env.PUSHER_APP_ID;
+    const pusherCluster = import.meta.env.PUSHER_APP_CLUSTER;
 
     if (!pusherKey || !pusherCluster) {
       console.warn('Pusher configuration not found. WebSocket features will be disabled.');
