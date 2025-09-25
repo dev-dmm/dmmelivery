@@ -120,6 +120,19 @@ class DMM_Delivery_Bridge {
         // Meta field monitoring for ACS vouchers
         add_action('updated_post_meta', [$this, 'on_meta_updated'], 10, 4);
         add_action('added_post_meta', [$this, 'on_meta_added'], 10, 4);
+        
+        // ACS Status Sync Scheduling
+        add_action('wp_ajax_dmm_acs_sync_all_shipments', [$this, 'ajax_acs_sync_all_shipments']);
+        add_action('wp_ajax_dmm_acs_sync_shipment_status', [$this, 'ajax_acs_sync_shipment_status']);
+        
+        // Schedule automatic sync (if not already scheduled)
+        if (!wp_next_scheduled('dmm_acs_sync_shipments')) {
+            wp_schedule_event(time(), 'dmm_acs_sync_interval', 'dmm_acs_sync_shipments');
+        }
+        add_action('dmm_acs_sync_shipments', [$this, 'sync_acs_shipments']);
+        
+        // Add custom cron interval
+        add_filter('cron_schedules', [$this, 'add_acs_sync_cron_interval']);
         add_action('wp_ajax_dmm_send_all_orders_simple', [$this, 'ajax_send_all_orders_simple']);
         
         // ACS Courier AJAX handlers
@@ -470,6 +483,51 @@ class DMM_Delivery_Bridge {
                 </div>
                 
                 <div id="dmm-acs-result" style="margin-top: 10px;"></div>
+            </div>
+            
+            <div class="dmm-acs-sync-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f8f9fa;">
+                <h3><?php _e('ACS Status Sync Management', 'dmm-delivery-bridge'); ?></h3>
+                <p><?php _e('Automatically sync ACS shipment statuses with your main application. Configure sync frequency and monitor sync performance.', 'dmm-delivery-bridge'); ?></p>
+                
+                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Controls', 'dmm-delivery-bridge'); ?></h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <button type="button" id="dmm-acs-sync-all" class="button button-primary">
+                            <?php _e('🔄 Sync All ACS Shipments', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-acs-test-sync" class="button button-secondary">
+                            <?php _e('🧪 Test Sync (5 Orders)', 'dmm-delivery-bridge'); ?>
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button type="button" id="dmm-acs-view-sync-log" class="button button-secondary">
+                            <?php _e('📋 View Sync Log', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-acs-clear-sync-log" class="button button-secondary" style="background: #dc3545; color: white; border-color: #dc3545;">
+                            <?php _e('🗑️ Clear Sync Log', 'dmm-delivery-bridge'); ?>
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Statistics', 'dmm-delivery-bridge'); ?></h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 14px;">
+                        <div>
+                            <strong><?php _e('Last Sync:', 'dmm-delivery-bridge'); ?></strong><br>
+                            <span id="acs-last-sync-time"><?php _e('Never', 'dmm-delivery-bridge'); ?></span>
+                        </div>
+                        <div>
+                            <strong><?php _e('Orders with ACS Vouchers:', 'dmm-delivery-bridge'); ?></strong><br>
+                            <span id="acs-orders-count"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
+                        </div>
+                        <div>
+                            <strong><?php _e('Next Scheduled Sync:', 'dmm-delivery-bridge'); ?></strong><br>
+                            <span id="acs-next-sync-time"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="dmm-acs-sync-result" style="margin-top: 10px;"></div>
             </div>
             
             <div class="dmm-bulk-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff;">
@@ -844,6 +902,46 @@ class DMM_Delivery_Bridge {
                     },
                     complete: function() {
                         button.prop('disabled', false).text('<?php _e('🏢 Get All Stations', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            // ACS Sync functionality
+            $('#dmm-acs-sync-all').on('click', function() {
+                if (!confirm('<?php _e('This will sync all ACS shipments. This may take several minutes. Continue?', 'dmm-delivery-bridge'); ?>')) {
+                    return;
+                }
+                
+                var button = $(this);
+                button.prop('disabled', true).text('<?php _e('Syncing...', 'dmm-delivery-bridge'); ?>');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_acs_sync_all_shipments',
+                        nonce: '<?php echo wp_create_nonce('dmm_acs_sync_all_shipments'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var results = response.data.results;
+                            var html = '<div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin-top: 10px;">';
+                            html += '<h4 style="margin: 0 0 10px 0; color: #155724;"><?php _e('Sync Completed', 'dmm-delivery-bridge'); ?></h4>';
+                            html += '<p><strong><?php _e('Processed:', 'dmm-delivery-bridge'); ?></strong> ' + results.processed + '</p>';
+                            html += '<p><strong><?php _e('Updated:', 'dmm-delivery-bridge'); ?></strong> ' + results.updated + '</p>';
+                            html += '<p><strong><?php _e('Skipped:', 'dmm-delivery-bridge'); ?></strong> ' + results.skipped + '</p>';
+                            html += '<p><strong><?php _e('Errors:', 'dmm-delivery-bridge'); ?></strong> ' + results.errors + '</p>';
+                            html += '</div>';
+                            $('#dmm-acs-sync-result').html(html);
+                        } else {
+                            $('#dmm-acs-sync-result').html('<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; color: #721c24;">' + response.data.message + '</div>');
+                        }
+                    },
+                    error: function() {
+                        $('#dmm-acs-sync-result').html('<div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; color: #721c24;"><?php _e('Failed to sync shipments. Please try again.', 'dmm-delivery-bridge'); ?></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🔄 Sync All ACS Shipments', 'dmm-delivery-bridge'); ?>');
                     }
                 });
             });
@@ -3690,6 +3788,247 @@ class DMM_Delivery_Bridge {
         $this->create_acs_shipment($order, $voucher_number);
         
         wp_send_json_success(['message' => __('ACS shipment synced successfully.', 'dmm-delivery-bridge')]);
+    }
+    
+    /**
+     * AJAX: Sync all ACS shipments
+     */
+    public function ajax_acs_sync_all_shipments() {
+        check_ajax_referer('dmm_acs_sync_all_shipments', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $results = $this->sync_acs_shipments();
+        
+        wp_send_json_success([
+            'message' => __('ACS shipments sync completed.', 'dmm-delivery-bridge'),
+            'results' => $results
+        ]);
+    }
+    
+    /**
+     * AJAX: Sync specific shipment status
+     */
+    public function ajax_acs_sync_shipment_status() {
+        check_ajax_referer('dmm_acs_sync_shipment_status', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error(['message' => __('Order not found.', 'dmm-delivery-bridge')]);
+        }
+        
+        $result = $this->sync_single_acs_shipment($order);
+        
+        wp_send_json_success([
+            'message' => __('ACS shipment status synced.', 'dmm-delivery-bridge'),
+            'result' => $result
+        ]);
+    }
+    
+    /**
+     * Sync all ACS shipments (scheduled task)
+     */
+    public function sync_acs_shipments() {
+        $results = [
+            'processed' => 0,
+            'updated' => 0,
+            'errors' => 0,
+            'skipped' => 0
+        ];
+        
+        // Get all orders with ACS vouchers
+        $orders = $this->get_orders_with_acs_vouchers();
+        
+        foreach ($orders as $order) {
+            try {
+                $result = $this->sync_single_acs_shipment($order);
+                
+                if ($result['success']) {
+                    $results['processed']++;
+                    if ($result['updated']) {
+                        $results['updated']++;
+                    } else {
+                        $results['skipped']++;
+                    }
+                } else {
+                    $results['errors']++;
+                }
+            } catch (Exception $e) {
+                $results['errors']++;
+                error_log("ACS Sync Error for Order {$order->get_id()}: " . $e->getMessage());
+            }
+        }
+        
+        error_log("ACS Sync Completed: " . json_encode($results));
+        return $results;
+    }
+    
+    /**
+     * Get orders with ACS vouchers that need syncing
+     */
+    private function get_orders_with_acs_vouchers() {
+        global $wpdb;
+        
+        // Get orders with ACS vouchers that haven't been synced recently
+        $orders = $wpdb->get_results("
+            SELECT DISTINCT p.ID 
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_type = 'shop_order'
+            AND p.post_status IN ('wc-processing', 'wc-shipped', 'wc-completed')
+            AND pm.meta_key IN ('acs_voucher', 'acs_tracking', 'tracking_number', 'voucher_number')
+            AND pm.meta_value REGEXP '^[0-9]{8,15}$'
+            AND (
+                NOT EXISTS (
+                    SELECT 1 FROM {$wpdb->postmeta} pm2 
+                    WHERE pm2.post_id = p.ID 
+                    AND pm2.meta_key = '_dmm_acs_last_sync'
+                    AND pm2.meta_value > DATE_SUB(NOW(), INTERVAL 2 HOUR)
+                )
+                OR NOT EXISTS (
+                    SELECT 1 FROM {$wpdb->postmeta} pm3 
+                    WHERE pm3.post_id = p.ID 
+                    AND pm3.meta_key = '_dmm_acs_last_sync'
+                )
+            )
+            ORDER BY p.post_date DESC
+            LIMIT 50
+        ");
+        
+        $order_objects = [];
+        foreach ($orders as $order_data) {
+            $order = wc_get_order($order_data->ID);
+            if ($order) {
+                $order_objects[] = $order;
+            }
+        }
+        
+        return $order_objects;
+    }
+    
+    /**
+     * Sync single ACS shipment
+     */
+    private function sync_single_acs_shipment($order) {
+        $voucher_number = $this->get_acs_voucher_from_order($order);
+        
+        if (!$voucher_number) {
+            return ['success' => false, 'error' => 'No ACS voucher found'];
+        }
+        
+        // Check if we should sync this order
+        if (!$this->should_sync_order($order, $voucher_number)) {
+            return ['success' => true, 'updated' => false, 'reason' => 'Skip conditions met'];
+        }
+        
+        // Get ACS tracking data
+        $acs_service = $this->get_acs_service();
+        $tracking_response = $acs_service->get_tracking_details($voucher_number);
+        
+        if (!$tracking_response['success']) {
+            return ['success' => false, 'error' => $tracking_response['error']];
+        }
+        
+        // Parse tracking events
+        $events = $acs_service->parse_tracking_events($tracking_response['data']);
+        
+        // Send to main application
+        $this->send_acs_shipment_to_main_app([
+            'external_order_id' => $order->get_id(),
+            'order_number' => $order->get_order_number(),
+            'courier' => 'ACS',
+            'tracking_number' => $voucher_number,
+            'courier_tracking_id' => $voucher_number,
+            'status' => $this->map_acs_status($events),
+            'weight' => $this->get_order_weight($order),
+            'shipping_address' => $order->get_formatted_shipping_address(),
+            'billing_address' => $order->get_formatted_billing_address(),
+            'shipping_cost' => $order->get_shipping_total(),
+            'courier_response' => $tracking_response['data'],
+            'tracking_events' => $events,
+            'customer_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+            'customer_email' => $order->get_billing_email(),
+            'customer_phone' => $order->get_billing_phone(),
+            'order_total' => $order->get_total(),
+            'currency' => $order->get_currency(),
+            'order_date' => $order->get_date_created()->format('Y-m-d H:i:s'),
+            'voucher_source' => 'acs_auto_sync',
+            'acs_voucher_number' => $voucher_number
+        ]);
+        
+        // Update last sync time
+        update_post_meta($order->get_id(), '_dmm_acs_last_sync', current_time('mysql'));
+        
+        return ['success' => true, 'updated' => true, 'events_count' => count($events)];
+    }
+    
+    /**
+     * Get ACS voucher from order
+     */
+    private function get_acs_voucher_from_order($order) {
+        $acs_meta_fields = [
+            'acs_voucher', 'acs_tracking', 'tracking_number', 
+            'voucher_number', 'shipment_id', '_dmm_delivery_shipment_id'
+        ];
+        
+        foreach ($acs_meta_fields as $field) {
+            $value = get_post_meta($order->get_id(), $field, true);
+            if ($this->is_acs_voucher($value)) {
+                return $value;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Check if order should be synced
+     */
+    private function should_sync_order($order, $voucher_number) {
+        // Don't sync if already delivered and synced recently
+        if ($order->get_status() === 'completed') {
+            $last_sync = get_post_meta($order->get_id(), '_dmm_acs_last_sync', true);
+            if ($last_sync && strtotime($last_sync) > strtotime('-24 hours')) {
+                return false;
+            }
+        }
+        
+        // Don't sync if order is too old (more than 30 days)
+        if (strtotime($order->get_date_created()) < strtotime('-30 days')) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Add custom cron interval for ACS sync
+     */
+    public function add_acs_sync_cron_interval($schedules) {
+        $schedules['dmm_acs_sync_interval'] = [
+            'interval' => 4 * HOUR_IN_SECONDS, // Every 4 hours
+            'display' => __('Every 4 Hours (ACS Sync)', 'dmm-delivery-bridge')
+        ];
+        
+        $schedules['dmm_acs_sync_frequent'] = [
+            'interval' => 2 * HOUR_IN_SECONDS, // Every 2 hours
+            'display' => __('Every 2 Hours (ACS Sync)', 'dmm-delivery-bridge')
+        ];
+        
+        $schedules['dmm_acs_sync_daily'] = [
+            'interval' => 24 * HOUR_IN_SECONDS, // Daily
+            'display' => __('Daily (ACS Sync)', 'dmm-delivery-bridge')
+        ];
+        
+        return $schedules;
     }
     
     /**
