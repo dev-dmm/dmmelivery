@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Badge } from '@/Components/ui/badge';
-import { Button } from '@/Components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/Card';
+import { Badge } from '@/Components/ui/Badge';
+import { Button } from '@/Components/ui/Button';
 import { Separator } from '@/Components/ui/separator';
 import { 
   ArrowLeft, 
