@@ -40,7 +40,7 @@ class ShipmentController extends Controller
             ->with([
                 'customer:id,name,email,phone',
                 'courier:id,name,code,tracking_url_template',
-                'predictiveEta:id,shipment_id,predicted_eta,confidence_score,delay_risk_level,delay_factors,weather_impact,traffic_impact,has_significant_delay',
+                'predictiveEta:id,shipment_id,predicted_eta,confidence_score,delay_risk_level,delay_factors,weather_impact,traffic_impact',
             ])
             ->allowedFilters([
                 AllowedFilter::partial('tracking_number'),
