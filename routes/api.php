@@ -46,4 +46,8 @@ Route::prefix('woocommerce')
             ->name('order');
         Route::put('/order', [WooCommerceOrderController::class, 'update'])
             ->name('order.update');
+        
+        // ACS Shipment endpoint for WordPress plugin
+        Route::post('/acs-shipment', [App\Http\Controllers\ACSShipmentController::class, 'store'])
+            ->name('acs-shipment');
     });

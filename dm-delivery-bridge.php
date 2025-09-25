@@ -107,6 +107,19 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_diagnose_orders', [$this, 'ajax_diagnose_orders']);
         add_action('wp_ajax_dmm_force_resend_all', [$this, 'ajax_force_resend_all']);
         add_action('wp_ajax_dmm_test_force_resend', [$this, 'ajax_test_force_resend']);
+        
+        // ACS Voucher Detection
+        add_action('wp_ajax_dmm_acs_track_shipment', [$this, 'ajax_acs_track_shipment']);
+        add_action('wp_ajax_dmm_acs_create_voucher', [$this, 'ajax_acs_create_voucher']);
+        add_action('wp_ajax_dmm_acs_calculate_price', [$this, 'ajax_acs_calculate_price']);
+        add_action('wp_ajax_dmm_acs_validate_address', [$this, 'ajax_acs_validate_address']);
+        add_action('wp_ajax_dmm_acs_find_stations', [$this, 'ajax_acs_find_stations']);
+        add_action('wp_ajax_dmm_acs_test_connection', [$this, 'ajax_acs_test_connection']);
+        add_action('wp_ajax_dmm_acs_sync_shipment', [$this, 'ajax_acs_sync_shipment']);
+        
+        // Meta field monitoring for ACS vouchers
+        add_action('updated_post_meta', [$this, 'on_meta_updated'], 10, 4);
+        add_action('added_post_meta', [$this, 'on_meta_added'], 10, 4);
         add_action('wp_ajax_dmm_send_all_orders_simple', [$this, 'ajax_send_all_orders_simple']);
         
         // ACS Courier AJAX handlers
@@ -2418,6 +2431,12 @@ class DMM_Delivery_Bridge {
         // Add common custom fields that might contain courier info
         $custom_fields = [
             'courier' => '[Custom] Courier (courier)',
+            'tracking_number' => '[Custom] Tracking Number (tracking_number)',
+            'acs_voucher' => '[Custom] ACS Voucher (acs_voucher)',
+            'acs_tracking' => '[Custom] ACS Tracking (acs_tracking)',
+            'voucher_number' => '[Custom] Voucher Number (voucher_number)',
+            'shipment_id' => '[Custom] Shipment ID (shipment_id)',
+            '_dmm_delivery_shipment_id' => '[DMM] DMM Shipment ID (_dmm_delivery_shipment_id)',
             'shipping_courier' => '[Custom] Shipping Courier (shipping_courier)',
             'delivery_method' => '[Custom] Delivery Method (delivery_method)',
             'courier_service' => '[Custom] Courier Service (courier_service)',
@@ -3386,6 +3405,291 @@ class DMM_Delivery_Bridge {
                 'meta_key' => '_dmm_delivery_shipment_id'
             ]
         );
+    }
+    
+    /**
+     * Monitor meta field updates for ACS vouchers
+     */
+    public function on_meta_updated($meta_id, $post_id, $meta_key, $meta_value) {
+        $this->check_for_acs_voucher($post_id, $meta_key, $meta_value);
+    }
+    
+    /**
+     * Monitor meta field additions for ACS vouchers
+     */
+    public function on_meta_added($meta_id, $post_id, $meta_key, $meta_value) {
+        $this->check_for_acs_voucher($post_id, $meta_key, $meta_value);
+    }
+    
+    /**
+     * Check if meta field contains ACS voucher and create shipment
+     */
+    private function check_for_acs_voucher($post_id, $meta_key, $meta_value) {
+        // Only process WooCommerce orders
+        if (get_post_type($post_id) !== 'shop_order') {
+            return;
+        }
+        
+        // Check if this is an ACS-related meta field
+        $acs_meta_fields = [
+            'acs_voucher',
+            'acs_tracking', 
+            'tracking_number',
+            'voucher_number',
+            'shipment_id',
+            '_dmm_delivery_shipment_id',
+            'courier',
+            'shipping_courier',
+            'delivery_method',
+            'courier_service'
+        ];
+        
+        if (!in_array($meta_key, $acs_meta_fields)) {
+            return;
+        }
+        
+        // Check if the value looks like an ACS voucher (numeric, 10+ digits)
+        if (!$this->is_acs_voucher($meta_value)) {
+            return;
+        }
+        
+        // Get the order
+        $order = wc_get_order($post_id);
+        if (!$order) {
+            return;
+        }
+        
+        // Check if we already processed this voucher
+        $processed_vouchers = get_post_meta($post_id, '_dmm_acs_processed_vouchers', true) ?: [];
+        if (in_array($meta_value, $processed_vouchers)) {
+            return;
+        }
+        
+        // Mark as processed
+        $processed_vouchers[] = $meta_value;
+        update_post_meta($post_id, '_dmm_acs_processed_vouchers', $processed_vouchers);
+        
+        // Create shipment and sync to main application
+        $this->create_acs_shipment($order, $meta_value);
+    }
+    
+    /**
+     * Check if value looks like an ACS voucher
+     */
+    private function is_acs_voucher($value) {
+        if (empty($value) || !is_string($value)) {
+            return false;
+        }
+        
+        // ACS vouchers are typically 10+ digit numbers
+        $clean_value = preg_replace('/[^0-9]/', '', $value);
+        
+        // Must be at least 8 digits and not too long
+        if (strlen($clean_value) < 8 || strlen($clean_value) > 15) {
+            return false;
+        }
+        
+        // Check if it starts with common ACS patterns
+        $acs_patterns = ['9', '7', '8']; // Common ACS voucher prefixes
+        return in_array(substr($clean_value, 0, 1), $acs_patterns);
+    }
+    
+    /**
+     * Create ACS shipment and sync to main application
+     */
+    private function create_acs_shipment($order, $voucher_number) {
+        try {
+            // Get ACS tracking data
+            $acs_service = $this->get_acs_service();
+            $tracking_response = $acs_service->get_tracking_details($voucher_number);
+            
+            if (!$tracking_response['success']) {
+                error_log("DMM ACS: Failed to get tracking data for voucher {$voucher_number}: " . $tracking_response['error']);
+                return;
+            }
+            
+            // Parse tracking events
+            $events = $acs_service->parse_tracking_events($tracking_response['data']);
+            
+            // Prepare data for main application using existing models
+            $shipment_data = [
+                'external_order_id' => $order->get_id(),
+                'order_number' => $order->get_order_number(),
+                'courier' => 'ACS',
+                'tracking_number' => $voucher_number,
+                'courier_tracking_id' => $voucher_number,
+                'status' => $this->map_acs_status($events),
+                'weight' => $this->get_order_weight($order),
+                'shipping_address' => $order->get_formatted_shipping_address(),
+                'billing_address' => $order->get_formatted_billing_address(),
+                'shipping_cost' => $order->get_shipping_total(),
+                'courier_response' => $tracking_response['data'], // Store full ACS response
+                'tracking_events' => $events,
+                'customer_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'customer_email' => $order->get_billing_email(),
+                'customer_phone' => $order->get_billing_phone(),
+                'order_total' => $order->get_total(),
+                'currency' => $order->get_currency(),
+                'order_date' => $order->get_date_created()->format('Y-m-d H:i:s'),
+                'voucher_source' => 'acs_auto_detection',
+                'acs_voucher_number' => $voucher_number
+            ];
+            
+            // Send to main application to create/update Order and Shipment
+            $this->send_acs_shipment_to_main_app($shipment_data);
+            
+            // Log success
+            error_log("DMM ACS: Successfully created shipment for voucher {$voucher_number} on order {$order->get_id()}");
+            
+        } catch (Exception $e) {
+            error_log("DMM ACS: Error creating shipment for voucher {$voucher_number}: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Get order weight for shipment
+     */
+    private function get_order_weight($order) {
+        $weight = 0;
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if ($product && $product->has_weight()) {
+                $weight += $product->get_weight() * $item->get_quantity();
+            }
+        }
+        return $weight ?: 0.5; // Default minimum weight
+    }
+    
+    /**
+     * Map ACS status to internal status
+     */
+    private function map_acs_status($events) {
+        if (empty($events)) {
+            return 'pending';
+        }
+        
+        $latest_event = $events[0]; // Events are sorted by newest first
+        $action = strtolower($latest_event['action'] ?? '');
+        
+        if (strpos($action, 'παραδόθηκε') !== false || strpos($action, 'delivered') !== false) {
+            return 'delivered';
+        } elseif (strpos($action, 'παραλαβή') !== false || strpos($action, 'picked up') !== false) {
+            return 'shipped';
+        } elseif (strpos($action, 'κέντρο') !== false || strpos($action, 'hub') !== false) {
+            return 'in_transit';
+        } else {
+            return 'processing';
+        }
+    }
+    
+    /**
+     * Send ACS shipment data to main application
+     */
+    private function send_acs_shipment_to_main_app($shipment_data) {
+        $api_url = $this->options['api_url'] ?? '';
+        $api_key = $this->options['api_key'] ?? '';
+        
+        if (empty($api_url) || empty($api_key)) {
+            error_log('DMM ACS: API URL or key not configured');
+            return;
+        }
+        
+        // Prepare data for existing Order and Shipment models
+        $order_data = [
+            'external_order_id' => $shipment_data['external_order_id'],
+            'order_number' => $shipment_data['order_number'],
+            'status' => $this->map_order_status_from_shipment($shipment_data['status']),
+            'customer_name' => $shipment_data['customer_name'],
+            'customer_email' => $shipment_data['customer_email'],
+            'customer_phone' => $shipment_data['customer_phone'],
+            'shipping_address' => $shipment_data['shipping_address'],
+            'billing_address' => $shipment_data['billing_address'],
+            'total_amount' => $shipment_data['order_total'],
+            'currency' => $shipment_data['currency'],
+            'order_date' => $shipment_data['order_date'],
+            'additional_data' => [
+                'acs_voucher_number' => $shipment_data['acs_voucher_number'],
+                'voucher_source' => $shipment_data['voucher_source'],
+                'tracking_events' => $shipment_data['tracking_events']
+            ]
+        ];
+        
+        $shipment_data_for_api = [
+            'tracking_number' => $shipment_data['tracking_number'],
+            'courier_tracking_id' => $shipment_data['courier_tracking_id'],
+            'status' => $shipment_data['status'],
+            'weight' => $shipment_data['weight'],
+            'shipping_address' => $shipment_data['shipping_address'],
+            'billing_address' => $shipment_data['billing_address'],
+            'shipping_cost' => $shipment_data['shipping_cost'],
+            'courier_response' => $shipment_data['courier_response'],
+            'tracking_events' => $shipment_data['tracking_events']
+        ];
+        
+        $payload = [
+            'order' => $order_data,
+            'shipment' => $shipment_data_for_api,
+            'courier' => 'ACS',
+            'source' => 'wordpress_acs_auto_detection'
+        ];
+        
+        $response = wp_remote_post($api_url . '/api/woocommerce/acs-shipment', [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Bearer ' . $api_key,
+                'X-ACS-Source' => 'wordpress-plugin'
+            ],
+            'body' => json_encode($payload),
+            'timeout' => 30
+        ]);
+        
+        if (is_wp_error($response)) {
+            error_log('DMM ACS: Failed to send shipment to main app: ' . $response->get_error_message());
+        } else {
+            $response_code = wp_remote_retrieve_response_code($response);
+            if ($response_code >= 200 && $response_code < 300) {
+                error_log('DMM ACS: Successfully sent shipment to main application');
+            } else {
+                $response_body = wp_remote_retrieve_body($response);
+                error_log('DMM ACS: Main app returned error: ' . $response_code . ' - ' . $response_body);
+            }
+        }
+    }
+    
+    /**
+     * Map shipment status to order status
+     */
+    private function map_order_status_from_shipment($shipment_status) {
+        return match($shipment_status) {
+            'delivered' => 'delivered',
+            'shipped' => 'shipped',
+            'in_transit' => 'shipped',
+            'processing' => 'processing',
+            default => 'processing'
+        };
+    }
+    
+    /**
+     * AJAX: Sync ACS shipment to main application
+     */
+    public function ajax_acs_sync_shipment() {
+        check_ajax_referer('dmm_acs_sync_shipment', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        $voucher_number = sanitize_text_field($_POST['voucher_number']);
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(['message' => __('Order not found.', 'dmm-delivery-bridge')]);
+        }
+        
+        $this->create_acs_shipment($order, $voucher_number);
+        
+        wp_send_json_success(['message' => __('ACS shipment synced successfully.', 'dmm-delivery-bridge')]);
     }
     
     /**
