@@ -355,6 +355,11 @@ export default function CourierApi({ sampleShipments = [], courierInfo = null })
                                                 <p className="text-sm text-green-700 mt-2">
                                                     {testResult.message}
                                                 </p>
+                                                {testResult.note && (
+                                                    <p className="text-xs text-green-600 mt-1 italic">
+                                                        {testResult.note}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -452,6 +457,52 @@ export default function CourierApi({ sampleShipments = [], courierInfo = null })
                                                 </div>
                                             )}
                                         </>
+                                    )}
+
+                                    {/* External Tracking Results */}
+                                    {testResult.results && testResult.results.length > 0 && (
+                                        <div>
+                                            <h4 className="font-medium text-gray-900 mb-4">🔍 External API Test Results</h4>
+                                            <div className="space-y-4">
+                                                {testResult.results.map((result, index) => (
+                                                    <div key={index} className="bg-gray-50 rounded-lg p-4 border">
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <h5 className="font-medium text-gray-900">
+                                                                {result.courier.name} ({result.courier.code})
+                                                            </h5>
+                                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                                result.tracking_data ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                            }`}>
+                                                                {result.tracking_data ? 'Success' : 'Failed'}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <p className="text-sm text-gray-600 mb-3">
+                                                            {result.message}
+                                                        </p>
+
+                                                        {result.error && (
+                                                            <div className="bg-red-50 border border-red-200 rounded p-3 mb-3">
+                                                                <p className="text-sm text-red-800">
+                                                                    <strong>Error:</strong> {result.error}
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {result.tracking_data && (
+                                                            <div className="bg-green-50 border border-green-200 rounded p-3">
+                                                                <h6 className="font-medium text-green-800 mb-2">📦 Tracking Data Retrieved:</h6>
+                                                                <div className="text-sm text-green-700">
+                                                                    <pre className="whitespace-pre-wrap text-xs bg-white p-2 rounded border">
+{JSON.stringify(result.tracking_data, null, 2)}
+                                                                    </pre>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             ) : null}

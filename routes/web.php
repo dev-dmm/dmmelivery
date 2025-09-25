@@ -414,60 +414,166 @@ Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:30,1'])
         ]);
 
         $tenantId = app('tenant')->id;
+        $trackingNumber = $request->tracking_number;
 
+        // First, try to find existing shipment in database
         $shipment = \App\Models\Shipment::query()
-            ->where(function ($q) use ($request) {
-                $q->where('tracking_number', $request->tracking_number)
-                  ->orWhere('courier_tracking_id', $request->tracking_number);
+            ->where(function ($q) use ($trackingNumber) {
+                $q->where('tracking_number', $trackingNumber)
+                  ->orWhere('courier_tracking_id', $trackingNumber);
             })
             ->where('tenant_id', $tenantId)
             ->with(['courier', 'statusHistory' => fn($q) => $q->orderByDesc('happened_at')->limit(10)])
             ->first();
 
-        if (!$shipment) {
-            return response()->json(['error' => 'Shipment not found'], 404);
-        }
-
-        // Authorization safety net (policy should also check tenant ownership)
-        $user = $request->user();
-        if ($user && method_exists($user, 'can')) {
-            abort_unless($user->can('view', $shipment), 403);
-        }
-
-        if (!$shipment->courier || !$shipment->courier->api_endpoint) {
-            return response()->json(['error' => 'Courier does not support API integration'], 400);
-        }
-
-        try {
-            // Prefer a service or a queued job (sync dispatch for testing)
-            if (class_exists(\App\Jobs\FetchCourierStatuses::class)) {
-                \App\Jobs\FetchCourierStatuses::dispatchSync($shipment->id);
-            } else {
-                // Fallback: no-op to avoid reflection into private methods
-                \Log::warning('FetchCourierStatuses job missing; skipping live fetch.');
+        // If shipment exists in database, use it
+        if ($shipment) {
+            // Authorization safety net (policy should also check tenant ownership)
+            $user = $request->user();
+            if ($user && method_exists($user, 'can')) {
+                abort_unless($user->can('view', $shipment), 403);
             }
 
-            $shipment->refresh()->load(['statusHistory' => fn($q) => $q->orderByDesc('happened_at')->limit(10)]);
+            if (!$shipment->courier || !$shipment->courier->api_endpoint) {
+                return response()->json(['error' => 'Courier does not support API integration'], 400);
+            }
 
-            // Return minimal, tenant-safe payload
-            return response()->json([
-                'success'  => true,
-                'shipment' => [
-                    'id'               => $shipment->id,
-                    'tracking_number'  => $shipment->tracking_number,
-                    'status'           => $shipment->status,
-                    'courier'          => $shipment->courier ? ['id' => $shipment->courier->id, 'name' => $shipment->courier->name, 'code' => $shipment->courier->code] : null,
-                    'history'          => $shipment->statusHistory->map(fn($h) => [
-                        'status' => $h->status,
-                        'note'   => $h->note,
-                        'at'     => $h->happened_at,
-                    ]),
-                ],
-                'message' => 'API test completed.',
-            ]);
+            try {
+                // Prefer a service or a queued job (sync dispatch for testing)
+                if (class_exists(\App\Jobs\FetchCourierStatuses::class)) {
+                    \App\Jobs\FetchCourierStatuses::dispatchSync($shipment->id);
+                } else {
+                    // Fallback: no-op to avoid reflection into private methods
+                    \Log::warning('FetchCourierStatuses job missing; skipping live fetch.');
+                }
+
+                $shipment->refresh()->load(['statusHistory' => fn($q) => $q->orderByDesc('happened_at')->limit(10)]);
+
+                // Return minimal, tenant-safe payload
+                return response()->json([
+                    'success'  => true,
+                    'message' => 'API test completed for existing shipment.',
+                    'shipment' => [
+                        'id'               => $shipment->id,
+                        'tracking_number'  => $shipment->tracking_number,
+                        'courier_tracking_id' => $shipment->courier_tracking_id,
+                        'status'           => $shipment->status,
+                        'courier'          => $shipment->courier ? [
+                            'id' => $shipment->courier->id, 
+                            'name' => $shipment->courier->name, 
+                            'code' => $shipment->courier->code,
+                            'api_endpoint' => $shipment->courier->api_endpoint,
+                            'is_active' => $shipment->courier->is_active
+                        ] : null,
+                        'status_history'   => $shipment->statusHistory->map(fn($h) => [
+                            'id' => $h->id,
+                            'status' => $h->status,
+                            'description' => $h->description,
+                            'location' => $h->location,
+                            'happened_at' => $h->happened_at,
+                        ]),
+                        'created_at' => $shipment->created_at,
+                        'updated_at' => $shipment->updated_at,
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('Courier API test error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+                return response()->json(['error' => 'API test failed: ' . $e->getMessage()], 500);
+            }
+        }
+
+        // If shipment doesn't exist in database, try to fetch from courier API directly
+        try {
+            // Get active couriers for this tenant
+            $activeCouriers = \App\Models\Courier::where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->whereNotNull('api_endpoint')
+                ->get();
+
+            if ($activeCouriers->isEmpty()) {
+                return response()->json(['error' => 'No active couriers configured for API testing'], 400);
+            }
+
+            $results = [];
+            $hasSuccess = false;
+
+            foreach ($activeCouriers as $courier) {
+                try {
+                    \Log::info("🔍 Testing tracking number {$trackingNumber} with courier: {$courier->name}");
+
+                    // Test with ACS courier
+                    if (strtoupper($courier->code) === 'ACS') {
+                        $acsService = new \App\Services\ACSCourierService($courier);
+                        $trackingResult = $acsService->getTrackingDetails($trackingNumber);
+                        
+                        if ($trackingResult['success']) {
+                            $hasSuccess = true;
+                            $results[] = [
+                                'courier' => [
+                                    'id' => $courier->id,
+                                    'name' => $courier->name,
+                                    'code' => $courier->code,
+                                    'api_endpoint' => $courier->api_endpoint,
+                                ],
+                                'tracking_data' => $trackingResult['data'],
+                                'message' => 'Successfully fetched tracking data from ACS API',
+                            ];
+                        } else {
+                            $results[] = [
+                                'courier' => [
+                                    'id' => $courier->id,
+                                    'name' => $courier->name,
+                                    'code' => $courier->code,
+                                ],
+                                'error' => $trackingResult['error'] ?? 'Unknown error',
+                                'message' => 'Failed to fetch tracking data from ACS API',
+                            ];
+                        }
+                    } else {
+                        $results[] = [
+                            'courier' => [
+                                'id' => $courier->id,
+                                'name' => $courier->name,
+                                'code' => $courier->code,
+                            ],
+                            'message' => 'Courier API not implemented yet',
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("❌ Error testing with courier {$courier->name}: " . $e->getMessage());
+                    $results[] = [
+                        'courier' => [
+                            'id' => $courier->id,
+                            'name' => $courier->name,
+                            'code' => $courier->code,
+                        ],
+                        'error' => $e->getMessage(),
+                        'message' => 'Error occurred while testing courier API',
+                    ];
+                }
+            }
+
+            if ($hasSuccess) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'API test completed for external tracking number.',
+                    'tracking_number' => $trackingNumber,
+                    'results' => $results,
+                    'note' => 'This tracking number was not found in your database but was tested against courier APIs.',
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Tracking number not found in database and no courier APIs returned valid data',
+                    'tracking_number' => $trackingNumber,
+                    'results' => $results,
+                    'note' => 'This tracking number was not found in your database and courier APIs did not return valid data.',
+                ]);
+            }
+
         } catch (\Throwable $e) {
             \Log::error('Courier API test error: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return response()->json(['error' => 'API test failed'], 500);
+            return response()->json(['error' => 'API test failed: ' . $e->getMessage()], 500);
         }
     })
     ->name('api.test.courier-api');
