@@ -109,6 +109,14 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_test_force_resend', [$this, 'ajax_test_force_resend']);
         add_action('wp_ajax_dmm_send_all_orders_simple', [$this, 'ajax_send_all_orders_simple']);
         
+        // ACS Courier AJAX handlers
+        add_action('wp_ajax_dmm_acs_track_shipment', [$this, 'ajax_acs_track_shipment']);
+        add_action('wp_ajax_dmm_acs_create_voucher', [$this, 'ajax_acs_create_voucher']);
+        add_action('wp_ajax_dmm_acs_calculate_price', [$this, 'ajax_acs_calculate_price']);
+        add_action('wp_ajax_dmm_acs_validate_address', [$this, 'ajax_acs_validate_address']);
+        add_action('wp_ajax_dmm_acs_find_stations', [$this, 'ajax_acs_find_stations']);
+        add_action('wp_ajax_dmm_acs_test_connection', [$this, 'ajax_acs_test_connection']);
+        
         // Background processing
         add_action('wp_ajax_dmm_process_bulk_orders', [$this, 'ajax_process_bulk_orders']);
         add_action('wp_ajax_nopriv_dmm_process_bulk_orders', [$this, 'ajax_process_bulk_orders']);
@@ -128,7 +136,15 @@ class DMM_Delivery_Bridge {
             'order_statuses' => ['processing', 'completed'],
             'create_shipment' => 'yes',
             'debug_mode' => 'no',
-            'performance_mode' => 'balanced'
+            'performance_mode' => 'balanced',
+            // ACS Courier settings
+            'acs_api_endpoint' => 'https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest',
+            'acs_api_key' => '',
+            'acs_company_id' => '',
+            'acs_company_password' => '',
+            'acs_user_id' => '',
+            'acs_user_password' => '',
+            'acs_enabled' => 'no'
         ];
         
         if (!get_option('dmm_delivery_bridge_options')) {
@@ -292,6 +308,70 @@ class DMM_Delivery_Bridge {
             'dmm_delivery_bridge_settings',
             'dmm_delivery_bridge_behavior_section'
         );
+        
+        // ACS Courier Settings Section
+        add_settings_section(
+            'dmm_delivery_bridge_acs_section',
+            __('ACS Courier Integration', 'dmm-delivery-bridge'),
+            [$this, 'acs_section_callback'],
+            'dmm_delivery_bridge_settings'
+        );
+        
+        add_settings_field(
+            'acs_enabled',
+            __('Enable ACS Courier', 'dmm-delivery-bridge'),
+            [$this, 'acs_enabled_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_api_endpoint',
+            __('ACS API Endpoint', 'dmm-delivery-bridge'),
+            [$this, 'acs_api_endpoint_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_api_key',
+            __('ACS API Key', 'dmm-delivery-bridge'),
+            [$this, 'acs_api_key_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_company_id',
+            __('ACS Company ID', 'dmm-delivery-bridge'),
+            [$this, 'acs_company_id_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_company_password',
+            __('ACS Company Password', 'dmm-delivery-bridge'),
+            [$this, 'acs_company_password_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_user_id',
+            __('ACS User ID', 'dmm-delivery-bridge'),
+            [$this, 'acs_user_id_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
+        
+        add_settings_field(
+            'acs_user_password',
+            __('ACS User Password', 'dmm-delivery-bridge'),
+            [$this, 'acs_user_password_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_acs_section'
+        );
     }
     
     /**
@@ -318,7 +398,10 @@ class DMM_Delivery_Bridge {
                 <h3><?php _e('Test Connection', 'dmm-delivery-bridge'); ?></h3>
                 <p><?php _e('Test your API connection with the current settings.', 'dmm-delivery-bridge'); ?></p>
                 <button type="button" id="dmm-test-connection" class="button button-secondary">
-                    <?php _e('Test Connection', 'dmm-delivery-bridge'); ?>
+                    <?php _e('Test DMM API Connection', 'dmm-delivery-bridge'); ?>
+                </button>
+                <button type="button" id="dmm-acs-test-connection" class="button button-secondary">
+                    <?php _e('Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>
                 </button>
                 <div id="dmm-test-result" style="margin-top: 10px;"></div>
             </div>
@@ -336,6 +419,44 @@ class DMM_Delivery_Bridge {
                     <?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>
                 </button>
                 <div id="dmm-debug-result" style="margin-top: 10px;"></div>
+            </div>
+            
+            <div class="dmm-acs-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #fff8dc;">
+                <h3><?php _e('ACS Courier Integration', 'dmm-delivery-bridge'); ?></h3>
+                <p><?php _e('Direct integration with ACS Courier API for tracking and shipment management.', 'dmm-delivery-bridge'); ?></p>
+                <p style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; color: #856404;">
+                    <strong><?php _e('Important:', 'dmm-delivery-bridge'); ?></strong> <?php _e('You need a valid ACS API Key to use this integration. The API key may be restricted to specific domains or IP addresses. Contact ACS to get your API key and ensure your WordPress site\'s domain/IP is whitelisted.', 'dmm-delivery-bridge'); ?>
+                </p>
+                
+                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('ACS Courier Tools', 'dmm-delivery-bridge'); ?></h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                            <input type="text" id="acs-voucher-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                            <button type="button" id="dmm-acs-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                            </button>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Find Stations:', 'dmm-delivery-bridge'); ?></label>
+                            <input type="text" id="acs-zip-code" placeholder="<?php _e('Enter ZIP code', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                            <button type="button" id="dmm-acs-find-stations" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                <?php _e('📍 Find Stations', 'dmm-delivery-bridge'); ?>
+                            </button>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button type="button" id="dmm-acs-get-stations" class="button button-secondary">
+                            <?php _e('🏢 Get All Stations', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-acs-validate-address" class="button button-secondary">
+                            <?php _e('✅ Validate Address', 'dmm-delivery-bridge'); ?>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="dmm-acs-result" style="margin-top: 10px;"></div>
             </div>
             
             <div class="dmm-bulk-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff;">
@@ -525,6 +646,191 @@ class DMM_Delivery_Bridge {
                     },
                     complete: function() {
                         button.prop('disabled', false).text('<?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            // ACS Courier functionality
+            $('#dmm-acs-test-connection').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-test-result');
+                
+                button.prop('disabled', true).text('<?php _e('Testing ACS...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_acs_test_connection',
+                        nonce: '<?php echo wp_create_nonce('dmm_acs_test_connection'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('ACS connection test failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-acs-track').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-acs-result');
+                var voucherNumber = $('#acs-voucher-number').val();
+                
+                if (!voucherNumber) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a voucher number.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('🔍 Tracking...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_acs_track_shipment',
+                        voucher_number: voucherNumber,
+                        nonce: '<?php echo wp_create_nonce('dmm_acs_track_shipment'); ?>'
+                    },
+                    success: function(response) {
+                        console.log('Full AJAX Response:', response);
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p><strong><?php _e('Tracking Results:', 'dmm-delivery-bridge'); ?></strong></p>';
+                            console.log('Events array:', response.data.events);
+                            console.log('Events length:', response.data.events ? response.data.events.length : 'undefined');
+                            if (response.data.events && response.data.events.length > 0) {
+                                html += '<table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">';
+                                html += '<thead><tr><th><?php _e('Date/Time', 'dmm-delivery-bridge'); ?></th><th><?php _e('Status', 'dmm-delivery-bridge'); ?></th><th><?php _e('Location', 'dmm-delivery-bridge'); ?></th><th><?php _e('Notes', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                response.data.events.forEach(function(event) {
+                                    html += '<tr><td>' + event.datetime + '</td><td>' + event.action + '</td><td>' + event.location + '</td><td>' + event.notes + '</td></tr>';
+                                });
+                                html += '</tbody></table>';
+                            } else {
+                                html += '<p><?php _e('No tracking events found.', 'dmm-delivery-bridge'); ?></p>';
+                                html += '<p><strong>Debug Info:</strong> Events array: ' + (response.data.events ? 'exists' : 'missing') + ', Length: ' + (response.data.events ? response.data.events.length : 'N/A') + '</p>';
+                                
+                                // Add debug information
+                                html += '<details style="margin-top: 10px;"><summary>Debug Information (Click to see full response)</summary>';
+                                html += '<pre style="background: #f1f1f1; padding: 10px; overflow: auto; max-height: 300px;">';
+                                html += 'Full Response: ' + JSON.stringify(response, null, 2);
+                                html += '</pre></details>';
+                            }
+                            html += '</div>';
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-acs-find-stations').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-acs-result');
+                var zipCode = $('#acs-zip-code').val();
+                
+                if (!zipCode) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a ZIP code.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('📍 Finding...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_acs_find_stations',
+                        zip_code: zipCode,
+                        nonce: '<?php echo wp_create_nonce('dmm_acs_find_stations'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p><strong><?php _e('Stations Found:', 'dmm-delivery-bridge'); ?></strong></p>';
+                            if (response.data.stations && response.data.stations.length > 0) {
+                                html += '<table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">';
+                                html += '<thead><tr><th><?php _e('Station Name', 'dmm-delivery-bridge'); ?></th><th><?php _e('Address', 'dmm-delivery-bridge'); ?></th><th><?php _e('Phone', 'dmm-delivery-bridge'); ?></th><th><?php _e('Hours', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                response.data.stations.forEach(function(station) {
+                                    html += '<tr><td>' + (station.name || 'N/A') + '</td><td>' + (station.address || 'N/A') + '</td><td>' + (station.phone || 'N/A') + '</td><td>' + (station.hours || 'N/A') + '</td></tr>';
+                                });
+                                html += '</tbody></table>';
+                            } else {
+                                html += '<p><?php _e('No stations found for this ZIP code.', 'dmm-delivery-bridge'); ?></p>';
+                            }
+                            html += '</div>';
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Station search failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('📍 Find Stations', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-acs-get-stations').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-acs-result');
+                
+                button.prop('disabled', true).text('<?php _e('🏢 Loading...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_acs_get_stations',
+                        nonce: '<?php echo wp_create_nonce('dmm_acs_get_stations'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p><strong><?php _e('All ACS Stations:', 'dmm-delivery-bridge'); ?></strong></p>';
+                            if (response.data.stations && response.data.stations.length > 0) {
+                                html += '<p><?php _e('Found', 'dmm-delivery-bridge'); ?> ' + response.data.stations.length + ' <?php _e('stations.', 'dmm-delivery-bridge'); ?></p>';
+                                html += '<table class="wp-list-table widefat fixed striped" style="margin-top: 10px;">';
+                                html += '<thead><tr><th><?php _e('Station Name', 'dmm-delivery-bridge'); ?></th><th><?php _e('Address', 'dmm-delivery-bridge'); ?></th><th><?php _e('Phone', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                response.data.stations.slice(0, 20).forEach(function(station) {
+                                    html += '<tr><td>' + (station.name || 'N/A') + '</td><td>' + (station.address || 'N/A') + '</td><td>' + (station.phone || 'N/A') + '</td></tr>';
+                                });
+                                html += '</tbody></table>';
+                                if (response.data.stations.length > 20) {
+                                    html += '<p><em><?php _e('Showing first 20 stations. Total:', 'dmm-delivery-bridge'); ?> ' + response.data.stations.length + '</em></p>';
+                                }
+                            } else {
+                                html += '<p><?php _e('No stations found.', 'dmm-delivery-bridge'); ?></p>';
+                            }
+                            html += '</div>';
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Failed to get stations.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🏢 Get All Stations', 'dmm-delivery-bridge'); ?>');
                     }
                 });
             });
@@ -1240,6 +1546,53 @@ class DMM_Delivery_Bridge {
         echo __('<strong>Balanced:</strong> 7-15 orders per batch, optimized for most servers<br>', 'dmm-delivery-bridge');
         echo __('<strong>Fast:</strong> 15-25 orders per batch, requires powerful server', 'dmm-delivery-bridge');
         echo '</p>';
+    }
+    
+    // ACS Courier Settings Callbacks
+    public function acs_section_callback() {
+        echo '<p>' . __('Configure ACS Courier API integration for direct courier services.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_enabled_callback() {
+        $value = isset($this->options['acs_enabled']) ? $this->options['acs_enabled'] : 'no';
+        echo '<label><input type="checkbox" name="dmm_delivery_bridge_options[acs_enabled]" value="yes" ' . checked($value, 'yes', false) . ' /> ' . __('Enable ACS Courier integration', 'dmm-delivery-bridge') . '</label>';
+        echo '<p class="description">' . __('Allow direct ACS Courier API calls from this WordPress site.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_api_endpoint_callback() {
+        $value = isset($this->options['acs_api_endpoint']) ? $this->options['acs_api_endpoint'] : 'https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest';
+        echo '<input type="url" name="dmm_delivery_bridge_options[acs_api_endpoint]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('ACS Courier API endpoint URL. Default: https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_api_key_callback() {
+        $value = isset($this->options['acs_api_key']) ? $this->options['acs_api_key'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[acs_api_key]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your ACS API key.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_company_id_callback() {
+        $value = isset($this->options['acs_company_id']) ? $this->options['acs_company_id'] : '';
+        echo '<input type="text" name="dmm_delivery_bridge_options[acs_company_id]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your ACS Company ID.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_company_password_callback() {
+        $value = isset($this->options['acs_company_password']) ? $this->options['acs_company_password'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[acs_company_password]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your ACS Company Password.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_user_id_callback() {
+        $value = isset($this->options['acs_user_id']) ? $this->options['acs_user_id'] : '';
+        echo '<input type="text" name="dmm_delivery_bridge_options[acs_user_id]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your ACS User ID.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function acs_user_password_callback() {
+        $value = isset($this->options['acs_user_password']) ? $this->options['acs_user_password'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[acs_user_password]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your ACS User Password.', 'dmm-delivery-bridge') . '</p>';
     }
     
     /**
@@ -3033,6 +3386,545 @@ class DMM_Delivery_Bridge {
                 'meta_key' => '_dmm_delivery_shipment_id'
             ]
         );
+    }
+    
+    /**
+     * ACS Courier Service Class
+     */
+    private function get_acs_service() {
+        return new DMM_ACS_Courier_Service($this->options);
+    }
+    
+    /**
+     * AJAX: Test ACS connection
+     */
+    public function ajax_acs_test_connection() {
+        check_ajax_referer('dmm_acs_test_connection', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $acs_service = $this->get_acs_service();
+        $response = $acs_service->test_connection();
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('ACS Courier connection test successful!', 'dmm-delivery-bridge')
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('ACS connection test failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Track ACS shipment
+     */
+    public function ajax_acs_track_shipment() {
+        check_ajax_referer('dmm_acs_track_shipment', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $voucher_number = sanitize_text_field($_POST['voucher_number']);
+        
+        if (empty($voucher_number)) {
+            wp_send_json_error([
+                'message' => __('Voucher number is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $acs_service = $this->get_acs_service();
+        $response = $acs_service->get_tracking_details($voucher_number);
+        
+        // Debug logging
+        error_log('ACS Tracking Response: ' . print_r($response, true));
+        
+        if ($response['success']) {
+            $events = $acs_service->parse_tracking_events($response['data']);
+            error_log('Parsed Events: ' . print_r($events, true));
+            
+            // Fallback: If parsing fails, extract events directly from raw response
+            if (empty($events) && isset($response['data']['ACSOutputResponce']['ACSTableOutput']['Table_Data'])) {
+                $raw_events = $response['data']['ACSOutputResponce']['ACSTableOutput']['Table_Data'];
+                $events = [];
+                foreach ($raw_events as $event) {
+                    if (isset($event['checkpoint_date_time'])) {
+                        $events[] = [
+                            'datetime' => $event['checkpoint_date_time'],
+                            'action' => $event['checkpoint_action'] ?? '',
+                            'location' => $event['checkpoint_location'] ?? '',
+                            'notes' => $event['checkpoint_notes'] ?? '',
+                            'status' => 'parsed',
+                            'raw_data' => $event
+                        ];
+                    }
+                }
+                error_log('Fallback parsing found ' . count($events) . ' events');
+            }
+            
+            wp_send_json_success([
+                'message' => __('Tracking data retrieved successfully.', 'dmm-delivery-bridge'),
+                'events' => $events,
+                'raw_response' => $response['data'] // Include raw response for debugging
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Failed to track shipment: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Find ACS stations by ZIP code
+     */
+    public function ajax_acs_find_stations() {
+        check_ajax_referer('dmm_acs_find_stations', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $zip_code = sanitize_text_field($_POST['zip_code']);
+        
+        if (empty($zip_code)) {
+            wp_send_json_error([
+                'message' => __('ZIP code is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $acs_service = $this->get_acs_service();
+        $response = $acs_service->find_stations_by_zip_code($zip_code);
+        
+        if ($response['success']) {
+            $stations = $acs_service->parse_stations($response['data']);
+            wp_send_json_success([
+                'message' => __('Stations found successfully.', 'dmm-delivery-bridge'),
+                'stations' => $stations
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Failed to find stations: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Get all ACS stations
+     */
+    public function ajax_acs_get_stations() {
+        check_ajax_referer('dmm_acs_get_stations', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $acs_service = $this->get_acs_service();
+        $response = $acs_service->get_stations();
+        
+        if ($response['success']) {
+            $stations = $acs_service->parse_stations($response['data']);
+            wp_send_json_success([
+                'message' => __('Stations retrieved successfully.', 'dmm-delivery-bridge'),
+                'stations' => $stations
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Failed to get stations: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Validate address
+     */
+    public function ajax_acs_validate_address() {
+        check_ajax_referer('dmm_acs_validate_address', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $address = sanitize_text_field($_POST['address']);
+        
+        if (empty($address)) {
+            wp_send_json_error([
+                'message' => __('Address is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $acs_service = $this->get_acs_service();
+        $response = $acs_service->validate_address($address);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Address validation completed.', 'dmm-delivery-bridge'),
+                'validation' => $response['data']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Address validation failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+}
+
+/**
+ * ACS Courier Service Class
+ */
+class DMM_ACS_Courier_Service {
+    private $options;
+    private $api_endpoint;
+    private $api_key;
+    private $company_id;
+    private $company_password;
+    private $user_id;
+    private $user_password;
+    
+    public function __construct($options) {
+        $this->options = $options;
+        $this->api_endpoint = isset($options['acs_api_endpoint']) ? $options['acs_api_endpoint'] : 'https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest';
+        $this->api_key = isset($options['acs_api_key']) ? $options['acs_api_key'] : '';
+        $this->company_id = isset($options['acs_company_id']) ? $options['acs_company_id'] : '';
+        $this->company_password = isset($options['acs_company_password']) ? $options['acs_company_password'] : '';
+        $this->user_id = isset($options['acs_user_id']) ? $options['acs_user_id'] : '';
+        $this->user_password = isset($options['acs_user_password']) ? $options['acs_user_password'] : '';
+    }
+    
+    /**
+     * Test ACS connection
+     */
+    public function test_connection() {
+        // First check if API key is configured
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ACS API Key not configured. Please enter your ACS API Key in the plugin settings.',
+                'data' => null
+            ];
+        }
+        
+        // Check if other credentials are configured
+        if (empty($this->company_id) || empty($this->company_password) || empty($this->user_id) || empty($this->user_password)) {
+            return [
+                'success' => false,
+                'error' => 'ACS credentials not fully configured. Please enter your Company ID, Company Password, User ID, and User Password.',
+                'data' => null
+            ];
+        }
+        
+        // Try a simple tracking summary request with a test voucher number
+        // Using a known working voucher number for connection testing
+        $payload = [
+            'ACSAlias' => 'ACS_Trackingsummary',
+            'ACSInputParameters' => [
+                'Company_ID' => $this->company_id,
+                'Company_Password' => $this->company_password,
+                'User_ID' => $this->user_id,
+                'User_Password' => $this->user_password,
+                'Language' => 'GR',
+                'Voucher_No' => '9703411222' // Test voucher number that works with your setup
+            ]
+        ];
+        
+        $result = $this->make_api_call($payload);
+        
+        // If the test fails with 403, it's likely an API key issue
+        if (!$result['success'] && strpos($result['error'], 'HTTP 403') !== false) {
+            return [
+                'success' => false,
+                'error' => 'HTTP 403 Forbidden: Invalid or missing API Key. Please check your ACS API Key. The API key may be restricted to specific domains/IPs.',
+                'data' => null
+            ];
+        }
+        
+        // If successful, provide more detailed information about the response
+        if ($result['success']) {
+            $result['message'] = 'ACS connection successful! API is responding correctly.';
+            $result['debug_info'] = 'Response received from ACS API. Check the data field for detailed tracking information.';
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Get tracking details
+     */
+    public function get_tracking_details($voucher_number) {
+        $payload = [
+            'ACSAlias' => 'ACS_TrackingDetails',
+            'ACSInputParameters' => [
+                'Company_ID' => $this->company_id,
+                'Company_Password' => $this->company_password,
+                'User_ID' => $this->user_id,
+                'User_Password' => $this->user_password,
+                'Language' => 'GR',
+                'Voucher_No' => $voucher_number
+            ]
+        ];
+        
+        $result = $this->make_api_call($payload);
+        
+        // Store raw response for debugging
+        if ($result['success'] && $result['data']) {
+            $result['raw_response'] = $result['data'];
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Find stations by ZIP code
+     */
+    public function find_stations_by_zip_code($zip_code) {
+        $payload = [
+            'ACSAlias' => 'ACS_Area_Find_By_Zip_Code',
+            'ACSInputParameters' => [
+                'Company_ID' => $this->company_id,
+                'Company_Password' => $this->company_password,
+                'User_ID' => $this->user_id,
+                'User_Password' => $this->user_password,
+                'Language' => 'GR',
+                'Zip_Code' => $zip_code,
+                'Show_Only_Inaccessible_Areas' => 0,
+                'Country' => 'GR'
+            ]
+        ];
+        
+        return $this->make_api_call($payload);
+    }
+    
+    /**
+     * Get all stations
+     */
+    public function get_stations() {
+        $payload = [
+            'ACSAlias' => 'Acs_Stations',
+            'ACSInputParameters' => [
+                'Company_ID' => $this->company_id,
+                'Company_Password' => $this->company_password,
+                'User_ID' => $this->user_id,
+                'User_Password' => $this->user_password,
+                'Language' => 'GR',
+            ]
+        ];
+        
+        return $this->make_api_call($payload);
+    }
+    
+    /**
+     * Validate address
+     */
+    public function validate_address($address) {
+        $payload = [
+            'ACSAlias' => 'ACS_Address_Validation',
+            'ACSInputParameters' => [
+                'Company_ID' => $this->company_id,
+                'Company_Password' => $this->company_password,
+                'User_ID' => $this->user_id,
+                'User_Password' => $this->user_password,
+                'Language' => 'GR',
+                'Address' => $address
+            ]
+        ];
+        
+        return $this->make_api_call($payload);
+    }
+    
+    /**
+     * Make API call to ACS
+     */
+    private function make_api_call($payload, $endpoint = null) {
+        try {
+            $api_endpoint = $endpoint ?: $this->api_endpoint;
+            
+            $args = [
+                'method' => 'POST',
+                'timeout' => 30,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'ACSApiKey' => $this->api_key
+                ],
+                'body' => json_encode($payload),
+            ];
+            
+            $response = wp_remote_request($api_endpoint, $args);
+            
+            if (is_wp_error($response)) {
+                return [
+                    'success' => false,
+                    'error' => $response->get_error_message(),
+                    'data' => null
+                ];
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            $response_data = json_decode($response_body, true);
+            
+            if ($response_code >= 200 && $response_code < 300) {
+                // Check for API execution errors
+                if (isset($response_data['ACSExecution_HasError']) && $response_data['ACSExecution_HasError'] === true) {
+                    $error_message = $response_data['ACSExecutionErrorMessage'] ?? 'API Error';
+                    
+                    // Provide more specific error messages
+                    if (strpos($error_message, 'fill data error') !== false) {
+                        $error_message = 'Data validation error. Please check your credentials and parameters.';
+                    } elseif (strpos($error_message, 'Company_ID') !== false) {
+                        $error_message = 'Invalid Company ID. Please check your ACS Company ID.';
+                    } elseif (strpos($error_message, 'User_ID') !== false) {
+                        $error_message = 'Invalid User ID. Please check your ACS User ID.';
+                    } elseif (strpos($error_message, 'Password') !== false) {
+                        $error_message = 'Invalid password. Please check your ACS Company Password or User Password.';
+                    }
+                    
+                    return [
+                        'success' => false,
+                        'error' => $error_message,
+                        'data' => $response_data
+                    ];
+                }
+                
+                return [
+                    'success' => true,
+                    'error' => null,
+                    'data' => $response_data
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => "HTTP {$response_code}: {$response_body}",
+                    'data' => null
+                ];
+            }
+            
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'ACS API request failed: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Parse tracking events from ACS response
+     */
+    public function parse_tracking_events($acs_response) {
+        // Debug logging
+        error_log('parse_tracking_events called with: ' . print_r($acs_response, true));
+        
+        // Check for both possible response key names (ACS has a typo: "ACSOutputResponce" instead of "ACSOutputResponse")
+        $output_response = null;
+        if (isset($acs_response['ACSOutputResponse'])) {
+            $output_response = $acs_response['ACSOutputResponse'];
+            error_log('Using ACSOutputResponse');
+        } elseif (isset($acs_response['ACSOutputResponce'])) {
+            $output_response = $acs_response['ACSOutputResponce'];
+            error_log('Using ACSOutputResponce');
+        }
+        
+        if (!$output_response) {
+            error_log('No output response found');
+            return [];
+        }
+        
+        if (!isset($output_response['ACSValueOutput']['ACSTableOutput']['Table_Data'])) {
+            error_log('Missing Table_Data structure: ' . print_r($output_response, true));
+            return [];
+        }
+        
+        $raw_events = $output_response['ACSValueOutput']['ACSTableOutput']['Table_Data'];
+        error_log('Raw events count: ' . count($raw_events));
+        
+        if (!is_array($raw_events) || empty($raw_events)) {
+            error_log('Raw events is not array or empty');
+            return [];
+        }
+        
+        $events = [];
+        foreach ($raw_events as $event) {
+            if (!isset($event['checkpoint_date_time'])) {
+                error_log('Event missing checkpoint_date_time: ' . print_r($event, true));
+                continue;
+            }
+            
+            $events[] = [
+                'datetime' => $event['checkpoint_date_time'],
+                'action' => $event['checkpoint_action'] ?? '',
+                'location' => $event['checkpoint_location'] ?? '',
+                'notes' => $event['checkpoint_notes'] ?? '',
+                'status' => $this->map_status_to_internal($event['checkpoint_action'] ?? ''),
+                'raw_data' => $event
+            ];
+        }
+        
+        error_log('Parsed events count: ' . count($events));
+        
+        // Sort by datetime descending (newest first)
+        usort($events, function($a, $b) {
+            return strtotime($b['datetime']) - strtotime($a['datetime']);
+        });
+        
+        return $events;
+    }
+    
+    /**
+     * Parse stations from ACS response
+     */
+    public function parse_stations($acs_response) {
+        if (!isset($acs_response['ACSOutputResponse']['ACSValueOutput']['ACSTableOutput']['Table_Data'])) {
+            return [];
+        }
+        
+        $raw_stations = $acs_response['ACSOutputResponse']['ACSValueOutput']['ACSTableOutput']['Table_Data'];
+        
+        if (!is_array($raw_stations)) {
+            return [];
+        }
+        
+        $stations = [];
+        foreach ($raw_stations as $station) {
+            $stations[] = [
+                'name' => $station['station_name'] ?? '',
+                'address' => $station['station_address'] ?? '',
+                'phone' => $station['station_phone'] ?? '',
+                'hours' => $station['station_hours'] ?? '',
+                'raw_data' => $station
+            ];
+        }
+        
+        return $stations;
+    }
+    
+    /**
+     * Map ACS status to internal status
+     */
+    private function map_status_to_internal($acs_status) {
+        $status_map = [
+            'Departure to destination' => 'in_transit',
+            'Arrival-departure from HUB' => 'in_transit', 
+            'Arrival to' => 'in_transit',
+            'On delivery' => 'out_for_delivery',
+            'Delivery to consignee' => 'delivered',
+            'Delivery attempt failed' => 'failed',
+            'Returned' => 'returned',
+            'Picked up' => 'picked_up',
+            'Scan' => 'picked_up',
+        ];
+        
+        // Try to match partial strings
+        foreach ($status_map as $acs_pattern => $internal_status) {
+            if (stripos($acs_status, $acs_pattern) !== false) {
+                return $internal_status;
+            }
+        }
+        
+        // Default to in_transit for unknown statuses
+        return 'in_transit';
     }
 }
 
