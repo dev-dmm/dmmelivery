@@ -7,13 +7,14 @@ import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 
-export default function CourierApi({ sampleShipments = [] }) {
+export default function CourierApi({ sampleShipments = [], courierInfo = null }) {
     const [testResult, setTestResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
         tracking_number: '',
     });
+
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -82,9 +83,160 @@ export default function CourierApi({ sampleShipments = [] }) {
                     </p>
                 </div>
 
+                {/* Active Courier & Credentials Info */}
+                {courierInfo && (
+                    <div className="bg-white rounded-lg shadow-sm border">
+                        <div className="p-6 border-b border-gray-200">
+                            <h2 className="text-xl font-semibold">🔧 Active Courier Configuration</h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Current courier setup and credentials for testing
+                            </p>
+                        </div>
+                        
+                        <div className="p-6 space-y-6">
+                            {/* Active Couriers */}
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-3">🚚 Active Couriers</h3>
+                                {courierInfo.active_couriers && courierInfo.active_couriers.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {courierInfo.active_couriers.map((courier) => (
+                                            <div key={courier.id} className="bg-gray-50 rounded-lg p-4 border">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="font-medium text-gray-900">{courier.name}</h4>
+                                                    <div className="flex space-x-2">
+                                                        {courier.is_default && (
+                                                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                                Default
+                                                            </span>
+                                                        )}
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                            courier.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                        }`}>
+                                                            {courier.is_active ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1 text-sm text-gray-600">
+                                                    <div className="flex justify-between">
+                                                        <span>Code:</span>
+                                                        <span className="font-mono">{courier.code}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>API Endpoint:</span>
+                                                        <span className={courier.has_api_endpoint ? 'text-green-600' : 'text-red-600'}>
+                                                            {courier.has_api_endpoint ? '✓ Configured' : '✗ Not configured'}
+                                                        </span>
+                                                    </div>
+                                                    {courier.api_endpoint && (
+                                                        <div className="text-xs text-gray-500 truncate" title={courier.api_endpoint}>
+                                                            {courier.api_endpoint}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                        <div className="flex">
+                                            <div className="flex-shrink-0">
+                                                <span className="text-yellow-400 text-xl">⚠️</span>
+                                            </div>
+                                            <div className="ml-3">
+                                                <h3 className="text-sm font-medium text-yellow-800">
+                                                    No Active Couriers
+                                                </h3>
+                                                <p className="text-sm text-yellow-700 mt-1">
+                                                    You need to configure at least one active courier to test API integration.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Credentials Status */}
+                            <div>
+                                <h3 className="text-lg font-medium text-gray-900 mb-3">🔑 API Credentials Status</h3>
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-gray-700">ACS Credentials:</span>
+                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                courierInfo.credentials.has_acs_credentials 
+                                                    ? 'bg-green-100 text-green-800' 
+                                                    : 'bg-red-100 text-red-800'
+                                            }`}>
+                                                {courierInfo.credentials.has_acs_credentials ? '✓ Configured' : '✗ Not configured'}
+                                            </span>
+                                        </div>
+                                        
+                                        {courierInfo.credentials.has_acs_credentials && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Company ID:</span>
+                                                    <span className="font-mono text-blue-600">{courierInfo.credentials.acs_company_id}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">User ID:</span>
+                                                    <span className="font-mono text-blue-600">{courierInfo.credentials.acs_user_id}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">API Key:</span>
+                                                    <span className="font-mono text-gray-500">{courierInfo.credentials.acs_api_key_masked || 'Not set'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">Company Password:</span>
+                                                    <span className="font-mono text-gray-500">{courierInfo.credentials.acs_company_password_masked || 'Not set'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-600">User Password:</span>
+                                                    <span className="font-mono text-gray-500">{courierInfo.credentials.acs_user_password_masked || 'Not set'}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {!courierInfo.credentials.has_acs_credentials && (
+                                            <div className="bg-amber-50 border border-amber-200 rounded p-3">
+                                                <p className="text-sm text-amber-800">
+                                                    <strong>Note:</strong> ACS credentials are not configured. 
+                                                    The test will use demo credentials ('demo' for all fields) which won't return real tracking data.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Test Form */}
                 <div className="bg-white rounded-lg shadow-sm border p-6">
                     <h2 className="text-xl font-semibold mb-4">📦 Test Shipment Tracking</h2>
+                    
+                    {/* Test Configuration Info */}
+                    {courierInfo && (
+                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <h3 className="text-sm font-medium text-blue-900 mb-2">🔧 Test Configuration</h3>
+                            <div className="text-sm text-blue-800 space-y-1">
+                                <p>
+                                    <strong>Active Couriers:</strong> {courierInfo.active_couriers?.length || 0} configured
+                                    {courierInfo.active_couriers?.length > 0 && (
+                                        <span className="ml-2">
+                                            ({courierInfo.active_couriers.map(c => c.name).join(', ')})
+                                        </span>
+                                    )}
+                                </p>
+                                <p>
+                                    <strong>Credentials:</strong> {courierInfo.credentials.has_acs_credentials ? 'Real ACS credentials' : 'Demo credentials (demo/demo/demo/demo)'}
+                                </p>
+                                <p>
+                                    <strong>Test Mode:</strong> {courierInfo.credentials.has_acs_credentials ? 'Live API calls' : 'Demo mode (no real data)'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
@@ -311,6 +463,7 @@ export default function CourierApi({ sampleShipments = [] }) {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                     <h3 className="text-lg font-medium text-blue-900 mb-3">💡 How to use this test</h3>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
+                        <li><strong>Review the courier configuration above</strong> to see which couriers are active and what credentials are configured</li>
                         <li><strong>Click any tracking number above</strong> to auto-fill the input field</li>
                         <li>Or manually enter a tracking number from your database</li>
                         <li>Click "🚀 Test API Integration" to fetch real-time status from the courier API</li>
@@ -319,13 +472,24 @@ export default function CourierApi({ sampleShipments = [] }) {
                         <li>The shipment status will be automatically updated based on the latest courier response</li>
                     </ol>
                     
-                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded">
-                        <p className="text-sm text-amber-800">
-                            <strong>📝 Note:</strong> Using demo ACS credentials ('demo' for all fields). 
-                            These won't return real tracking data but will test your API integration logic.
-                            For real data, configure your actual ACS credentials in the <code className="bg-amber-100 px-1 rounded">.env</code> file.
-                        </p>
-                    </div>
+                    {courierInfo && !courierInfo.credentials.has_acs_credentials && (
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded">
+                            <p className="text-sm text-amber-800">
+                                <strong>📝 Note:</strong> Using demo ACS credentials ('demo' for all fields). 
+                                These won't return real tracking data but will test your API integration logic.
+                                For real data, configure your actual ACS credentials in the Settings page.
+                            </p>
+                        </div>
+                    )}
+                    
+                    {courierInfo && courierInfo.credentials.has_acs_credentials && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                            <p className="text-sm text-green-800">
+                                <strong>✅ Ready for Live Testing:</strong> Your ACS credentials are configured. 
+                                This test will make real API calls to fetch actual tracking data.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
         </AuthenticatedLayout>

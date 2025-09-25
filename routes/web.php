@@ -309,15 +309,49 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
 
     Route::middleware('throttle:30,1')->group(function () {
             Route::get('/test/courier-api', function () {
+                $tenant = app('tenant');
+                
                 $sampleShipments = \App\Models\Shipment::query()
                     ->with('courier:id,name,code')
-                    ->where('tenant_id', app('tenant')->id)
+                    ->where('tenant_id', $tenant->id)
                     ->latest('id')
                     ->take(5)
                     ->get(['id', 'tracking_number', 'courier_tracking_id', 'status', 'courier_id']);
 
+                // Get active couriers
+                $activeCouriers = \App\Models\Courier::query()
+                    ->where('tenant_id', $tenant->id)
+                    ->where('is_active', true)
+                    ->get(['id', 'name', 'code', 'api_endpoint', 'is_active', 'is_default'])
+                    ->map(function ($courier) {
+                        return [
+                            'id' => $courier->id,
+                            'name' => $courier->name,
+                            'code' => $courier->code,
+                            'api_endpoint' => $courier->api_endpoint,
+                            'is_active' => $courier->is_active,
+                            'is_default' => $courier->is_default,
+                            'has_api_endpoint' => !empty($courier->api_endpoint),
+                        ];
+                    });
+
+                // Get tenant credentials info (masked for security)
+                $credentialsInfo = [
+                    'has_acs_credentials' => $tenant->hasACSCredentials(),
+                    'acs_company_id' => $tenant->acs_company_id,
+                    'acs_user_id' => $tenant->acs_user_id,
+                    'acs_api_key_masked' => $tenant->acs_api_key ? '••••••••' : null,
+                    'acs_company_password_masked' => $tenant->acs_company_password ? '••••••••' : null,
+                    'acs_user_password_masked' => $tenant->acs_user_password ? '••••••••' : null,
+                ];
+
                 return Inertia::render('Test/CourierApi', [
                     'sampleShipments' => $sampleShipments,
+                    'courierInfo' => [
+                        'active_couriers' => $activeCouriers,
+                        'credentials' => $credentialsInfo,
+                        'tenant_name' => $tenant->business_name ?? $tenant->name,
+                    ],
                 ]);
             })->name('test.courier-api');
 
@@ -325,6 +359,49 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
                 ->name('test.acs-credentials');
         });
 });
+
+// -----------------------------
+// API: get active courier and credentials info
+// -----------------------------
+Route::middleware(['auth', 'verified', 'identify.tenant', 'throttle:30,1'])
+    ->get('/api/test/courier-info', function () {
+        $tenant = app('tenant');
+        
+        // Get active couriers
+        $activeCouriers = \App\Models\Courier::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('is_active', true)
+            ->get(['id', 'name', 'code', 'api_endpoint', 'is_active', 'is_default'])
+            ->map(function ($courier) {
+                return [
+                    'id' => $courier->id,
+                    'name' => $courier->name,
+                    'code' => $courier->code,
+                    'api_endpoint' => $courier->api_endpoint,
+                    'is_active' => $courier->is_active,
+                    'is_default' => $courier->is_default,
+                    'has_api_endpoint' => !empty($courier->api_endpoint),
+                ];
+            });
+
+        // Get tenant credentials info (masked for security)
+        $credentialsInfo = [
+            'has_acs_credentials' => $tenant->hasACSCredentials(),
+            'acs_company_id' => $tenant->acs_company_id,
+            'acs_user_id' => $tenant->acs_user_id,
+            'acs_api_key_masked' => $tenant->acs_api_key ? '••••••••' : null,
+            'acs_company_password_masked' => $tenant->acs_company_password ? '••••••••' : null,
+            'acs_user_password_masked' => $tenant->acs_user_password ? '••••••••' : null,
+        ];
+
+        return response()->json([
+            'success' => true,
+            'active_couriers' => $activeCouriers,
+            'credentials' => $credentialsInfo,
+            'tenant_name' => $tenant->business_name ?? $tenant->name,
+        ]);
+    })
+    ->name('api.test.courier-info');
 
 // -----------------------------
 // API: test courier (protected; no reflection; tenant-scoped; throttled)
