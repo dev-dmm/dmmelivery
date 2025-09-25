@@ -111,7 +111,7 @@ class PredictiveEtaController extends Controller
     /**
      * Get predictive ETA details
      */
-    public function show(string $id): JsonResponse
+    public function show(string $id)
     {
         $tenant = Auth::user()->currentTenant();
         
@@ -120,9 +120,8 @@ class PredictiveEtaController extends Controller
             ->with(['shipment.customer', 'shipment.courier', 'shipment.statusHistory'])
             ->firstOrFail();
 
-        return response()->json([
-            'success' => true,
-            'data' => [
+        return inertia('PredictiveEta/Show', [
+            'predictiveEta' => [
                 'id' => $predictiveEta->id,
                 'shipment' => [
                     'id' => $predictiveEta->shipment->id,
