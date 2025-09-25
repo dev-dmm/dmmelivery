@@ -412,191 +412,305 @@ class DMM_Delivery_Bridge {
                 <p><?php _e('Configure your DMM Delivery API settings to automatically send WooCommerce orders for tracking.', 'dmm-delivery-bridge'); ?></p>
             </div>
             
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('dmm_delivery_bridge_settings');
-                do_settings_sections('dmm_delivery_bridge_settings');
-                submit_button();
-                ?>
-            </form>
-            
-            <div class="dmm-test-section" style="margin-top: 30px; padding: 20px; border: 1px solid #ddd; background: #f9f9f9;">
-                <h3><?php _e('Test Connection', 'dmm-delivery-bridge'); ?></h3>
-                <p><?php _e('Test your API connection with the current settings.', 'dmm-delivery-bridge'); ?></p>
-                <button type="button" id="dmm-test-connection" class="button button-secondary">
-                    <?php _e('Test DMM API Connection', 'dmm-delivery-bridge'); ?>
-                </button>
-                <button type="button" id="dmm-acs-test-connection" class="button button-secondary">
-                    <?php _e('Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>
-                </button>
-                <div id="dmm-test-result" style="margin-top: 10px;"></div>
+            <!-- Tab Navigation -->
+            <div class="dmm-tab-navigation">
+                <nav class="nav-tab-wrapper">
+                    <a href="#dmm-tab-settings" class="nav-tab nav-tab-active" data-tab="settings">
+                        <?php _e('⚙️ Settings', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-testing" class="nav-tab" data-tab="testing">
+                        <?php _e('🔧 Testing & Debug', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-acs" class="nav-tab" data-tab="acs">
+                        <?php _e('🚚 ACS Integration', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-bulk" class="nav-tab" data-tab="bulk">
+                        <?php _e('📦 Bulk Processing', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-logs" class="nav-tab" data-tab="logs">
+                        <?php _e('📋 Logs & History', 'dmm-delivery-bridge'); ?>
+                    </a>
+                </nav>
             </div>
             
-            <div class="dmm-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f9f9f9;">
-                <h3><?php _e('Debug & Maintenance', 'dmm-delivery-bridge'); ?></h3>
-                <p><?php _e('Debug logging and maintenance tools.', 'dmm-delivery-bridge'); ?></p>
-                <button type="button" id="dmm-check-logs" class="button button-secondary">
-                    <?php _e('Check Log Table', 'dmm-delivery-bridge'); ?>
-                </button>
-                <button type="button" id="dmm-create-log-table" class="button button-secondary">
-                    <?php _e('Recreate Log Table', 'dmm-delivery-bridge'); ?>
-                </button>
-                <button type="button" id="dmm-diagnose-orders" class="button button-secondary">
-                    <?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>
-                </button>
-                <div id="dmm-debug-result" style="margin-top: 10px;"></div>
-            </div>
-            
-            <div class="dmm-acs-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #fff8dc;">
-                <h3><?php _e('ACS Courier Integration', 'dmm-delivery-bridge'); ?></h3>
-                <p><?php _e('Direct integration with ACS Courier API for tracking and shipment management.', 'dmm-delivery-bridge'); ?></p>
-                <p style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; color: #856404;">
-                    <strong><?php _e('Important:', 'dmm-delivery-bridge'); ?></strong> <?php _e('You need a valid ACS API Key to use this integration. The API key may be restricted to specific domains or IP addresses. Contact ACS to get your API key and ensure your WordPress site\'s domain/IP is whitelisted.', 'dmm-delivery-bridge'); ?>
-                </p>
-                
-                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('ACS Courier Tools', 'dmm-delivery-bridge'); ?></h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
-                            <input type="text" id="acs-voucher-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
-                            <button type="button" id="dmm-acs-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
-                                <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
-                            </button>
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Find Stations:', 'dmm-delivery-bridge'); ?></label>
-                            <input type="text" id="acs-zip-code" placeholder="<?php _e('Enter ZIP code', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
-                            <button type="button" id="dmm-acs-find-stations" class="button button-secondary" style="margin-top: 5px; width: 100%;">
-                                <?php _e('📍 Find Stations', 'dmm-delivery-bridge'); ?>
-                            </button>
-                        </div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button type="button" id="dmm-acs-get-stations" class="button button-secondary">
-                            <?php _e('🏢 Get All Stations', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-acs-validate-address" class="button button-secondary">
-                            <?php _e('✅ Validate Address', 'dmm-delivery-bridge'); ?>
-                        </button>
-                    </div>
-                </div>
-                
-                <div id="dmm-acs-result" style="margin-top: 10px;"></div>
-            </div>
-            
-            <div class="dmm-acs-sync-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f8f9fa;">
-                <h3><?php _e('ACS Status Sync Management', 'dmm-delivery-bridge'); ?></h3>
-                <p><?php _e('Automatically sync ACS shipment statuses with your main application. Configure sync frequency and monitor sync performance.', 'dmm-delivery-bridge'); ?></p>
-                
-                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Controls', 'dmm-delivery-bridge'); ?></h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                        <button type="button" id="dmm-acs-sync-all" class="button button-primary">
-                            <?php _e('🔄 Sync All ACS Shipments', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-acs-test-sync" class="button button-secondary">
-                            <?php _e('🧪 Test Sync (5 Orders)', 'dmm-delivery-bridge'); ?>
-                        </button>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <button type="button" id="dmm-acs-view-sync-log" class="button button-secondary">
-                            <?php _e('📋 View Sync Log', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-acs-clear-sync-log" class="button button-secondary" style="background: #dc3545; color: white; border-color: #dc3545;">
-                            <?php _e('🗑️ Clear Sync Log', 'dmm-delivery-bridge'); ?>
-                        </button>
-                    </div>
-                </div>
-                
-                <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Statistics', 'dmm-delivery-bridge'); ?></h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 14px;">
-                        <div>
-                            <strong><?php _e('Last Sync:', 'dmm-delivery-bridge'); ?></strong><br>
-                            <span id="acs-last-sync-time"><?php _e('Never', 'dmm-delivery-bridge'); ?></span>
-                        </div>
-                        <div>
-                            <strong><?php _e('Orders with ACS Vouchers:', 'dmm-delivery-bridge'); ?></strong><br>
-                            <span id="acs-orders-count"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
-                        </div>
-                        <div>
-                            <strong><?php _e('Next Scheduled Sync:', 'dmm-delivery-bridge'); ?></strong><br>
-                            <span id="acs-next-sync-time"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="dmm-acs-sync-result" style="margin-top: 10px;"></div>
-            </div>
-            
-            <div class="dmm-bulk-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff;">
-                <h3><?php _e('Bulk Order Processing', 'dmm-delivery-bridge'); ?></h3>
-                <p><?php _e('Send all unsent orders to DMM Delivery system in the background. This process runs safely without timeouts.', 'dmm-delivery-bridge'); ?></p>
-                
-                <div style="background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
-                    <h4 style="margin: 0 0 8px 0; color: #333;"><?php _e('Performance Information', 'dmm-delivery-bridge'); ?></h4>
-                    <div style="font-size: 12px; color: #666;">
+            <!-- Tab Content -->
+            <div class="dmm-tab-content">
+                <!-- Settings Tab -->
+                <div id="dmm-tab-settings" class="dmm-tab-panel active">
+                    <form method="post" action="options.php">
                         <?php
-                        $memory_limit = ini_get('memory_limit');
-                        $batch_size = $this->get_optimal_batch_size();
-                        $performance_mode = isset($this->options['performance_mode']) ? $this->options['performance_mode'] : 'balanced';
+                        settings_fields('dmm_delivery_bridge_settings');
+                        do_settings_sections('dmm_delivery_bridge_settings');
+                        submit_button();
                         ?>
-                        <strong><?php _e('Current Settings:', 'dmm-delivery-bridge'); ?></strong><br>
-                        • <?php _e('Performance Mode:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo ucfirst($performance_mode); ?></span><br>
-                        • <?php _e('Batch Size:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $batch_size; ?> <?php _e('orders per batch', 'dmm-delivery-bridge'); ?></span><br>
-                        • <?php _e('Server Memory:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $memory_limit; ?></span><br>
-                        • <?php _e('Processing Speed:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo round($batch_size / 1.5, 1); ?> <?php _e('orders per second', 'dmm-delivery-bridge'); ?></span>
+                    </form>
+                </div>
+                
+                <!-- Testing & Debug Tab -->
+                <div id="dmm-tab-testing" class="dmm-tab-panel">
+                    <div class="dmm-test-section" style="padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px;">
+                        <h3><?php _e('Test Connection', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Test your API connection with the current settings.', 'dmm-delivery-bridge'); ?></p>
+                        <button type="button" id="dmm-test-connection" class="button button-secondary">
+                            <?php _e('Test DMM API Connection', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-acs-test-connection" class="button button-secondary">
+                            <?php _e('Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <div id="dmm-test-result" style="margin-top: 10px;"></div>
+                    </div>
+                    
+                    <div class="dmm-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px;">
+                        <h3><?php _e('Debug & Maintenance', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Debug logging and maintenance tools.', 'dmm-delivery-bridge'); ?></p>
+                        <button type="button" id="dmm-check-logs" class="button button-secondary">
+                            <?php _e('Check Log Table', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-create-log-table" class="button button-secondary">
+                            <?php _e('Recreate Log Table', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="dmm-diagnose-orders" class="button button-secondary">
+                            <?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <div id="dmm-debug-result" style="margin-top: 10px;"></div>
                     </div>
                 </div>
                 
-                <div id="dmm-bulk-controls">
-                    <button type="button" id="dmm-start-bulk-send" class="button button-primary">
-                        <?php _e('🚀 Start Bulk Send', 'dmm-delivery-bridge'); ?>
-                    </button>
-                    <button type="button" id="dmm-start-bulk-sync" class="button button-secondary">
-                        <?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>
-                    </button>
-                    <button type="button" id="dmm-force-resend-all" class="button button-secondary" style="background: #ff6b6b; color: white; border-color: #ff6b6b;">
-                        <?php _e('⚠️ Force Resend All Orders', 'dmm-delivery-bridge'); ?>
-                    </button>
-                    <button type="button" id="dmm-test-force-resend" class="button button-secondary" style="background: #28a745; color: white; border-color: #28a745;">
-                        <?php _e('🧪 Test Force Resend', 'dmm-delivery-bridge'); ?>
-                    </button>
-                    <button type="button" id="dmm-send-all-simple" class="button button-primary" style="background: #007cba; color: white; border-color: #007cba; font-weight: bold;">
-                        <?php _e('📤 Send All Orders Now (Simple)', 'dmm-delivery-bridge'); ?>
-                    </button>
-                    <button type="button" id="dmm-cancel-bulk-send" class="button button-secondary" style="display: none;">
-                        <?php _e('⏹️ Cancel', 'dmm-delivery-bridge'); ?>
-                    </button>
-                </div>
-                
-                <div id="dmm-bulk-progress" style="margin-top: 15px; display: none;">
-                    <div style="background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span id="dmm-progress-text"><?php _e('Preparing...', 'dmm-delivery-bridge'); ?></span>
-                            <span id="dmm-progress-percentage">0%</span>
+                <!-- ACS Integration Tab -->
+                <div id="dmm-tab-acs" class="dmm-tab-panel">
+                    <div class="dmm-acs-section" style="padding: 20px; border: 1px solid #ddd; background: #fff8dc; border-radius: 4px;">
+                        <h3><?php _e('ACS Courier Integration', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Direct integration with ACS Courier API for tracking and shipment management.', 'dmm-delivery-bridge'); ?></p>
+                        <p style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; color: #856404;">
+                            <strong><?php _e('Important:', 'dmm-delivery-bridge'); ?></strong> <?php _e('You need a valid ACS API Key to use this integration. The API key may be restricted to specific domains or IP addresses. Contact ACS to get your API key and ensure your WordPress site\'s domain/IP is whitelisted.', 'dmm-delivery-bridge'); ?>
+                        </p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('ACS Courier Tools', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="acs-voucher-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-acs-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Find Stations:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="acs-zip-code" placeholder="<?php _e('Enter ZIP code', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-acs-find-stations" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📍 Find Stations', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button type="button" id="dmm-acs-get-stations" class="button button-secondary">
+                                    <?php _e('🏢 Get All Stations', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-acs-validate-address" class="button button-secondary">
+                                    <?php _e('✅ Validate Address', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
                         </div>
-                        <div style="background: #f0f0f0; border-radius: 10px; height: 20px; overflow: hidden;">
-                            <div id="dmm-progress-bar" style="background: #0073aa; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                        
+                        <div id="dmm-acs-result" style="margin-top: 10px;"></div>
+                    </div>
+                    
+                    <div class="dmm-acs-sync-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px;">
+                        <h3><?php _e('ACS Status Sync Management', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Automatically sync ACS shipment statuses with your main application. Configure sync frequency and monitor sync performance.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Controls', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <button type="button" id="dmm-acs-sync-all" class="button button-primary">
+                                    <?php _e('🔄 Sync All ACS Shipments', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-acs-test-sync" class="button button-secondary">
+                                    <?php _e('🧪 Test Sync (5 Orders)', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button type="button" id="dmm-acs-view-sync-log" class="button button-secondary">
+                                    <?php _e('📋 View Sync Log', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-acs-clear-sync-log" class="button button-secondary" style="background: #dc3545; color: white; border-color: #dc3545;">
+                                    <?php _e('🗑️ Clear Sync Log', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
                         </div>
-                        <div id="dmm-progress-details" style="margin-top: 10px; font-size: 12px; color: #666;">
-                            <div><?php _e('Total Orders:', 'dmm-delivery-bridge'); ?> <span id="dmm-total-orders">0</span></div>
-                            <div><?php _e('Processed:', 'dmm-delivery-bridge'); ?> <span id="dmm-processed-orders">0</span></div>
-                            <div><?php _e('Successful:', 'dmm-delivery-bridge'); ?> <span id="dmm-successful-orders">0</span></div>
-                            <div><?php _e('Failed:', 'dmm-delivery-bridge'); ?> <span id="dmm-failed-orders">0</span></div>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Sync Statistics', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 14px;">
+                                <div>
+                                    <strong><?php _e('Last Sync:', 'dmm-delivery-bridge'); ?></strong><br>
+                                    <span id="acs-last-sync-time"><?php _e('Never', 'dmm-delivery-bridge'); ?></span>
+                                </div>
+                                <div>
+                                    <strong><?php _e('Orders with ACS Vouchers:', 'dmm-delivery-bridge'); ?></strong><br>
+                                    <span id="acs-orders-count"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
+                                </div>
+                                <div>
+                                    <strong><?php _e('Next Scheduled Sync:', 'dmm-delivery-bridge'); ?></strong><br>
+                                    <span id="acs-next-sync-time"><?php _e('Loading...', 'dmm-delivery-bridge'); ?></span>
+                                </div>
+                            </div>
                         </div>
+                        
+                        <div id="dmm-acs-sync-result" style="margin-top: 10px;"></div>
                     </div>
                 </div>
                 
-                <div id="dmm-bulk-result" style="margin-top: 10px;"></div>
+                <!-- Bulk Processing Tab -->
+                <div id="dmm-tab-bulk" class="dmm-tab-panel">
+                    <div class="dmm-bulk-section" style="padding: 20px; border: 1px solid #ddd; background: #f0f8ff; border-radius: 4px;">
+                        <h3><?php _e('Bulk Order Processing', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Send all unsent orders to DMM Delivery system in the background. This process runs safely without timeouts.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 8px 0; color: #333;"><?php _e('Performance Information', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="font-size: 12px; color: #666;">
+                                <?php
+                                $memory_limit = ini_get('memory_limit');
+                                $batch_size = $this->get_optimal_batch_size();
+                                $performance_mode = isset($this->options['performance_mode']) ? $this->options['performance_mode'] : 'balanced';
+                                ?>
+                                <strong><?php _e('Current Settings:', 'dmm-delivery-bridge'); ?></strong><br>
+                                • <?php _e('Performance Mode:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo ucfirst($performance_mode); ?></span><br>
+                                • <?php _e('Batch Size:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $batch_size; ?> <?php _e('orders per batch', 'dmm-delivery-bridge'); ?></span><br>
+                                • <?php _e('Server Memory:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo $memory_limit; ?></span><br>
+                                • <?php _e('Processing Speed:', 'dmm-delivery-bridge'); ?> <span style="color: #0073aa; font-weight: bold;"><?php echo round($batch_size / 1.5, 1); ?> <?php _e('orders per second', 'dmm-delivery-bridge'); ?></span>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-bulk-controls">
+                            <button type="button" id="dmm-start-bulk-send" class="button button-primary">
+                                <?php _e('🚀 Start Bulk Send', 'dmm-delivery-bridge'); ?>
+                            </button>
+                            <button type="button" id="dmm-start-bulk-sync" class="button button-secondary">
+                                <?php _e('🔄 Sync Up All', 'dmm-delivery-bridge'); ?>
+                            </button>
+                            <button type="button" id="dmm-force-resend-all" class="button button-secondary" style="background: #ff6b6b; color: white; border-color: #ff6b6b;">
+                                <?php _e('⚠️ Force Resend All Orders', 'dmm-delivery-bridge'); ?>
+                            </button>
+                            <button type="button" id="dmm-test-force-resend" class="button button-secondary" style="background: #28a745; color: white; border-color: #28a745;">
+                                <?php _e('🧪 Test Force Resend', 'dmm-delivery-bridge'); ?>
+                            </button>
+                            <button type="button" id="dmm-send-all-simple" class="button button-primary" style="background: #007cba; color: white; border-color: #007cba; font-weight: bold;">
+                                <?php _e('📤 Send All Orders Now (Simple)', 'dmm-delivery-bridge'); ?>
+                            </button>
+                            <button type="button" id="dmm-cancel-bulk-send" class="button button-secondary" style="display: none;">
+                                <?php _e('⏹️ Cancel', 'dmm-delivery-bridge'); ?>
+                            </button>
+                        </div>
+                        
+                        <div id="dmm-bulk-progress" style="margin-top: 15px; display: none;">
+                            <div style="background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <span id="dmm-progress-text"><?php _e('Preparing...', 'dmm-delivery-bridge'); ?></span>
+                                    <span id="dmm-progress-percentage">0%</span>
+                                </div>
+                                <div style="background: #f0f0f0; border-radius: 10px; height: 20px; overflow: hidden;">
+                                    <div id="dmm-progress-bar" style="background: #0073aa; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                                </div>
+                                <div id="dmm-progress-details" style="margin-top: 10px; font-size: 12px; color: #666;">
+                                    <div><?php _e('Total Orders:', 'dmm-delivery-bridge'); ?> <span id="dmm-total-orders">0</span></div>
+                                    <div><?php _e('Processed:', 'dmm-delivery-bridge'); ?> <span id="dmm-processed-orders">0</span></div>
+                                    <div><?php _e('Successful:', 'dmm-delivery-bridge'); ?> <span id="dmm-successful-orders">0</span></div>
+                                    <div><?php _e('Failed:', 'dmm-delivery-bridge'); ?> <span id="dmm-failed-orders">0</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-bulk-result" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+                
+                <!-- Logs Tab -->
+                <div id="dmm-tab-logs" class="dmm-tab-panel">
+                    <?php $this->render_logs_section(); ?>
+                </div>
             </div>
-            
-            <?php $this->render_logs_section(); ?>
         </div>
+        
+        <style>
+        .dmm-tab-navigation {
+            margin: 20px 0;
+        }
+        
+        .dmm-tab-navigation .nav-tab-wrapper {
+            border-bottom: 1px solid #ccd0d4;
+            margin: 0;
+        }
+        
+        .dmm-tab-navigation .nav-tab {
+            background: #f1f1f1;
+            border: 1px solid #ccd0d4;
+            border-bottom: none;
+            color: #555;
+            text-decoration: none;
+            padding: 8px 12px;
+            margin-right: 0;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.2s ease;
+        }
+        
+        .dmm-tab-navigation .nav-tab:hover {
+            background: #f9f9f9;
+            color: #0073aa;
+        }
+        
+        .dmm-tab-navigation .nav-tab.nav-tab-active {
+            background: #fff;
+            border-bottom: 1px solid #fff;
+            color: #000;
+            font-weight: 600;
+        }
+        
+        .dmm-tab-content {
+            background: #fff;
+            border: 1px solid #ccd0d4;
+            border-top: none;
+            padding: 0;
+            margin-top: -1px;
+        }
+        
+        .dmm-tab-panel {
+            display: none;
+            padding: 20px;
+        }
+        
+        .dmm-tab-panel.active {
+            display: block;
+        }
+        
+        .dmm-tab-panel h3 {
+            margin-top: 0;
+            color: #23282d;
+        }
+        
+        .dmm-tab-panel .notice {
+            margin: 15px 0;
+        }
+        </style>
         
         <script>
         jQuery(document).ready(function($) {
+            // Tab functionality
+            $('.dmm-tab-navigation .nav-tab').on('click', function(e) {
+                e.preventDefault();
+                
+                var targetTab = $(this).data('tab');
+                
+                // Remove active class from all tabs and panels
+                $('.dmm-tab-navigation .nav-tab').removeClass('nav-tab-active');
+                $('.dmm-tab-panel').removeClass('active');
+                
+                // Add active class to clicked tab and corresponding panel
+                $(this).addClass('nav-tab-active');
+                $('#dmm-tab-' + targetTab).addClass('active');
+            });
             $('#dmm-test-connection').on('click', function() {
                 var button = $(this);
                 var result = $('#dmm-test-result');
