@@ -132,6 +132,7 @@ return [
     */
     
     // ACS Courier API Configuration
+    'acs_api_key' => env('ACS_API_KEY', 'demo'),
     'acs_company_id' => env('ACS_COMPANY_ID', 'demo'),
     'acs_company_password' => env('ACS_COMPANY_PASSWORD', 'demo'),
     'acs_user_id' => env('ACS_USER_ID', 'demo'), 

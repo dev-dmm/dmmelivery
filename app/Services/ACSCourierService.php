@@ -19,17 +19,18 @@ class ACSCourierService
     public function __construct(Courier $courier)
     {
         $this->apiEndpoint = $courier->api_endpoint;
-        $this->apiKey = $courier->api_key;
         
-        // Get credentials from current tenant if available, otherwise fall back to config
+        // Get API key from tenant's ACS credentials instead of courier model
         try {
             $tenant = app('tenant');
             if ($tenant && $tenant->hasACSCredentials()) {
+                $this->apiKey = $tenant->acs_api_key;
                 $this->companyId = $tenant->acs_company_id;
                 $this->companyPassword = $tenant->acs_company_password;
                 $this->userId = $tenant->acs_user_id;
                 $this->userPassword = $tenant->acs_user_password;
             } else {
+                $this->apiKey = config('app.acs_api_key', 'demo');
                 $this->companyId = config('app.acs_company_id');
                 $this->companyPassword = config('app.acs_company_password');
                 $this->userId = config('app.acs_user_id');
@@ -37,6 +38,7 @@ class ACSCourierService
             }
         } catch (\Exception $e) {
             // Fall back to config if tenant is not available
+            $this->apiKey = config('app.acs_api_key', 'demo');
             $this->companyId = config('app.acs_company_id');
             $this->companyPassword = config('app.acs_company_password');
             $this->userId = config('app.acs_user_id');
