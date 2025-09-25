@@ -16,6 +16,8 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\WebSocketController;
 
 // -----------------------------
 // Feature flags / helpers
@@ -121,6 +123,13 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // Analytics Dashboard
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/analytics/advanced', [AnalyticsController::class, 'advanced'])->name('analytics.advanced');
+    
+    // Real-time Dashboard
+    Route::get('/realtime', [DashboardController::class, 'realtime'])->name('realtime.dashboard');
     
     // Settings (keep sensitive actions POST/DELETE and CSRF-protected)
     Route::get('/settings',                                 [SettingsController::class, 'index'])->name('settings.index');

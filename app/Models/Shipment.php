@@ -48,6 +48,25 @@ class Shipment extends Model
     protected static function booted()
     {
         static::addGlobalScope(new TenantScope);
+        
+        // WebSocket events
+        static::created(function ($shipment) {
+            app(\App\Services\WebSocketService::class)->broadcastNewShipment($shipment);
+        });
+        
+        static::updated(function ($shipment) {
+            if ($shipment->wasChanged('status')) {
+                app(\App\Services\WebSocketService::class)->broadcastShipmentUpdate($shipment, [
+                    'old_status' => $shipment->getOriginal('status'),
+                    'new_status' => $shipment->status,
+                ]);
+                
+                // Special handling for delivered status
+                if ($shipment->status === 'delivered' && $shipment->wasChanged('status')) {
+                    app(\App\Services\WebSocketService::class)->broadcastShipmentDelivered($shipment);
+                }
+            }
+        });
     }
 
     public function tenant(): BelongsTo
@@ -93,5 +112,47 @@ class Shipment extends Model
     public function getCurrentStatusAttribute(): ?ShipmentStatusHistory
     {
         return $this->statusHistory()->latest('happened_at')->first();
+    }
+
+    // Optimized query scopes
+    public function scopeForTenant($query, $tenantId)
+    {
+        return $query->where('tenant_id', $tenantId);
+    }
+
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', ['delivered', 'cancelled', 'returned']);
+    }
+
+    public function scopeDelivered($query)
+    {
+        return $query->where('status', 'delivered');
+    }
+
+    public function scopeInTransit($query)
+    {
+        return $query->whereIn('status', ['in_transit', 'out_for_delivery']);
+    }
+
+    public function scopeWithRelations($query)
+    {
+        return $query->with(['customer', 'courier', 'statusHistory', 'predictiveEta']);
+    }
+
+    public function scopeRecent($query, $days = 30)
+    {
+        return $query->where('created_at', '>=', now()->subDays($days));
+    }
+
+    public function scopeByTrackingNumber($query, $trackingNumber)
+    {
+        return $query->where('tracking_number', $trackingNumber)
+                    ->orWhere('courier_tracking_id', $trackingNumber);
     }
 }

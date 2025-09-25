@@ -328,6 +328,36 @@ export default function Dashboard(props) {
           <StatCard title="Ενεργοί Courier" value={stats.total_couriers} icon="🏢" color="purple" subtitle={`${stats.total_customers} πελάτες`} />
         </div>
 
+        {/* New Features Navigation */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">🚀 New Features Available</h2>
+              <p className="text-sm text-gray-600">Explore advanced analytics, real-time tracking, and business intelligence tools.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                href={route('analytics.index')}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              >
+                📊 Analytics Dashboard
+              </Link>
+              <Link
+                href={route('analytics.advanced')}
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                🔬 Advanced Analytics
+              </Link>
+              <Link
+                href={route('realtime.dashboard')}
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+              >
+                ⚡ Real-time Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+
         {/* Charts + Activity */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           <div className="bg-white rounded-lg shadow-sm border p-4 lg:p-6">

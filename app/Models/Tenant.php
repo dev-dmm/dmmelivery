@@ -124,6 +124,14 @@ class Tenant extends Model
         'api_token_expires_at' => 'datetime',
     ];
 
+    // Encrypted fields
+    protected $encrypted = [
+        'acs_api_key',
+        'acs_company_password',
+        'acs_user_password',
+        'courier_api_keys',
+    ];
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
@@ -316,5 +324,75 @@ class Tenant extends Model
         $features = $this->enabled_features ?? [];
         $features = array_values(array_filter($features, fn($f) => $f !== $feature));
         $this->update(['enabled_features' => $features]);
+    }
+
+    // Security methods for encrypted fields
+    public function setEncryptedAttribute(string $key, string $value): void
+    {
+        if (in_array($key, $this->encrypted)) {
+            $this->attributes[$key] = encrypt($value);
+        } else {
+            $this->attributes[$key] = $value;
+        }
+    }
+
+    public function getEncryptedAttribute(string $key): ?string
+    {
+        if (in_array($key, $this->encrypted) && !empty($this->attributes[$key])) {
+            try {
+                return decrypt($this->attributes[$key]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to decrypt tenant field', [
+                    'tenant_id' => $this->id,
+                    'field' => $key,
+                    'error' => $e->getMessage()
+                ]);
+                return null;
+            }
+        }
+        
+        return $this->attributes[$key] ?? null;
+    }
+
+    // Secure credential management
+    public function updateCredentials(array $credentials): void
+    {
+        $updates = [];
+        
+        foreach ($credentials as $key => $value) {
+            if (in_array($key, $this->encrypted)) {
+                $updates[$key] = encrypt($value);
+            } else {
+                $updates[$key] = $value;
+            }
+        }
+        
+        $this->update($updates);
+        
+        \Log::info('Tenant credentials updated', [
+            'tenant_id' => $this->id,
+            'updated_fields' => array_keys($credentials)
+        ]);
+    }
+
+    public function getDecryptedCredentials(): array
+    {
+        $credentials = [];
+        
+        foreach ($this->encrypted as $field) {
+            if (!empty($this->attributes[$field])) {
+                try {
+                    $credentials[$field] = decrypt($this->attributes[$field]);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to decrypt credential', [
+                        'tenant_id' => $this->id,
+                        'field' => $field
+                    ]);
+                    $credentials[$field] = null;
+                }
+            }
+        }
+        
+        return $credentials;
     }
 }

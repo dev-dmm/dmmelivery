@@ -6,6 +6,7 @@ use App\Models\Shipment;
 use App\Models\Customer;
 use App\Models\Courier;
 use App\Http\Resources\TenantResource;
+use App\Services\AnalyticsService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -477,5 +478,28 @@ class DashboardController extends Controller
         }
 
         return $trends;
+    }
+
+    /**
+     * Display real-time dashboard
+     */
+    public function realtime(Request $request): InertiaResponse
+    {
+        $user = $request->user();
+        $tenant = $user->tenant;
+        
+        // Get basic stats for real-time dashboard
+        $stats = [
+            'total_shipments' => Shipment::where('tenant_id', $tenant->id)->count(),
+            'delivered_shipments' => Shipment::where('tenant_id', $tenant->id)->where('status', 'delivered')->count(),
+            'in_transit_shipments' => Shipment::where('tenant_id', $tenant->id)->whereIn('status', ['in_transit', 'out_for_delivery'])->count(),
+            'pending_shipments' => Shipment::where('tenant_id', $tenant->id)->where('status', 'pending')->count(),
+        ];
+
+        return Inertia::render('RealtimeDashboard', [
+            'tenantId' => $tenant->id,
+            'userId' => $user->id,
+            'initialStats' => $stats,
+        ]);
     }
 }

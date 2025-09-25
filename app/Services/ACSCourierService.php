@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Courier;
 use App\Models\Shipment;
+use App\Services\CacheService;
+use App\Exceptions\CourierApiException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +17,7 @@ class ACSCourierService
     private string $companyPassword;
     private string $userId;
     private string $userPassword;
+    private CacheService $cacheService;
 
     public function __construct(Courier $courier)
     {
@@ -44,6 +47,8 @@ class ACSCourierService
             $this->userId = config('app.acs_user_id');
             $this->userPassword = config('app.acs_user_password');
         }
+        
+        $this->cacheService = app(CacheService::class);
     }
 
     /**
@@ -51,6 +56,13 @@ class ACSCourierService
      */
     public function getTrackingDetails(string $voucherNumber): array
     {
+        // Check cache first
+        $cachedResponse = $this->cacheService->getCachedCourierResponse($voucherNumber);
+        if ($cachedResponse) {
+            Log::info('ACS API: Using cached response', ['voucher_number' => $voucherNumber]);
+            return $cachedResponse;
+        }
+
         $payload = [
             'ACSAlias' => 'ACS_TrackingDetails',
             'ACSInputParameters' => [
@@ -63,7 +75,14 @@ class ACSCourierService
             ]
         ];
 
-        return $this->makeApiCall($payload);
+        $response = $this->makeApiCall($payload);
+        
+        // Cache successful responses for 5 minutes
+        if ($response['success']) {
+            $this->cacheService->cacheCourierResponse($voucherNumber, $response, 300);
+        }
+
+        return $response;
     }
 
     /**
@@ -249,11 +268,16 @@ class ACSCourierService
                 'payload' => $payload
             ]);
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'data' => null
-            ];
+            // Throw a more specific exception for better error handling
+            throw new CourierApiException(
+                'ACS API request failed: ' . $e->getMessage(),
+                'ACS',
+                [
+                    'endpoint' => $this->apiEndpoint,
+                    'alias' => $payload['ACSAlias'] ?? 'unknown',
+                    'original_error' => $e->getMessage()
+                ]
+            );
         }
     }
 
