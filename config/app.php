@@ -127,19 +127,9 @@ return [
     | Courier API Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for courier API integrations (ACS, ELTA, Speedex, etc.)
+    | Courier API credentials are now managed through the WordPress plugin.
+    | The main application receives authenticated requests from the plugin.
     |
     */
-    
-    // ACS Courier API Configuration
-    'acs_api_key' => env('ACS_API_KEY', 'demo'),
-    'acs_company_id' => env('ACS_COMPANY_ID', 'demo'),
-    'acs_company_password' => env('ACS_COMPANY_PASSWORD', 'demo'),
-    'acs_user_id' => env('ACS_USER_ID', 'demo'), 
-    'acs_user_password' => env('ACS_USER_PASSWORD', 'demo'),
-
-    // Other courier configurations can be added here
-    'elta_api_key' => env('ELTA_API_KEY'),
-    'speedex_api_key' => env('SPEEDEX_API_KEY'),
 
 ];

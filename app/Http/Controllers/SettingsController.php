@@ -31,18 +31,8 @@ class SettingsController extends Controller
                 'business_address' => $tenant->business_address,
                 'website_url' => $tenant->website_url,
                 
-                // Courier API Settings
-                'has_acs_credentials' => $tenant->hasACSCredentials(),
-                'acs_api_key' => $tenant->acs_api_key ? '••••••••' : null,
-                'acs_company_id' => $tenant->acs_company_id,
-                'acs_company_password' => $tenant->acs_company_password ? '••••••••' : null,
-                'acs_user_id' => $tenant->acs_user_id,
-                'acs_user_password' => $tenant->acs_user_password ? '••••••••' : null,
-                
-                // Other courier APIs (placeholders for future)
-                'speedex_api_key' => $tenant->speedex_api_key ? '••••••••' : null,
-                'elta_api_key' => $tenant->elta_api_key ? '••••••••' : null,
-                'geniki_api_key' => $tenant->geniki_api_key ? '••••••••' : null,
+                // Courier API Settings (now managed through WordPress plugin)
+                'courier_integration_note' => 'Courier API credentials are now managed through the WordPress plugin',
                 
                 // Business Settings
                 'default_currency' => $tenant->default_currency ?? 'EUR',
@@ -63,31 +53,31 @@ class SettingsController extends Controller
                 'current_month_shipments' => $tenant->getCurrentMonthShipments(),
             ],
             
-            // Available options
+            // Available courier options (all managed via WordPress plugin)
             'courier_options' => [
                 'acs' => [
                     'name' => 'ACS Courier',
                     'logo' => '🚚',
-                    'status' => $tenant->hasACSCredentials() ? 'configured' : 'not_configured',
-                    'description' => 'Greek courier service with real-time tracking',
+                    'status' => 'managed_via_wordpress',
+                    'description' => 'Greek courier service with real-time tracking (configured via WordPress plugin)',
                 ],
                 'speedex' => [
                     'name' => 'Speedex',
                     'logo' => '📦',
-                    'status' => $tenant->speedex_api_key ? 'configured' : 'not_configured',
-                    'description' => 'Fast delivery service',
+                    'status' => 'managed_via_wordpress',
+                    'description' => 'Fast delivery service (configured via WordPress plugin)',
                 ],
                 'elta' => [
                     'name' => 'ΕΛΤΑ Courier',
                     'logo' => '📮',
-                    'status' => $tenant->elta_api_key ? 'configured' : 'not_configured',
-                    'description' => 'Greek postal service',
+                    'status' => 'managed_via_wordpress',
+                    'description' => 'Greek postal service (configured via WordPress plugin)',
                 ],
                 'geniki' => [
                     'name' => 'Geniki Taxydromiki',
                     'logo' => '🚛',
-                    'status' => $tenant->geniki_api_key ? 'configured' : 'not_configured',
-                    'description' => 'Express delivery service',
+                    'status' => 'managed_via_wordpress',
+                    'description' => 'Express delivery service (configured via WordPress plugin)',
                 ],
             ],
             
@@ -157,157 +147,11 @@ class SettingsController extends Controller
         ]);
     }
 
-    /**
-     * Update ACS Courier credentials
-     */
-    public function updateACSCredentials(Request $request): JsonResponse
-    {
-        $tenant = Auth::user()->currentTenant();
-        
-        $validator = Validator::make($request->all(), [
-            'acs_api_key' => 'required|string|max:100',
-            'acs_company_id' => 'required|string|max:50',
-            'acs_company_password' => 'required|string|max:100',
-            'acs_user_id' => 'required|string|max:50',
-            'acs_user_password' => 'required|string|max:100',
-        ]);
+    // Note: ACS Courier credentials are now managed through the WordPress plugin
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+    // Note: Courier credentials are now managed through the WordPress plugin
 
-        $tenant->update([
-            'acs_api_key' => $request->input('acs_api_key'),
-            'acs_company_id' => $request->input('acs_company_id'),
-            'acs_company_password' => $request->input('acs_company_password'),
-            'acs_user_id' => $request->input('acs_user_id'),
-            'acs_user_password' => $request->input('acs_user_password'),
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'ACS credentials updated successfully',
-            'has_credentials' => $tenant->hasACSCredentials(),
-        ]);
-    }
-
-    /**
-     * Update other courier credentials
-     */
-    public function updateCourierCredentials(Request $request): JsonResponse
-    {
-        $tenant = Auth::user()->currentTenant();
-        $courier = $request->input('courier');
-
-        $rules = [];
-        $updateData = [];
-
-        switch ($courier) {
-            case 'speedex':
-                $rules['speedex_api_key'] = 'required|string|max:100';
-                $updateData['speedex_api_key'] = $request->input('speedex_api_key');
-                break;
-                
-            case 'elta':
-                $rules['elta_api_key'] = 'required|string|max:100';
-                $updateData['elta_api_key'] = $request->input('elta_api_key');
-                break;
-                
-            case 'geniki':
-                $rules['geniki_api_key'] = 'required|string|max:100';
-                $updateData['geniki_api_key'] = $request->input('geniki_api_key');
-                break;
-                
-            default:
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid courier specified',
-                ], 400);
-        }
-
-        $validator = Validator::make($request->all(), $rules);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        $tenant->update($updateData);
-
-        return response()->json([
-            'success' => true,
-            'message' => ucfirst($courier) . ' credentials updated successfully',
-        ]);
-    }
-
-    /**
-     * Test courier API connection
-     */
-    public function testCourierConnection(Request $request): JsonResponse
-    {
-        $tenant = Auth::user()->currentTenant();
-        $courier = $request->input('courier');
-
-        try {
-            switch ($courier) {
-                case 'acs':
-                    if (!$tenant->hasACSCredentials()) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'ACS credentials not configured',
-                        ], 400);
-                    }
-
-                    // Test ACS connection using the service
-                    $courier = \App\Models\Courier::where('code', 'ACS')->first();
-                    if (!$courier) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'ACS courier not found in database',
-                        ], 400);
-                    }
-                    
-                    $acsService = new \App\Services\ACSCourierService($courier);
-                    $testResult = $acsService->getStations(); // Simple API test
-                    
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'ACS connection successful',
-                        'test_data' => [
-                            'stations_found' => count($testResult ?? []),
-                            'api_response_time' => 'OK',
-                        ],
-                    ]);
-
-                case 'speedex':
-                case 'elta':
-                case 'geniki':
-                    return response()->json([
-                        'success' => false,
-                        'message' => ucfirst($courier) . ' integration not yet implemented',
-                    ], 501);
-
-                default:
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Invalid courier specified',
-                    ], 400);
-            }
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Connection test failed: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
+    // Note: Courier API testing is now handled through the WordPress plugin
 
     /**
      * Generate new API token
@@ -363,53 +207,7 @@ class SettingsController extends Controller
         ]);
     }
 
-    /**
-     * Delete courier credentials
-     */
-    public function deleteCourierCredentials(Request $request): JsonResponse
-    {
-        $tenant = Auth::user()->currentTenant();
-        $courier = $request->input('courier');
-
-        $updateData = [];
-        
-        switch ($courier) {
-            case 'acs':
-                $updateData = [
-                    'acs_api_key' => null,
-                    'acs_company_id' => null,
-                    'acs_company_password' => null,
-                    'acs_user_id' => null,
-                    'acs_user_password' => null,
-                ];
-                break;
-                
-            case 'speedex':
-                $updateData['speedex_api_key'] = null;
-                break;
-                
-            case 'elta':
-                $updateData['elta_api_key'] = null;
-                break;
-                
-            case 'geniki':
-                $updateData['geniki_api_key'] = null;
-                break;
-                
-            default:
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid courier specified',
-                ], 400);
-        }
-
-        $tenant->update($updateData);
-
-        return response()->json([
-            'success' => true,
-            'message' => ucfirst($courier) . ' credentials removed successfully',
-        ]);
-    }
+    // Note: Courier credential management is now handled through the WordPress plugin
 
     /**
      * Download WordPress plugin as zip file

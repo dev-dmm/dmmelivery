@@ -179,20 +179,49 @@ class WooCommerceOrderController extends Controller
             ], 200);
         }
 
-        // Upsert customer (simple)
-        $customer = Customer::firstOrCreate(
-            [
+        // Find or create customer by email OR phone
+        $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
+        $customerPhone = data_get($request, 'customer.phone');
+        $customerName = trim(implode(' ', array_filter([
+            data_get($request, 'customer.first_name'),
+            data_get($request, 'customer.last_name'),
+        ])));
+
+        // Check for existing customer by email OR phone
+        $customer = Customer::where('tenant_id', $tenant->id)
+            ->where(function ($query) use ($customerEmail, $customerPhone) {
+                $query->where('email', $customerEmail);
+                if ($customerPhone) {
+                    $query->orWhere('phone', $customerPhone);
+                }
+            })
+            ->first();
+
+        if (!$customer) {
+            // Create new customer
+            $customer = Customer::create([
                 'tenant_id' => $tenant->id,
-                'email'     => data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local',
-            ],
-            [
-                'name'  => trim(implode(' ', array_filter([
-                    data_get($request, 'customer.first_name'),
-                    data_get($request, 'customer.last_name'),
-                ]))),
-                'phone' => data_get($request, 'customer.phone'),
-            ]
-        );
+                'name' => $customerName,
+                'email' => $customerEmail,
+                'phone' => $customerPhone,
+            ]);
+        } else {
+            // Update existing customer with new information if provided
+            $updateData = [];
+            if ($customerName && $customerName !== $customer->name) {
+                $updateData['name'] = $customerName;
+            }
+            if ($customerPhone && $customerPhone !== $customer->phone) {
+                $updateData['phone'] = $customerPhone;
+            }
+            if ($customerEmail !== $customer->email) {
+                $updateData['email'] = $customerEmail;
+            }
+
+            if (!empty($updateData)) {
+                $customer->update($updateData);
+            }
+        }
 
         // Create order
         $order = Order::create([

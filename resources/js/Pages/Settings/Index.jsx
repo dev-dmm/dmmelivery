@@ -129,7 +129,6 @@ export default function SettingsIndex({
   const [messages, setMessages] = useState({});
 
   const couriers = courier_options || {};
-  const hasAcsCredentials = Boolean(tenant?.has_acs_credentials);
   const tenantId = tenant?.id || '';
   const apiToken = tenant?.api_token || '';
   // holds the FULL token only when we just generated one
@@ -155,12 +154,7 @@ export default function SettingsIndex({
     auto_create_shipments: tenant?.auto_create_shipments || false,
     send_notifications: tenant?.send_notifications ?? true,
 
-    // ACS Credentials
-    acs_api_key: tenant?.acs_api_key || '',
-    acs_company_id: tenant?.acs_company_id || '',
-    acs_company_password: '',
-    acs_user_id: tenant?.acs_user_id || '',
-    acs_user_password: '',
+    // Note: ACS credentials are now managed through WordPress plugin
 
     // Webhook Settings
     webhook_url: tenant?.webhook_url || '',
@@ -260,77 +254,9 @@ export default function SettingsIndex({
     }
   }, [apiService, canMakeCall, recordCall, setLoading, showMessage, formData]);
 
-  const handleACSCredentialsUpdate = useCallback(async () => {
-    if (!canMakeCall()) {
-      showMessage('acs', 'Too many requests. Please wait a moment.', 'error');
-      return;
-    }
+  // Note: ACS credentials are now managed through WordPress plugin
 
-    setLoading('acs', true);
-    recordCall();
-
-    try {
-      const payload = {
-        acs_api_key: sanitizeInput(formData.acs_api_key),
-        acs_company_id: sanitizeInput(formData.acs_company_id),
-        acs_company_password: formData.acs_company_password,
-        acs_user_id: sanitizeInput(formData.acs_user_id),
-        acs_user_password: formData.acs_user_password,
-      };
-
-      const result = await apiService.post(route('settings.courier.acs.update'), payload);
-
-      if (result?.success) {
-        showMessage('acs', result.message || 'ACS credentials updated successfully', 'success');
-        updateFormData('acs_company_password', '');
-        updateFormData('acs_user_password', '');
-      } else {
-        showMessage('acs', result?.message || 'Update failed', 'error');
-      }
-    } catch (error) {
-      console.error('ACS update error:', error);
-      showMessage('acs', error instanceof Error ? error.message : 'Update failed', 'error');
-    } finally {
-      setLoading('acs', false);
-    }
-  }, [apiService, formData, canMakeCall, recordCall, setLoading, showMessage]);
-
-  const fillDemoCredentials = useCallback(() => {
-    updateFormData('acs_api_key', 'demo');
-    updateFormData('acs_company_id', 'demo');
-    updateFormData('acs_company_password', 'demo');
-    updateFormData('acs_user_id', 'demo');
-    updateFormData('acs_user_password', 'demo');
-    showMessage('acs', 'Demo credentials filled', 'success');
-  }, [showMessage]);
-
-  const testCourierConnection = useCallback(
-    async (courier) => {
-      if (!canMakeCall()) {
-        showMessage(`test_${courier}`, 'Too many requests. Please wait a moment.', 'error');
-        return;
-      }
-
-      setLoading(`test_${courier}`, true);
-      recordCall();
-
-      try {
-        const result = await apiService.post(route('settings.courier.test'), { courier });
-
-        if (result?.success) {
-          showMessage(`test_${courier}`, result.message || 'Connection test successful', 'success');
-        } else {
-          showMessage(`test_${courier}`, result?.message || 'Test failed', 'error');
-        }
-      } catch (error) {
-        console.error('Courier test error:', error);
-        showMessage(`test_${courier}`, error instanceof Error ? error.message : 'Test failed', 'error');
-      } finally {
-        setLoading(`test_${courier}`, false);
-      }
-    },
-    [apiService, canMakeCall, recordCall, setLoading, showMessage]
-  );
+  // Note: Courier credential management and testing are now handled through WordPress plugin
 
   const generateApiToken = useCallback(async () => {
     if (!canMakeCall()) {
@@ -485,17 +411,7 @@ export default function SettingsIndex({
   }, [apiService, canMakeCall, recordCall, setLoading, showMessage]);
 
   /* --------- UI Helpers --------- */
-  const getCourierStatusBadge = useCallback((status) => {
-    const statusConfig = {
-      active: { label: 'Active', color: 'bg-green-100 text-green-800' },
-      inactive: { label: 'Inactive', color: 'bg-gray-100 text-gray-800' },
-      configured: { label: 'Configured', color: 'bg-blue-100 text-blue-800' },
-      pending: { label: 'Pending Setup', color: 'bg-yellow-100 text-yellow-800' },
-      error: { label: 'Error', color: 'bg-red-100 text-red-800' },
-    };
-    const config = statusConfig[status] || statusConfig.pending;
-    return <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${config.color}`}>{config.label}</span>;
-  }, []);
+  // Note: Courier status badges are no longer needed since all couriers are managed via WordPress
 
   const getMessageAlert = useCallback(
     (section) => {
@@ -731,145 +647,61 @@ export default function SettingsIndex({
                     <div>
                       <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Courier Integrations</h3>
                       <p className="text-xs lg:text-sm text-gray-600 mb-4 lg:mb-6">
-                        Configure API credentials for your courier partners to enable real-time tracking and automated processing.
+                        Courier API credentials are now managed through the WordPress plugin for enhanced security and centralized management.
                       </p>
                     </div>
 
-                    {Object.entries(couriers).length > 0 ? (
-                      Object.entries(couriers).map(([key, courier]) => (
-                        <div key={key} className="border rounded-lg p-4 lg:p-6">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 lg:mb-4 gap-3">
-                            <div className="flex items-center space-x-2 lg:space-x-3">
+                    {/* WordPress Plugin Integration Notice */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 lg:p-6">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <GlobeAltIcon className="h-5 w-5 text-blue-400" />
+                        </div>
+                        <div className="ml-3">
+                          <h4 className="text-sm font-medium text-blue-800">WordPress Plugin Integration</h4>
+                          <div className="mt-2 text-sm text-blue-700">
+                            <p>All courier API credentials are now configured through the DMM Delivery Bridge WordPress plugin.</p>
+                            <p className="mt-1">This provides better security, centralized management, and automatic order synchronization.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Available Couriers */}
+                    {Object.entries(couriers).length > 0 && (
+                      <div className="space-y-4">
+                        <h4 className="text-sm font-medium text-gray-900">Supported Couriers</h4>
+                        {Object.entries(couriers).map(([key, courier]) => (
+                          <div key={key} className="border rounded-lg p-4 lg:p-6">
+                            <div className="flex items-center space-x-3">
                               <span className="text-xl lg:text-2xl flex-shrink-0" aria-hidden="true">
                                 {courier.logo}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <h4 className="text-base lg:text-lg font-medium text-gray-900">{courier.name}</h4>
+                                <h5 className="text-sm lg:text-base font-medium text-gray-900">{courier.name}</h5>
                                 <p className="text-xs lg:text-sm text-gray-500">{courier.description}</p>
                               </div>
-                            </div>
-                            <div className="flex-shrink-0 self-start sm:self-auto">
-                              {getCourierStatusBadge(courier.status)}
+                              <div className="flex-shrink-0">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  WordPress Managed
+                                </span>
+                              </div>
                             </div>
                           </div>
-
-                          {key === 'acs' ? (
-                            <div className="space-y-4">
-                              {getMessageAlert('acs')}
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
-                                <div>
-                                  <InputLabel htmlFor="acs_api_key" value="ACS API Key" />
-                                  <TextInput
-                                    id="acs_api_key"
-                                    value={formData.acs_api_key}
-                                    onChange={(e) => updateFormData('acs_api_key', e.target.value)}
-                                    className="mt-1 block w-full"
-                                    placeholder="Enter your ACS API key"
-                                  />
-                                </div>
-
-                                <div>
-                                  <InputLabel htmlFor="acs_company_id" value="Company ID" />
-                                  <TextInput
-                                    id="acs_company_id"
-                                    value={formData.acs_company_id}
-                                    onChange={(e) => updateFormData('acs_company_id', e.target.value)}
-                                    className="mt-1 block w-full"
-                                  />
-                                </div>
-
-                                <div>
-                                  <InputLabel htmlFor="acs_company_password" value="Company Password" />
-                                  <TextInput
-                                    id="acs_company_password"
-                                    type="password"
-                                    value={formData.acs_company_password}
-                                    onChange={(e) => updateFormData('acs_company_password', e.target.value)}
-                                    className="mt-1 block w-full"
-                                    placeholder={tenant?.acs_company_id ? '••••••••' : 'Enter password'}
-                                    autoComplete="new-password"
-                                  />
-                                </div>
-
-                                <div>
-                                  <InputLabel htmlFor="acs_user_id" value="User ID" />
-                                  <TextInput
-                                    id="acs_user_id"
-                                    value={formData.acs_user_id}
-                                    onChange={(e) => updateFormData('acs_user_id', e.target.value)}
-                                    className="mt-1 block w-full"
-                                  />
-                                </div>
-
-                                <div>
-                                  <InputLabel htmlFor="acs_user_password" value="User Password" />
-                                  <TextInput
-                                    id="acs_user_password"
-                                    type="password"
-                                    value={formData.acs_user_password}
-                                    onChange={(e) => updateFormData('acs_user_password', e.target.value)}
-                                    className="mt-1 block w-full"
-                                    placeholder={tenant?.acs_user_id ? '••••••••' : 'Enter password'}
-                                    autoComplete="new-password"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-4 lg:mt-6 gap-3 lg:gap-4">
-                                <SecondaryButton onClick={fillDemoCredentials} className="w-full sm:w-auto text-xs lg:text-sm">
-                                  Fill Demo Credentials
-                                </SecondaryButton>
-
-                                <div className="flex flex-col sm:flex-row gap-2 lg:gap-3 w-full sm:w-auto">
-                                  {hasAcsCredentials && (
-                                    <SecondaryButton 
-                                      onClick={() => testCourierConnection('acs')} 
-                                      disabled={loading.test_acs}
-                                      className="w-full sm:w-auto"
-                                    >
-                                      {loading.test_acs ? (
-                                        <>
-                                          <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                          Testing...
-                                        </>
-                                      ) : (
-                                        'Test Connection'
-                                      )}
-                                    </SecondaryButton>
-                                  )}
-
-                                  <PrimaryButton 
-                                    onClick={handleACSCredentialsUpdate} 
-                                    disabled={loading.acs}
-                                    className="w-full sm:w-auto"
-                                  >
-                                    {loading.acs ? (
-                                      <>
-                                        <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                        Saving...
-                                      </>
-                                    ) : (
-                                      'Save ACS Credentials'
-                                    )}
-                                  </PrimaryButton>
-                                </div>
-                              </div>
-
-                              {getMessageAlert('test_acs')}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8 text-gray-500">
-                              <p className="text-sm">{courier.name} integration coming soon!</p>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <p className="text-sm">No couriers configured yet.</p>
+                        ))}
                       </div>
                     )}
+
+                    {/* Next Steps */}
+                    <div className="bg-gray-50 rounded-lg p-4 lg:p-6">
+                      <h4 className="text-sm font-medium text-gray-900 mb-3">Next Steps</h4>
+                      <div className="text-xs lg:text-sm text-gray-600 space-y-2">
+                        <p>1. Install the DMM Delivery Bridge plugin on your WordPress site</p>
+                        <p>2. Configure your courier credentials in the plugin settings</p>
+                        <p>3. Orders will automatically sync to this application</p>
+                        <p>4. Track shipments and receive status updates automatically</p>
+                      </div>
+                    </div>
                   </div>
                 </TabPanel>
 

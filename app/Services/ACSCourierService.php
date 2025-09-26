@@ -12,49 +12,19 @@ use Illuminate\Support\Facades\Log;
 class ACSCourierService
 {
     private string $apiEndpoint;
-    private string $apiKey;
-    private string $companyId;
-    private string $companyPassword;
-    private string $userId;
-    private string $userPassword;
     private CacheService $cacheService;
 
     public function __construct(Courier $courier)
     {
         $this->apiEndpoint = $courier->api_endpoint;
-        
-        // Get API key from tenant's ACS credentials instead of courier model
-        try {
-            $tenant = app('tenant');
-            if ($tenant && $tenant->hasACSCredentials()) {
-                $this->apiKey = $tenant->acs_api_key;
-                $this->companyId = $tenant->acs_company_id;
-                $this->companyPassword = $tenant->acs_company_password;
-                $this->userId = $tenant->acs_user_id;
-                $this->userPassword = $tenant->acs_user_password;
-            } else {
-                $this->apiKey = config('app.acs_api_key', 'demo');
-                $this->companyId = config('app.acs_company_id');
-                $this->companyPassword = config('app.acs_company_password');
-                $this->userId = config('app.acs_user_id');
-                $this->userPassword = config('app.acs_user_password');
-            }
-        } catch (\Exception $e) {
-            // Fall back to config if tenant is not available
-            $this->apiKey = config('app.acs_api_key', 'demo');
-            $this->companyId = config('app.acs_company_id');
-            $this->companyPassword = config('app.acs_company_password');
-            $this->userId = config('app.acs_user_id');
-            $this->userPassword = config('app.acs_user_password');
-        }
-        
         $this->cacheService = app(CacheService::class);
     }
 
     /**
      * Get tracking details for a shipment
+     * Credentials are now passed from the WordPress plugin
      */
-    public function getTrackingDetails(string $voucherNumber): array
+    public function getTrackingDetails(string $voucherNumber, array $credentials = []): array
     {
         // Check cache first
         $cachedResponse = $this->cacheService->getCachedCourierResponse($voucherNumber);
@@ -63,13 +33,14 @@ class ACSCourierService
             return $cachedResponse;
         }
 
+        // Use credentials passed from WordPress plugin
         $payload = [
             'ACSAlias' => 'ACS_TrackingDetails',
             'ACSInputParameters' => [
-                'Company_ID' => $this->companyId,
-                'Company_Password' => $this->companyPassword,
-                'User_ID' => $this->userId,
-                'User_Password' => $this->userPassword,
+                'Company_ID' => $credentials['company_id'] ?? '',
+                'Company_Password' => $credentials['company_password'] ?? '',
+                'User_ID' => $credentials['user_id'] ?? '',
+                'User_Password' => $credentials['user_password'] ?? '',
                 'Language' => 'GR',
                 'Voucher_No' => $voucherNumber
             ]
@@ -87,16 +58,17 @@ class ACSCourierService
 
     /**
      * Get tracking summary for a shipment
+     * Credentials are now passed from the WordPress plugin
      */
-    public function getTrackingSummary(string $voucherNumber): array
+    public function getTrackingSummary(string $voucherNumber, array $credentials = []): array
     {
         $payload = [
             'ACSAlias' => 'ACS_Trackingsummary',
             'ACSInputParameters' => [
-                'Company_ID' => $this->companyId,
-                'Company_Password' => $this->companyPassword,
-                'User_ID' => $this->userId,
-                'User_Password' => $this->userPassword,
+                'Company_ID' => $credentials['company_id'] ?? '',
+                'Company_Password' => $credentials['company_password'] ?? '',
+                'User_ID' => $credentials['user_id'] ?? '',
+                'User_Password' => $credentials['user_password'] ?? '',
                 'Language' => 'GR',
                 'Voucher_No' => $voucherNumber
             ]
@@ -107,16 +79,17 @@ class ACSCourierService
 
     /**
      * Create a new voucher/shipment
+     * Credentials are now passed from the WordPress plugin
      */
-    public function createVoucher(array $shipmentData): array
+    public function createVoucher(array $shipmentData, array $credentials = []): array
     {
         $payload = [
             'ACSAlias' => 'ACS_Create_Voucher',
             'ACSInputParameters' => array_merge([
-                'Company_ID' => $this->companyId,
-                'Company_Password' => $this->companyPassword,
-                'User_ID' => $this->userId,
-                'User_Password' => $this->userPassword,
+                'Company_ID' => $credentials['company_id'] ?? '',
+                'Company_Password' => $credentials['company_password'] ?? '',
+                'User_ID' => $credentials['user_id'] ?? '',
+                'User_Password' => $credentials['user_password'] ?? '',
                 'Language' => 'GR',
             ], $shipmentData)
         ];
@@ -126,16 +99,17 @@ class ACSCourierService
 
     /**
      * Calculate shipping price
+     * Credentials are now passed from the WordPress plugin
      */
-    public function calculatePrice(array $shipmentData): array
+    public function calculatePrice(array $shipmentData, array $credentials = []): array
     {
         $payload = [
             'ACSAlias' => 'ACS_Price_Calculation',
             'ACSInputParameters' => array_merge([
-                'Company_ID' => $this->companyId,
-                'Company_Password' => $this->companyPassword,
-                'User_ID' => $this->userId,
-                'User_Password' => $this->userPassword,
+                'Company_ID' => $credentials['company_id'] ?? '',
+                'Company_Password' => $credentials['company_password'] ?? '',
+                'User_ID' => $credentials['user_id'] ?? '',
+                'User_Password' => $credentials['user_password'] ?? '',
                 'Language' => 'GR',
             ], $shipmentData)
         ];

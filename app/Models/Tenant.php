@@ -49,14 +49,7 @@ class Tenant extends Model
         'auto_create_shipments',
         'send_notifications',
         
-        // ACS API Credentials
-        'acs_api_key',
-        'acs_company_id',
-        'acs_company_password',
-        'acs_user_id',
-        'acs_user_password',
-        
-        // Other API Keys
+        // Other API Keys (legacy - now handled by WordPress plugin)
         'courier_api_keys',
         
         // Onboarding & Status
@@ -89,9 +82,6 @@ class Tenant extends Model
 
     protected $hidden = [
         // API Credentials - never expose these
-        'acs_api_key',
-        'acs_company_password',
-        'acs_user_password',
         'courier_api_keys',
         'api_token',
         'webhook_urls',
@@ -126,9 +116,6 @@ class Tenant extends Model
 
     // Encrypted fields
     protected $encrypted = [
-        'acs_api_key',
-        'acs_company_password',
-        'acs_user_password',
         'courier_api_keys',
     ];
 
@@ -194,25 +181,7 @@ class Tenant extends Model
     }
 
     // API Configuration Methods
-    public function hasACSCredentials(): bool
-    {
-        return !empty($this->acs_api_key) && 
-               !empty($this->acs_company_id) && 
-               !empty($this->acs_company_password) && 
-               !empty($this->acs_user_id) && 
-               !empty($this->acs_user_password);
-    }
-
-    public function getACSCredentials(): array
-    {
-        return [
-            'api_key' => $this->acs_api_key,
-            'company_id' => $this->acs_company_id,
-            'company_password' => $this->acs_company_password,
-            'user_id' => $this->acs_user_id,
-            'user_password' => $this->acs_user_password,
-        ];
-    }
+    // Note: Courier credentials are now managed through the WordPress plugin
 
     // Subscription & Billing Methods
     public function canCreateShipments(): bool

@@ -82,18 +82,46 @@ class ACSShipmentController extends Controller
     private function findOrCreateCustomer($orderData)
     {
         $email = $orderData['customer_email'] ?? null;
+        $phone = $orderData['customer_phone'] ?? null;
+        $name = $orderData['customer_name'] ?? 'Unknown Customer';
         
-        if ($email) {
-            $customer = Customer::where('email', $email)->first();
-            if ($customer) {
-                return $customer;
+        // Check for existing customer by email OR phone
+        $customer = null;
+        if ($email || $phone) {
+            $customer = Customer::where(function ($query) use ($email, $phone) {
+                if ($email) {
+                    $query->where('email', $email);
+                }
+                if ($phone) {
+                    $query->orWhere('phone', $phone);
+                }
+            })->first();
+        }
+
+        if ($customer) {
+            // Update existing customer with new information if provided
+            $updateData = [];
+            if ($name && $name !== $customer->name) {
+                $updateData['name'] = $name;
             }
+            if ($phone && $phone !== $customer->phone) {
+                $updateData['phone'] = $phone;
+            }
+            if ($email && $email !== $customer->email) {
+                $updateData['email'] = $email;
+            }
+
+            if (!empty($updateData)) {
+                $customer->update($updateData);
+            }
+            
+            return $customer;
         }
 
         return Customer::create([
-            'name' => $orderData['customer_name'] ?? 'Unknown Customer',
+            'name' => $name,
             'email' => $email ?? 'no-email@example.com',
-            'phone' => $orderData['customer_phone'] ?? null,
+            'phone' => $phone,
         ]);
     }
 

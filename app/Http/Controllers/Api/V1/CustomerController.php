@@ -67,6 +67,40 @@ class CustomerController extends Controller
             ], 422);
         }
 
+        // Check for existing customer by email OR phone
+        $existingCustomer = Customer::where('tenant_id', Auth::user()->tenant_id)
+            ->where(function ($query) use ($request) {
+                $query->where('email', $request->email);
+                if ($request->phone) {
+                    $query->orWhere('phone', $request->phone);
+                }
+            })
+            ->first();
+
+        if ($existingCustomer) {
+            // Update existing customer with new information if provided
+            $updateData = [];
+            if ($request->name && $request->name !== $existingCustomer->name) {
+                $updateData['name'] = $request->name;
+            }
+            if ($request->address && $request->address !== $existingCustomer->address) {
+                $updateData['address'] = $request->address;
+            }
+            if ($request->phone && $request->phone !== $existingCustomer->phone) {
+                $updateData['phone'] = $request->phone;
+            }
+
+            if (!empty($updateData)) {
+                $existingCustomer->update($updateData);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer already exists and was updated',
+                'data' => $existingCustomer->fresh(),
+            ], 200);
+        }
+
         $customer = Customer::create([
             'tenant_id' => Auth::user()->tenant_id,
             'name' => $request->name,
