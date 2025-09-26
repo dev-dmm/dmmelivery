@@ -47,7 +47,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Not available';
+    if (!dateString) return 'Δεν είναι διαθέσιμο';
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -82,25 +82,25 @@ export default function PredictiveEtaShow({ predictiveEta }) {
               className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Predictions
+              Επιστροφή στις Προβλέψεις
             </Link>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                Predictive ETA Details
+                Λεπτομέρειες Προγνωστικού ETA
               </h2>
               <p className="text-sm text-gray-500">
-                Shipment: {predictiveEta.shipment?.tracking_number}
+                Αποστολή: {predictiveEta.shipment?.tracking_number}
               </p>
             </div>
           </div>
           <Button onClick={handleRefresh} disabled={isRefreshing} variant="outline">
             <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            Ανανέωση
           </Button>
         </div>
       }
     >
-      <Head title="Predictive ETA Details" />
+      <Head title="Λεπτομέρειες Προγνωστικού ETA" />
 
       <div className="py-6">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,7 +112,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Brain className="w-5 h-5 text-blue-600" />
-                    <span>AI Prediction Analysis</span>
+                    <span>Ανάλυση Προβλέψεων AI</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -122,7 +122,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Calendar className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Predicted ETA</span>
+                        <span className="text-sm font-medium text-gray-700">Προβλεπόμενο ETA</span>
                       </div>
                       <p className="text-lg font-semibold text-gray-900">
                         {formatDate(predictiveEta.predicted_eta)}
@@ -132,7 +132,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Target className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Confidence</span>
+                        <span className="text-sm font-medium text-gray-700">Εμπιστοσύνη</span>
                       </div>
                       <p className="text-lg font-semibold text-gray-900">
                         {formatConfidence(predictiveEta.confidence_score)}
@@ -144,16 +144,16 @@ export default function PredictiveEtaShow({ predictiveEta }) {
 
                   {/* Risk Assessment */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-gray-900">Risk Assessment</h3>
+                    <h3 className="text-lg font-medium text-gray-900">Αξιολόγηση Κινδύνου</h3>
                     <div className="flex items-center space-x-3">
                       <Badge className={`${getRiskColor(predictiveEta.delay_risk_level)} border`}>
                         <div className="flex items-center space-x-1">
                           {getRiskIcon(predictiveEta.delay_risk_level)}
-                          <span className="capitalize">{predictiveEta.delay_risk_level} Risk</span>
+                          <span className="capitalize">{predictiveEta.delay_risk_level} Κίνδυνος</span>
                         </div>
                       </Badge>
                       <span className="text-sm text-gray-600">
-                        {predictiveEta.has_significant_delay ? 'Significant delay expected' : 'No significant delays expected'}
+                        {predictiveEta.has_significant_delay ? 'Αναμένεται σημαντική καθυστέρηση' : 'Δεν αναμένονται σημαντικές καθυστερήσεις'}
                       </span>
                     </div>
                   </div>
@@ -162,13 +162,13 @@ export default function PredictiveEtaShow({ predictiveEta }) {
 
                   {/* Delay Factors */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-medium text-gray-900">Delay Impact Analysis</h3>
+                    <h3 className="text-lg font-medium text-gray-900">Ανάλυση Επίδρασης Καθυστέρησης</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <Cloud className="w-4 h-4 text-blue-500" />
-                            <span className="text-sm font-medium">Weather Impact</span>
+                            <span className="text-sm font-medium">Επίδραση Καιρού</span>
                           </div>
                           <span className="text-sm font-semibold">{formatImpact(predictiveEta.weather_impact)}</span>
                         </div>
@@ -184,7 +184,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-2">
                             <Car className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm font-medium">Traffic Impact</span>
+                            <span className="text-sm font-medium">Επίδραση Κυκλοφορίας</span>
                           </div>
                           <span className="text-sm font-semibold">{formatImpact(predictiveEta.traffic_impact)}</span>
                         </div>
@@ -203,7 +203,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                     <>
                       <Separator />
                       <div className="space-y-4">
-                        <h3 className="text-lg font-medium text-gray-900">Route Optimization</h3>
+                        <h3 className="text-lg font-medium text-gray-900">Βελτιστοποίηση Διαδρομής</h3>
                         <div className="space-y-2">
                           {predictiveEta.route_optimization_suggestions.map((suggestion, index) => (
                             <div key={index} className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg">
@@ -219,7 +219,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                   {/* Delay Explanation */}
                   <Separator />
                   <div className="space-y-2">
-                    <h3 className="text-lg font-medium text-gray-900">Analysis Summary</h3>
+                    <h3 className="text-lg font-medium text-gray-900">Σύνοψη Ανάλυσης</h3>
                     <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
                       {predictiveEta.delay_explanation}
                     </p>
@@ -234,13 +234,13 @@ export default function PredictiveEtaShow({ predictiveEta }) {
               {/* Shipment Info */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Shipment Information</CardTitle>
+                  <CardTitle className="text-lg">Πληροφορίες Αποστολής</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <MapPin className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">Tracking Number</span>
+                      <span className="text-sm font-medium text-gray-700">Αριθμός Παρακολούθησης</span>
                     </div>
                     <p className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                       {predictiveEta.shipment?.tracking_number}
@@ -248,19 +248,19 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                   </div>
 
                   <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700">Status</span>
+                    <span className="text-sm font-medium text-gray-700">Κατάσταση</span>
                     <Badge variant="outline" className="capitalize">
                       {predictiveEta.shipment?.status}
                     </Badge>
                   </div>
 
                   <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700">Customer</span>
+                    <span className="text-sm font-medium text-gray-700">Πελάτης</span>
                     <p className="text-sm text-gray-900">{predictiveEta.shipment?.customer}</p>
                   </div>
 
                   <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700">Courier</span>
+                    <span className="text-sm font-medium text-gray-700">Μεταφορέας</span>
                     <p className="text-sm text-gray-900">{predictiveEta.shipment?.courier}</p>
                   </div>
                 </CardContent>
@@ -271,13 +271,13 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center space-x-2">
                     <BarChart3 className="w-5 h-5" />
-                    <span>Model Performance</span>
+                    <span>Απόδοση Μοντέλου</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">Historical Accuracy</span>
+                      <span className="text-sm font-medium text-gray-700">Ιστορική Ακρίβεια</span>
                       <span className="text-sm font-semibold">{formatConfidence(predictiveEta.historical_accuracy)}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -289,7 +289,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
                   </div>
 
                   <div className="text-xs text-gray-500">
-                    Based on {predictiveEta.historical_accuracy * 100}% accuracy of similar shipments
+                    Βασισμένο σε {predictiveEta.historical_accuracy * 100}% ακρίβεια παρόμοιων αποστολών
                   </div>
                 </CardContent>
               </Card>
@@ -297,7 +297,7 @@ export default function PredictiveEtaShow({ predictiveEta }) {
               {/* Last Updated */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Last Updated</CardTitle>
+                  <CardTitle className="text-lg">Τελευταία Ενημέρωση</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center space-x-2">
