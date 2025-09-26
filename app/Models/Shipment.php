@@ -25,6 +25,7 @@ class Shipment extends Model
         'weight',
         'dimensions',
         'shipping_address',
+        'shipping_city',
         'billing_address',
         'shipping_cost',
         'estimated_delivery',

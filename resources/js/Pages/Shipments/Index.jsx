@@ -11,6 +11,7 @@ export default function Index({
     'filter[status]':          filters['filter.status'] || '',
     'filter[courier]':         filters['filter.courier'] || '',
     'filter[customer]':        filters['filter.customer'] || '',
+    'filter[internal_id]':     filters['filter.internal_id'] || '',
   });
 
   const submit = (e) => {
@@ -141,6 +142,19 @@ export default function Index({
                 value={data['filter[customer]']}
                 onChange={(e) => setData('filter[customer]', e.target.value)}
                 placeholder="Name or email..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs lg:text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-3 lg:mb-4">
+            <div>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Εσωτερικό ID</label>
+              <input
+                type="text"
+                value={data['filter[internal_id]']}
+                onChange={(e) => setData('filter[internal_id]', e.target.value)}
+                placeholder="01998579-7c1d-736e-ae93-b359eda63139"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs lg:text-sm"
               />
             </div>

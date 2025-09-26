@@ -275,6 +275,7 @@ class ACSShipmentController extends Controller
             'status' => $shipmentData['status'] ?? 'pending',
             'weight' => $shipmentData['weight'] ?? 0.5,
             'shipping_address' => $shipmentData['shipping_address'] ?? $order->shipping_address,
+            'shipping_city' => $shipmentData['shipping_city'] ?? $order->shipping_city,
             'billing_address' => $shipmentData['billing_address'] ?? $order->billing_address,
             'shipping_cost' => $shipmentData['shipping_cost'] ?? 0,
             'courier_response' => $shipmentData['courier_response'] ?? null,

@@ -57,6 +57,14 @@ class ShipmentController extends Controller
                         $q->where('name','like',"%{$value}%")
                           ->orWhere('email','like',"%{$value}%"));
                 }),
+                AllowedFilter::callback('internal_id', function ($query, $value) {
+                    if (!filled($value)) return;
+                    $query->where('id', 'like', "%{$value}%")
+                          ->orWhere('courier_tracking_id', 'like', "%{$value}%")
+                          ->orWhereHas('order', fn($q) => 
+                              $q->where('external_order_id', 'like', "%{$value}%")
+                                ->orWhere('order_number', 'like', "%{$value}%"));
+                }),
             ])
             ->allowedSorts(['created_at','status','tracking_number','estimated_delivery'])
             ->defaultSort('-created_at')
@@ -67,7 +75,7 @@ class ShipmentController extends Controller
         return Inertia::render('Shipments/Index', [
             'shipments' => $shipments,
             'filters' => $request->only([
-                'filter.tracking_number','filter.status','filter.courier','filter.customer',
+                'filter.tracking_number','filter.status','filter.courier','filter.customer','filter.internal_id',
             ]),
         ]);
     }

@@ -293,6 +293,7 @@ class WooCommerceOrderController extends Controller
                 'weight'              => data_get($request, 'shipping.weight'),
                 'dimensions'          => null,
                 'shipping_address'    => $this->formatAddress($addr),
+                'shipping_city'       => $addr['city'] ?? null,
                 'billing_address'     => null,
                 'shipping_cost'       => (float) data_get($request, 'order.shipping_cost', 0),
                 'estimated_delivery'  => null,

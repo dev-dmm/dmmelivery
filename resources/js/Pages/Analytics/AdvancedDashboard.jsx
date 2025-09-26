@@ -121,7 +121,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
     if (!data.geographic?.top_destinations) return [];
     
     return data.geographic.top_destinations.slice(0, 5).map(dest => ({
-      location: dest.shipping_address?.split(',')[0] || 'Unknown',
+      location: dest.shipping_city || dest.shipping_address?.split(',')[0] || 'Unknown',
       shipments: dest.shipment_count,
       successRate: dest.shipment_count > 0 
         ? Math.round((dest.delivered_count / dest.shipment_count) * 100)

@@ -327,6 +327,7 @@ class Order extends Model
             'status' => 'pending',
             'weight' => $this->getTotalWeight(),
             'shipping_address' => $this->getFullShippingAddress(),
+            'shipping_city' => $this->shipping_city,
             'billing_address' => $this->getFullBillingAddress(),
             'shipping_cost' => $this->shipping_cost ?? 0,
             'estimated_delivery' => $this->expected_ship_date,

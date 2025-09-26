@@ -252,19 +252,58 @@ class AnalyticsService
             ->whereBetween('created_at', $dateRange)
             ->selectRaw('
                 shipping_address,
+                shipping_city,
                 COUNT(*) as shipment_count,
                 SUM(CASE WHEN status = "delivered" THEN 1 ELSE 0 END) as delivered_count,
                 AVG(CASE WHEN status = "delivered" AND actual_delivery IS NOT NULL AND estimated_delivery IS NOT NULL 
                     THEN TIMESTAMPDIFF(HOUR, estimated_delivery, actual_delivery) ELSE NULL END) as avg_delay
             ')
-            ->groupBy('shipping_address')
+            ->groupBy('shipping_city', 'shipping_address')
             ->orderByDesc('shipment_count')
             ->limit(10)
             ->get();
 
+        // Process the data to extract proper city names
+        $processedData = $geographicData->map(function ($item) {
+            // Use shipping_city if available, otherwise extract from shipping_address
+            $city = $item->shipping_city;
+            if (empty($city) && !empty($item->shipping_address)) {
+                // Try to extract city from address - look for common patterns
+                $address = $item->shipping_address;
+                
+                // Pattern 1: Look for "City, Area" pattern
+                if (preg_match('/,([^,]+),?\s*\d{5}/', $address, $matches)) {
+                    $city = trim($matches[1]);
+                }
+                // Pattern 2: Look for Greek city names (common patterns)
+                elseif (preg_match('/(Θεσσαλονίκη|Αθήνα|Πάτρα|Ηράκλειο|Λάρισα|Βόλος|Ιωάννινα|Κομοτηνή|Καβάλα|Δράμα|Σέρρες|Κιλκίς|Πιερία|Χαλκιδική)/', $address, $matches)) {
+                    $city = $matches[1];
+                }
+                // Pattern 3: If address contains comma, take the second part (usually city)
+                elseif (strpos($address, ',') !== false) {
+                    $parts = explode(',', $address);
+                    if (count($parts) >= 2) {
+                        $city = trim($parts[1]);
+                    }
+                }
+                // Fallback: use first part but clean it up
+                else {
+                    $city = trim(explode(',', $address)[0]);
+                }
+            }
+            
+            return (object) [
+                'shipping_address' => $item->shipping_address,
+                'shipping_city' => $city ?: 'Unknown Location',
+                'shipment_count' => $item->shipment_count,
+                'delivered_count' => $item->delivered_count,
+                'avg_delay' => $item->avg_delay,
+            ];
+        });
+
         return [
-            'top_destinations' => $geographicData->toArray(),
-            'geographic_performance' => $this->getGeographicPerformance($geographicData),
+            'top_destinations' => $processedData->toArray(),
+            'geographic_performance' => $this->getGeographicPerformance($processedData),
         ];
     }
 
@@ -463,7 +502,7 @@ class AnalyticsService
     {
         return $geographicData->map(function ($location) {
             return [
-                'location' => $location->shipping_address,
+                'location' => $location->shipping_city,
                 'success_rate' => $location->shipment_count > 0 
                     ? round(($location->delivered_count / $location->shipment_count) * 100, 2)
                     : 0,
