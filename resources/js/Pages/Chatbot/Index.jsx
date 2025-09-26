@@ -38,7 +38,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
         },
         body: JSON.stringify({
           customer_id: null, // Anonymous session
-          language: 'en'
+          language: 'el'
         })
       });
       
