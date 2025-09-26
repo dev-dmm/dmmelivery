@@ -23,11 +23,18 @@ const ChatbotIndex = ({ sessions, stats }) => {
   const handleStartNewSession = async () => {
     setIsStarting(true);
     try {
+      // Get CSRF token
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+      if (!csrfToken) {
+        throw new Error('CSRF token not found');
+      }
+
       const response = await fetch('/chatbot/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+          'X-CSRF-TOKEN': csrfToken,
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           customer_id: null, // Anonymous session

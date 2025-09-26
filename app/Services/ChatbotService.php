@@ -45,6 +45,15 @@ class ChatbotService
         // Analyze message intent
         $intent = $this->analyzeIntent($message);
         $entities = $this->extractEntities($message);
+        
+        // Debug logging
+        Log::info("Chatbot processing message", [
+            'message' => $message,
+            'intent' => $intent,
+            'entities' => $entities,
+            'session_id' => $session->id,
+            'tenant_id' => $session->tenant_id
+        ]);
 
         // Update customer message with analysis
         $customerMessage->update([
@@ -87,7 +96,7 @@ class ChatbotService
         
         // Intent patterns
         $intents = [
-            'tracking' => ['track', 'where', 'status', 'location', 'shipping'],
+            'tracking' => ['track', 'where', 'status', 'location', 'shipping', 'package', 'parcel'],
             'delivery' => ['deliver', 'arrive', 'eta', 'when', 'time'],
             'complaint' => ['problem', 'issue', 'wrong', 'bad', 'angry', 'frustrated'],
             'escalation' => ['human', 'agent', 'manager', 'supervisor', 'help'],
@@ -104,6 +113,11 @@ class ChatbotService
             }
         }
 
+        // If message is just a tracking number or contains tracking-like patterns, treat as tracking
+        if (preg_match('/\b[A-Z0-9]{4,}\b/', $message)) {
+            return 'tracking';
+        }
+
         return 'general';
     }
 
@@ -114,9 +128,18 @@ class ChatbotService
     {
         $entities = [];
 
-        // Extract tracking numbers
-        if (preg_match_all('/\b[A-Z0-9]{8,}\b/', $message, $matches)) {
+        // Extract tracking numbers - improved pattern to catch more formats
+        if (preg_match_all('/\b[A-Z0-9]{6,}\b/', $message, $matches)) {
             $entities['tracking_numbers'] = $matches[0];
+        }
+
+        // Also try to extract any alphanumeric strings that might be tracking numbers
+        if (preg_match_all('/\b[A-Z0-9]{4,}\b/', $message, $matches)) {
+            if (!isset($entities['tracking_numbers'])) {
+                $entities['tracking_numbers'] = [];
+            }
+            $entities['tracking_numbers'] = array_merge($entities['tracking_numbers'], $matches[0]);
+            $entities['tracking_numbers'] = array_unique($entities['tracking_numbers']);
         }
 
         // Extract email addresses
@@ -152,16 +175,29 @@ class ChatbotService
             // Build user message
             $userMessage = $this->buildUserMessage($message, $intent, $entities);
 
+            // Get conversation history for context
+            $conversationHistory = $this->getConversationHistory($session);
+            
+            // Build messages array with history
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+            ];
+            
+            // Add conversation history
+            foreach ($conversationHistory as $msg) {
+                $messages[] = $msg;
+            }
+            
+            // Add current user message
+            $messages[] = ['role' => 'user', 'content' => $userMessage];
+
             // Call OpenAI API
             $response = Http::timeout(30)->withHeaders([
                 'Authorization' => 'Bearer ' . $this->openaiApiKey,
                 'Content-Type' => 'application/json',
             ])->post($this->openaiEndpoint, [
-                'model' => 'gpt-3.5-turbo',
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userMessage],
-                ],
+                'model' => 'gpt-4.1',
+                'messages' => $messages,
                 'max_tokens' => 500,
                 'temperature' => 0.7,
             ]);
@@ -174,7 +210,7 @@ class ChatbotService
             $aiResponse = $data['choices'][0]['message']['content'] ?? '';
 
             // Parse response and determine message type
-            $parsedResponse = $this->parseAIResponse($aiResponse, $intent, $entities);
+            $parsedResponse = $this->parseAIResponse($aiResponse, $intent, $entities, $session);
 
             return $parsedResponse;
 
@@ -216,6 +252,9 @@ class ChatbotService
 
         $prompt .= "Guidelines:\n";
         $prompt .= "- Always be helpful and friendly\n";
+        $prompt .= "- When customers provide tracking numbers, look up the shipment data and provide specific status information\n";
+        $prompt .= "- If you find shipment data, provide: current status, estimated delivery date, courier name, and any relevant updates\n";
+        $prompt .= "- If no shipment is found, ask them to verify the tracking number\n";
         $prompt .= "- Provide accurate information when available\n";
         $prompt .= "- If you don't know something, say so and offer to help in other ways\n";
         $prompt .= "- For complex issues, suggest escalating to human support\n";
@@ -242,7 +281,7 @@ class ChatbotService
     /**
      * Parse AI response and determine message type
      */
-    private function parseAIResponse(string $response, string $intent, array $entities): array
+    private function parseAIResponse(string $response, string $intent, array $entities, ChatSession $session): array
     {
         $messageType = 'text';
         $metadata = [];
@@ -256,7 +295,7 @@ class ChatbotService
             // Try to find shipment data
             if (!empty($entities['tracking_numbers'])) {
                 $trackingNumber = $entities['tracking_numbers'][0];
-                $shipment = $this->findShipmentByTracking($trackingNumber);
+                $shipment = $this->findShipmentByTracking($trackingNumber, $session->tenant_id);
                 
                 if ($shipment) {
                     $metadata['shipment'] = [
@@ -265,6 +304,13 @@ class ChatbotService
                         'courier' => $shipment->courier?->name ?? 'Unknown',
                         'estimated_delivery' => $shipment->estimated_delivery?->format('Y-m-d H:i:s'),
                     ];
+                    
+                    // Update the response with actual shipment data
+                    $response = $this->formatShipmentResponse($shipment);
+                } else {
+                    // No shipment found - update response to indicate this
+                    $response = "I couldn't find a shipment with tracking number {$trackingNumber}. Please verify the tracking number is correct, or contact our support team for assistance.";
+                    $messageType = 'error';
                 }
             }
         }
@@ -292,11 +338,65 @@ class ChatbotService
     /**
      * Find shipment by tracking number
      */
-    private function findShipmentByTracking(string $trackingNumber): ?Shipment
+    private function findShipmentByTracking(string $trackingNumber, string $tenantId): ?Shipment
     {
-        return Shipment::where('tracking_number', $trackingNumber)
-            ->orWhere('courier_tracking_id', $trackingNumber)
+        return Shipment::where('tenant_id', $tenantId)
+            ->where(function($query) use ($trackingNumber) {
+                $query->where('tracking_number', $trackingNumber)
+                      ->orWhere('courier_tracking_id', $trackingNumber);
+            })
             ->first();
+    }
+
+    /**
+     * Get conversation history for context
+     */
+    private function getConversationHistory(ChatSession $session): array
+    {
+        $history = [];
+        
+        // Get last 10 messages for context (5 exchanges)
+        $messages = $session->messages()
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->reverse();
+            
+        foreach ($messages as $message) {
+            if ($message->sender_type === 'customer') {
+                $history[] = ['role' => 'user', 'content' => $message->message];
+            } elseif ($message->sender_type === 'ai') {
+                $history[] = ['role' => 'assistant', 'content' => $message->message];
+            }
+        }
+        
+        return $history;
+    }
+
+    /**
+     * Format shipment response with actual data
+     */
+    private function formatShipmentResponse(Shipment $shipment): string
+    {
+        $response = "📦 SHIPMENT STATUS UPDATE\n\n";
+        $response .= "🔍 Tracking Number: {$shipment->tracking_number}\n";
+        $response .= "📊 Current Status: " . ucfirst(str_replace('_', ' ', $shipment->status)) . "\n";
+        
+        if ($shipment->courier) {
+            $response .= "🚚 Courier: {$shipment->courier->name}\n";
+        }
+        
+        if ($shipment->estimated_delivery) {
+            $response .= "📅 Estimated Delivery: {$shipment->estimated_delivery->format('M j, Y \a\t g:i A')}\n";
+        }
+        
+        if ($shipment->shipping_address) {
+            $response .= "📍 Shipping Address: {$shipment->shipping_address}\n";
+        }
+        
+        $response .= "\n💬 If you need more detailed information or have any questions, please let me know!";
+        
+        return $response;
     }
 
     /**

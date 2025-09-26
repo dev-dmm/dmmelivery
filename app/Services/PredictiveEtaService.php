@@ -135,24 +135,35 @@ class PredictiveEtaService
         }
 
         try {
-            $city = $this->extractCityFromAddress($shipment->shipping_address);
-            $country = 'GR'; // Default to Greece
+            // Get coordinates for the shipping address
+            $coordinates = $this->getCoordinatesFromAddress($shipment->shipping_address);
             
-            $response = Http::timeout(10)->get('https://api.openweathermap.org/data/2.5/weather', [
-                'q' => $city . ',' . $country,
+            if (!$coordinates) {
+                Log::warning("Could not get coordinates for address: " . $shipment->shipping_address);
+                return ['impact_score' => 0, 'conditions' => 'unknown'];
+            }
+
+            // Use One Call API 3.0 for better weather data
+            $response = Http::timeout(10)->get('https://api.openweathermap.org/data/3.0/onecall', [
+                'lat' => $coordinates['lat'],
+                'lon' => $coordinates['lon'],
                 'appid' => $this->weatherApiKey,
-                'units' => 'metric'
+                'units' => 'metric',
+                'exclude' => 'minutely,daily,alerts' // Only get current and hourly data
             ]);
 
             if (!$response->successful()) {
+                Log::warning("Weather API request failed: " . $response->status());
                 return ['impact_score' => 0, 'conditions' => 'unknown'];
             }
 
             $weather = $response->json();
-            $conditions = $weather['weather'][0]['main'] ?? 'Clear';
-            $description = $weather['weather'][0]['description'] ?? '';
-            $windSpeed = $weather['wind']['speed'] ?? 0;
-            $visibility = $weather['visibility'] ?? 10000;
+            $current = $weather['current'] ?? [];
+            
+            $conditions = $current['weather'][0]['main'] ?? 'Clear';
+            $description = $current['weather'][0]['description'] ?? '';
+            $windSpeed = $current['wind_speed'] ?? 0;
+            $visibility = $current['visibility'] ?? 10000;
 
             // Calculate impact score (0-1, where 1 is maximum delay)
             $impactScore = 0;
@@ -311,6 +322,41 @@ class PredictiveEtaService
         // Simple city extraction (in production, use proper address parsing)
         $parts = explode(',', $address);
         return trim($parts[count($parts) - 2] ?? 'Athens');
+    }
+
+    /**
+     * Get coordinates from shipping address using geocoding
+     */
+    private function getCoordinatesFromAddress(string $address): ?array
+    {
+        try {
+            // Use OpenWeather Geocoding API to get coordinates
+            $response = Http::timeout(10)->get('http://api.openweathermap.org/geo/1.0/direct', [
+                'q' => $address,
+                'limit' => 1,
+                'appid' => $this->weatherApiKey
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning("Geocoding API request failed: " . $response->status());
+                return null;
+            }
+
+            $data = $response->json();
+            if (empty($data)) {
+                Log::warning("No coordinates found for address: " . $address);
+                return null;
+            }
+
+            return [
+                'lat' => $data[0]['lat'],
+                'lon' => $data[0]['lon']
+            ];
+
+        } catch (\Exception $e) {
+            Log::warning("Geocoding error: " . $e->getMessage());
+            return null;
+        }
     }
 
     /**

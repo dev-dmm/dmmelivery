@@ -27,6 +27,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/acs/get-credentials',
             'api/woocommerce/order',
             'settings/api/generate',
+            'chatbot/sessions',
+            'chatbot/sessions/*',
         ]);
 
         // Tenant middleware is applied per-route, not globally
