@@ -295,9 +295,12 @@ class ChatbotService
             // Try to find shipment data
             if (!empty($entities['tracking_numbers'])) {
                 $trackingNumber = $entities['tracking_numbers'][0];
+                Log::info("🔍 Chatbot looking for tracking number: {$trackingNumber} in tenant: {$session->tenant_id}");
+                
                 $shipment = $this->findShipmentByTracking($trackingNumber, $session->tenant_id);
                 
                 if ($shipment) {
+                    Log::info("✅ Shipment found: {$shipment->tracking_number} - {$shipment->status}");
                     $metadata['shipment'] = [
                         'tracking_number' => $shipment->tracking_number,
                         'status' => $shipment->status,
@@ -308,6 +311,7 @@ class ChatbotService
                     // Update the response with actual shipment data
                     $response = $this->formatShipmentResponse($shipment, $session);
                 } else {
+                    Log::warning("❌ Shipment not found for tracking: {$trackingNumber} in tenant: {$session->tenant_id}");
                     // No shipment found - update response to indicate this
                     if ($session->language === 'el') {
                         $response = "Δεν μπόρεσα να βρω αποστολή με αριθμό παρακολούθησης {$trackingNumber}. Παρακαλώ επιβεβαιώστε ότι ο αριθμός είναι σωστός ή επικοινωνήστε με την ομάδα υποστήριξης.";
