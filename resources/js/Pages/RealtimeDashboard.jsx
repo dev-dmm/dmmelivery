@@ -29,7 +29,7 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
 
   return (
     <AuthenticatedLayout user={auth.user}>
-      <Head title="Real-time Dashboard" />
+      <Head title="Πίνακας Πραγματικού Χρόνου" />
       
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -42,12 +42,12 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
                 size="sm"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                Επιστροφή
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Real-time Dashboard</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Πίνακας Πραγματικού Χρόνου</h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  Live shipment tracking and updates
+                  Παρακολούθηση και ενημερώσεις αποστολών σε πραγματικό χρόνο
                 </p>
               </div>
             </div>
@@ -60,7 +60,7 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
                   <WifiOff className="w-5 h-5 text-red-600" />
                 )}
                 <Badge variant={isConnected ? "default" : "destructive"}>
-                  {isConnected ? 'Connected' : 'Disconnected'}
+                  {isConnected ? 'Συνδεδεμένο' : 'Αποσυνδεδεμένο'}
                 </Badge>
               </div>
               
@@ -70,7 +70,7 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
                 size="sm"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+                Ανανέωση
               </Button>
             </div>
           </div>
@@ -80,7 +80,7 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Activity className="w-5 h-5" />
-                <span>Connection Status</span>
+                <span>Κατάσταση Σύνδεσης</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -88,18 +88,18 @@ export default function RealtimeDashboardPage({ tenantId, userId, initialStats, 
                 <div>
                   <p className="text-sm text-gray-600">
                     {isConnected 
-                      ? 'Receiving real-time updates for shipments, alerts, and dashboard changes.'
-                      : 'Connection lost. Attempting to reconnect...'
+                      ? 'Λήψη ενημερώσεων σε πραγματικό χρόνο για αποστολές, ειδοποιήσεις και αλλαγές πίνακα ελέγχου.'
+                      : 'Η σύνδεση χάθηκε. Προσπάθεια επανασύνδεσης...'
                     }
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Last update: {lastUpdate.toLocaleTimeString()}
+                    Τελευταία ενημέρωση: {lastUpdate.toLocaleTimeString()}
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></div>
                   <span className="text-sm font-medium">
-                    {isConnected ? 'Live' : 'Offline'}
+                    {isConnected ? 'Ζωντανό' : 'Εκτός Σύνδεσης'}
                   </span>
                 </div>
               </div>

@@ -439,17 +439,17 @@ export default function SettingsIndex({
   }, []);
 
   const tabs = [
-    { name: '🏢 Business', icon: BuildingOfficeIcon },
-    { name: '🚚 Couriers', icon: TruckIcon },
+    { name: '🏢 Επιχείρηση', icon: BuildingOfficeIcon },
+    { name: '🚚 Μεταφορείς', icon: TruckIcon },
     { name: '🔗 API & Webhooks', icon: GlobeAltIcon },
-    { name: '📦 Download Plugin', icon: ClipboardDocumentIcon },
+    { name: '📦 Λήψη Plugin', icon: ClipboardDocumentIcon },
   ];
 
   const maskedToken = apiToken === 'configured' ? '••••••••••••••••' : (apiToken ? `${apiToken.slice(0, 4)}••••${apiToken.slice(-4)}` : '—');
 
   return (
-    <AuthenticatedLayout user={auth?.user} header={<h2 className="font-semibold text-lg lg:text-xl text-gray-800 leading-tight">Settings</h2>}>
-      <Head title="Settings" />
+    <AuthenticatedLayout user={auth?.user} header={<h2 className="font-semibold text-lg lg:text-xl text-gray-800 leading-tight">Ρυθμίσεις</h2>}>
+      <Head title="Ρυθμίσεις" />
 
       <div className="py-4 lg:py-12">
         <div className="mx-auto">
@@ -477,11 +477,11 @@ export default function SettingsIndex({
 
                   <div className="space-y-4 lg:space-y-6">
                     <div>
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Business Information</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Πληροφορίες Επιχείρησης</h3>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
                         <div>
-                          <InputLabel htmlFor="business_name" value="Business Name *" />
+                          <InputLabel htmlFor="business_name" value="Όνομα Επιχείρησης *" />
                           <TextInput
                             id="business_name"
                             value={formData.business_name}
@@ -492,7 +492,7 @@ export default function SettingsIndex({
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="business_type" value="Business Type *" />
+                          <InputLabel htmlFor="business_type" value="Τύπος Επιχείρησης *" />
                           <select
                             id="business_type"
                             value={formData.business_type}
@@ -509,7 +509,7 @@ export default function SettingsIndex({
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="contact_email" value="Contact Email *" />
+                          <InputLabel htmlFor="contact_email" value="Email Επικοινωνίας *" />
                           <TextInput
                             id="contact_email"
                             type="email"
@@ -521,7 +521,7 @@ export default function SettingsIndex({
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="contact_phone" value="Contact Phone" />
+                          <InputLabel htmlFor="contact_phone" value="Τηλέφωνο Επικοινωνίας" />
                           <TextInput
                             id="contact_phone"
                             value={formData.contact_phone}
@@ -532,7 +532,7 @@ export default function SettingsIndex({
                       </div>
 
                       <div className="mt-4">
-                        <InputLabel htmlFor="business_address" value="Business Address" />
+                        <InputLabel htmlFor="business_address" value="Διεύθυνση Επιχείρησης" />
                         <textarea
                           id="business_address"
                           value={formData.business_address}
@@ -543,7 +543,7 @@ export default function SettingsIndex({
                       </div>
 
                       <div>
-                        <InputLabel htmlFor="website_url" value="Website URL" />
+                        <InputLabel htmlFor="website_url" value="URL Ιστοσελίδας" />
                         <TextInput
                           id="website_url"
                           type="url"
@@ -556,11 +556,11 @@ export default function SettingsIndex({
                     </div>
 
                     <div className="border-t pt-4 lg:pt-6">
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Order Defaults</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Προεπιλογές Παραγγελιών</h3>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                         <div>
-                          <InputLabel htmlFor="default_currency" value="Default Currency" />
+                          <InputLabel htmlFor="default_currency" value="Προεπιλεγμένο Νόμισμα" />
                           <select
                             id="default_currency"
                             value={formData.default_currency}
@@ -576,7 +576,7 @@ export default function SettingsIndex({
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="tax_rate" value="Tax Rate (%)" />
+                          <InputLabel htmlFor="tax_rate" value="Φορολογικός Συντελεστής (%)" />
                           <TextInput
                             id="tax_rate"
                             type="number"
@@ -590,7 +590,7 @@ export default function SettingsIndex({
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="shipping_cost" value="Default Shipping Cost" />
+                          <InputLabel htmlFor="shipping_cost" value="Προεπιλεγμένο Κόστος Αποστολής" />
                           <TextInput
                             id="shipping_cost"
                             type="number"
@@ -611,7 +611,7 @@ export default function SettingsIndex({
                             onChange={(e) => updateFormData('auto_create_shipments', e.target.checked)}
                             className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                           />
-                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Auto-create shipments for new orders</span>
+                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Αυτόματη δημιουργία αποστολών για νέες παραγγελίες</span>
                         </label>
 
                         <label className="flex items-center">
@@ -621,7 +621,7 @@ export default function SettingsIndex({
                             onChange={(e) => updateFormData('send_notifications', e.target.checked)}
                             className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
                           />
-                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Send notifications to customers</span>
+                          <span className="ml-2 text-xs lg:text-sm text-gray-600">Αποστολή ειδοποιήσεων στους πελάτες</span>
                         </label>
                       </div>
                     </div>
@@ -631,10 +631,10 @@ export default function SettingsIndex({
                         {loading.business ? (
                           <>
                             <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                            Saving...
+                            Αποθήκευση...
                           </>
                         ) : (
-                          'Save Business Settings'
+                          'Αποθήκευση Ρυθμίσεων Επιχείρησης'
                         )}
                       </PrimaryButton>
                     </div>
@@ -645,9 +645,9 @@ export default function SettingsIndex({
                 <TabPanel className="p-4 lg:p-6">
                   <div className="space-y-4 lg:space-y-6">
                     <div>
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Courier Integrations</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Ενσωματώσεις Μεταφορέων</h3>
                       <p className="text-xs lg:text-sm text-gray-600 mb-4 lg:mb-6">
-                        Courier API credentials are now managed through the WordPress plugin for enhanced security and centralized management.
+                        Τα διαπιστευτήρια API των μεταφορέων διαχειρίζονται τώρα μέσω του plugin WordPress για ενισχυμένη ασφάλεια και κεντρική διαχείριση.
                       </p>
                     </div>
 
@@ -658,10 +658,10 @@ export default function SettingsIndex({
                           <GlobeAltIcon className="h-5 w-5 text-blue-400" />
                         </div>
                         <div className="ml-3">
-                          <h4 className="text-sm font-medium text-blue-800">WordPress Plugin Integration</h4>
+                          <h4 className="text-sm font-medium text-blue-800">Ενσωμάτωση Plugin WordPress</h4>
                           <div className="mt-2 text-sm text-blue-700">
-                            <p>All courier API credentials are now configured through the DMM Delivery Bridge WordPress plugin.</p>
-                            <p className="mt-1">This provides better security, centralized management, and automatic order synchronization.</p>
+                            <p>Όλα τα διαπιστευτήρια API των μεταφορέων διαμορφώνονται τώρα μέσω του plugin DMM Delivery Bridge WordPress.</p>
+                            <p className="mt-1">Αυτό παρέχει καλύτερη ασφάλεια, κεντρική διαχείριση και αυτόματη συγχρονισμός παραγγελιών.</p>
                           </div>
                         </div>
                       </div>
@@ -670,7 +670,7 @@ export default function SettingsIndex({
                     {/* Available Couriers */}
                     {Object.entries(couriers).length > 0 && (
                       <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-gray-900">Supported Couriers</h4>
+                        <h4 className="text-sm font-medium text-gray-900">Υποστηριζόμενοι Μεταφορείς</h4>
                         {Object.entries(couriers).map(([key, courier]) => (
                           <div key={key} className="border rounded-lg p-4 lg:p-6">
                             <div className="flex items-center space-x-3">
@@ -683,7 +683,7 @@ export default function SettingsIndex({
                               </div>
                               <div className="flex-shrink-0">
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                  WordPress Managed
+                                  Διαχειρίζεται από WordPress
                                 </span>
                               </div>
                             </div>
@@ -694,12 +694,12 @@ export default function SettingsIndex({
 
                     {/* Next Steps */}
                     <div className="bg-gray-50 rounded-lg p-4 lg:p-6">
-                      <h4 className="text-sm font-medium text-gray-900 mb-3">Next Steps</h4>
+                      <h4 className="text-sm font-medium text-gray-900 mb-3">Επόμενα Βήματα</h4>
                       <div className="text-xs lg:text-sm text-gray-600 space-y-2">
-                        <p>1. Install the DMM Delivery Bridge plugin on your WordPress site</p>
-                        <p>2. Configure your courier credentials in the plugin settings</p>
-                        <p>3. Orders will automatically sync to this application</p>
-                        <p>4. Track shipments and receive status updates automatically</p>
+                        <p>1. Εγκαταστήστε το plugin DMM Delivery Bridge στον ιστότοπο WordPress σας</p>
+                        <p>2. Διαμορφώστε τα διαπιστευτήρια των μεταφορέων στις ρυθμίσεις του plugin</p>
+                        <p>3. Οι παραγγελίες θα συγχρονιστούν αυτόματα σε αυτή την εφαρμογή</p>
+                        <p>4. Παρακολουθήστε αποστολές και λάβετε ενημερώσεις κατάστασης αυτόματα</p>
                       </div>
                     </div>
                   </div>
@@ -710,13 +710,13 @@ export default function SettingsIndex({
                   <div className="space-y-4 lg:space-y-6">
                     {/* API Token */}
                     <div>
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">API Access</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Πρόσβαση API</h3>
 
                       <div className="bg-gray-50 rounded-lg p-3 lg:p-4">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 lg:gap-4">
                           <div className="min-w-0 flex-1">
-                            <h4 className="text-xs lg:text-sm font-medium text-gray-900">API Token</h4>
-                            <p className="text-xs lg:text-sm text-gray-500">{apiToken ? 'Token is configured' : 'No token generated'}</p>
+                            <h4 className="text-xs lg:text-sm font-medium text-gray-900">Token API</h4>
+                            <p className="text-xs lg:text-sm text-gray-500">{apiToken ? 'Το token είναι διαμορφωμένο' : 'Δεν έχει δημιουργηθεί token'}</p>
                             {apiToken && (
                               <code className="text-xs bg-white px-2 py-1 rounded border break-all block mt-2">
                                 Token: {maskedToken}
@@ -744,7 +744,7 @@ export default function SettingsIndex({
                                 className="w-full sm:w-auto"
                               >
                                 <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                Copy token
+                                Αντιγραφή token
                               </SecondaryButton>
                             )}
                             <SecondaryButton 
@@ -755,12 +755,12 @@ export default function SettingsIndex({
                               {loading.api_token ? (
                                 <>
                                   <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                  Generating...
+                                  Δημιουργία...
                                 </>
                               ) : (
                                 <>
                                   <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
-                                  Generate New Token
+                                  Δημιουργία Νέου Token
                                 </>
                               )}
                             </SecondaryButton>
@@ -773,7 +773,7 @@ export default function SettingsIndex({
 
                     {/* WooCommerce Bridge */}
                     <div className="border-t pt-4 lg:pt-6">
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">WooCommerce Bridge</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Γέφυρα WooCommerce</h3>
 
                       {getMessageAlert('woo')}
 
@@ -784,12 +784,12 @@ export default function SettingsIndex({
                             <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all flex-1">{wooEndpoint}</code>
                             <SecondaryButton onClick={() => copyToClipboard(wooEndpoint, 'woo')} aria-label="Copy WooCommerce endpoint">
                               <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                              Copy
+                              Αντιγραφή
                             </SecondaryButton>
                           </div>
 
                           <div className="space-y-3">
-                            <h5 className="text-sm font-medium text-gray-900">Required Headers</h5>
+                            <h5 className="text-sm font-medium text-gray-900">Απαιτούμενα Headers</h5>
 
                             <div className="space-y-2">
                               <div className="flex items-center gap-2">
@@ -806,7 +806,7 @@ export default function SettingsIndex({
                                     aria-label="Copy API key"
                                   >
                                     <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                    Copy
+                                    Αντιγραφή
                                   </SecondaryButton>
                                 )}
                               </div>
@@ -816,7 +816,7 @@ export default function SettingsIndex({
                                 {tenantId && (
                                   <SecondaryButton onClick={() => copyToClipboard(tenantId, 'woo')} aria-label="Copy tenant ID">
                                     <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                    Copy
+                                    Αντιγραφή
                                   </SecondaryButton>
                                 )}
                               </div>
@@ -824,49 +824,49 @@ export default function SettingsIndex({
 
                             {/* NEW: Quick Test token input (unmasked, ASCII only) */}
                             <div className="mt-3">
-                              <label className="text-xs text-gray-600">API key for Quick Test</label>
+                              <label className="text-xs text-gray-600">Κλειδί API για Γρήγορο Test</label>
                               <input
                                 type="text"
                                 value={testApiKey}
                                 onChange={(e) => setTestApiKey(e.target.value.trim())}
-                                placeholder="Generate a new token or paste your full API token here"
+                                placeholder="Δημιουργήστε ένα νέο token ή επικολλήστε το πλήρες API token σας εδώ"
                                 className="mt-1 w-full rounded border px-2 py-1 text-xs"
                                 autoComplete="off"
                               />
                               <p className="text-[11px] text-gray-500 mt-1">
-                                Must be plain ASCII (no • characters). Use “Copy token” or paste the token you generated.
+                                Πρέπει να είναι απλό ASCII (χωρίς • χαρακτήρες). Χρησιμοποιήστε "Αντιγραφή token" ή επικολλήστε το token που δημιουργήσατε.
                               </p>
                             </div>
 
                             <p className="text-xs text-gray-500 mt-2">
-                              The WooCommerce plugin should send orders to this endpoint using these headers. Your Laravel controller accepts either
-                              the tenant token or a global bridge key.
+                              Το plugin WooCommerce θα πρέπει να στέλνει παραγγελίες σε αυτό το endpoint χρησιμοποιώντας αυτά τα headers. Ο Laravel controller σας δέχεται είτε
+                              το tenant token είτε ένα global bridge key.
                             </p>
                           </div>
                         </div>
 
                         <div className="bg-white border rounded-lg p-4">
-                          <h4 className="text-sm font-medium text-gray-900 mb-2">Quick Test</h4>
+                          <h4 className="text-sm font-medium text-gray-900 mb-2">Γρήγορο Test</h4>
                           <p className="text-xs text-gray-600 mb-3">
-                            Sends a minimal WooCommerce-style payload from your browser to verify the endpoint works correctly.
+                            Στέλνει ένα ελάχιστο payload στυλ WooCommerce από τον browser σας για να επαληθεύσει ότι το endpoint λειτουργεί σωστά.
                           </p>
                           <PrimaryButton onClick={testWooBridge} disabled={loading.woo_test || !testApiKey || !tenantId}>
                             {loading.woo_test ? (
                               <>
                                 <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                Testing...
+                                Δοκιμή...
                               </>
                             ) : (
-                              'Send Test Order'
+                              'Αποστολή Test Παραγγελίας'
                             )}
                           </PrimaryButton>
                           {(!testApiKey || !tenantId) && (
                             <p className="text-xs text-red-600 mt-2">
                               {!testApiKey && !tenantId
-                                ? 'Paste an API token and ensure tenant ID is available.'
+                                ? 'Επικολλήστε ένα API token και βεβαιωθείτε ότι το tenant ID είναι διαθέσιμο.'
                                 : !testApiKey
-                                ? 'Paste an API token first.'
-                                : 'Tenant ID is required.'}
+                                ? 'Επικολλήστε πρώτα ένα API token.'
+                                : 'Απαιτείται Tenant ID.'}
                             </p>
                           )}
                         </div>
@@ -875,11 +875,11 @@ export default function SettingsIndex({
 
                     {/* Webhooks */}
                     <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Webhook Configuration</h3>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Διαμόρφωση Webhook</h3>
 
                       <div className="space-y-4">
                         <div>
-                          <InputLabel htmlFor="webhook_url" value="Webhook URL" />
+                          <InputLabel htmlFor="webhook_url" value="URL Webhook" />
                           <TextInput
                             id="webhook_url"
                             type="url"
@@ -888,11 +888,11 @@ export default function SettingsIndex({
                             className="mt-1 block w-full"
                             placeholder="https://your-site.com/webhook"
                           />
-                          <p className="mt-1 text-sm text-gray-500">Receive real-time notifications about shipment status changes</p>
+                          <p className="mt-1 text-sm text-gray-500">Λάβετε ειδοποιήσεις σε πραγματικό χρόνο για αλλαγές κατάστασης αποστολών</p>
                         </div>
 
                         <div>
-                          <InputLabel htmlFor="webhook_secret" value="Webhook Secret" />
+                          <InputLabel htmlFor="webhook_secret" value="Μυστικό Webhook" />
                           <TextInput
                             id="webhook_secret"
                             type="password"
@@ -933,9 +933,9 @@ export default function SettingsIndex({
                 <TabPanel className="p-4 lg:p-6">
                   <div className="space-y-4 lg:space-y-6">
                     <div>
-                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Download WordPress Plugin</h3>
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Λήψη Plugin WordPress</h3>
                       <p className="text-xs lg:text-sm text-gray-600 mb-4 lg:mb-6">
-                        Download the complete DMM Delivery Bridge plugin as a zip file for installation on other WordPress sites.
+                        Λάβετε το πλήρες plugin DMM Delivery Bridge ως αρχείο zip για εγκατάσταση σε άλλους ιστότοπους WordPress.
                       </p>
                     </div>
 
@@ -947,20 +947,20 @@ export default function SettingsIndex({
                           <ClipboardDocumentIcon className="h-6 w-6 text-green-600" />
                         </div>
                         <div className="flex-1">
-                          <h4 className="text-sm font-medium text-green-900 mb-2">Plugin Package</h4>
+                          <h4 className="text-sm font-medium text-green-900 mb-2">Πακέτο Plugin</h4>
                           <p className="text-sm text-green-700 mb-4">
-                            The downloaded zip file contains the complete WordPress plugin that can be installed on any WordPress site with WooCommerce.
+                            Το ληφθέν αρχείο zip περιέχει το πλήρες plugin WordPress που μπορεί να εγκατασταθεί σε οποιονδήποτε ιστότοπο WordPress με WooCommerce.
                           </p>
                           
                           <div className="bg-white rounded-md p-3 mb-4">
-                            <h5 className="text-xs font-medium text-gray-900 mb-2">What's included:</h5>
+                            <h5 className="text-xs font-medium text-gray-900 mb-2">Τι περιλαμβάνεται:</h5>
                             <ul className="text-xs text-gray-600 space-y-1">
-                              <li>• Complete WordPress plugin file (dm-delivery-bridge.php)</li>
-                              <li>• Automatic order synchronization with DMM Delivery</li>
-                              <li>• WooCommerce integration</li>
-                              <li>• Admin interface for configuration</li>
-                              <li>• Bulk order processing tools</li>
-                              <li>• Debug and logging features</li>
+                              <li>• Πλήρες αρχείο plugin WordPress (dm-delivery-bridge.php)</li>
+                              <li>• Αυτόματη συγχρονισμός παραγγελιών με DMM Delivery</li>
+                              <li>• Ενσωμάτωση WooCommerce</li>
+                              <li>• Διεπαφή διαχειριστή για διαμόρφωση</li>
+                              <li>• Εργαλεία μαζικής επεξεργασίας παραγγελιών</li>
+                              <li>• Χαρακτηριστικά αποσφαλμάτωσης και καταγραφής</li>
                             </ul>
                           </div>
 
@@ -973,12 +973,12 @@ export default function SettingsIndex({
                               {loading.download ? (
                                 <>
                                   <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                  Creating Zip...
+                                  Δημιουργία Zip...
                                 </>
                               ) : (
                                 <>
                                   <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                                  Download Plugin Zip
+                                  Λήψη Plugin Zip
                                 </>
                               )}
                             </PrimaryButton>
@@ -988,7 +988,7 @@ export default function SettingsIndex({
                               className="w-full sm:w-auto"
                             >
                               <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
-                              Copy API Endpoint
+                              Αντιγραφή API Endpoint
                             </SecondaryButton>
                           </div>
                         </div>
@@ -996,18 +996,18 @@ export default function SettingsIndex({
                     </div>
 
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">Installation Instructions</h4>
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">Οδηγίες Εγκατάστασης</h4>
                       <div className="text-sm text-blue-700 space-y-2">
-                        <p>1. Download the plugin zip file using the button above</p>
-                        <p>2. Go to your WordPress admin → Plugins → Add New → Upload Plugin</p>
-                        <p>3. Upload the downloaded zip file and activate the plugin</p>
-                        <p>4. Configure the plugin with your API endpoint and credentials</p>
-                        <p>5. The plugin will automatically sync WooCommerce orders to DMM Delivery</p>
+                        <p>1. Λάβετε το αρχείο zip του plugin χρησιμοποιώντας το κουμπί παραπάνω</p>
+                        <p>2. Πηγαίνετε στον διαχειριστή WordPress → Plugins → Add New → Upload Plugin</p>
+                        <p>3. Ανεβάστε το ληφθέν αρχείο zip και ενεργοποιήστε το plugin</p>
+                        <p>4. Διαμορφώστε το plugin με το API endpoint και τα διαπιστευτήριά σας</p>
+                        <p>5. Το plugin θα συγχρονίσει αυτόματα τις παραγγελίες WooCommerce με το DMM Delivery</p>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">API Configuration</h4>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Διαμόρφωση API</h4>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <code className="text-xs bg-white px-2 py-1 rounded border break-all flex-1">

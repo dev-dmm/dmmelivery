@@ -66,16 +66,16 @@ export default function Login({ status, canResetPassword }) {
                     </div>
                 </div>
                 <h2 className="text-center text-3xl font-bold text-gray-900">
-                    Sign in to your account
+                    Συνδεθείτε στον λογαριασμό σας
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
-                    Access your shipment tracking dashboard
+                    Πρόσβαση στον πίνακα παρακολούθησης αποστολών
                 </p>
             </div>
 
             {/* Demo Credentials Helper */}
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-medium text-blue-900 mb-2">🎯 Demo Credentials:</h3>
+                <h3 className="text-sm font-medium text-blue-900 mb-2">🎯 Διαπιστευτήρια Demo:</h3>
                 <div className="text-xs text-blue-800 space-y-1">
                     <div><code className="bg-blue-100 px-1 rounded">electroshop@demo.com</code> / <code className="bg-blue-100 px-1 rounded">password</code></div>
                     <div><code className="bg-blue-100 px-1 rounded">fashionboutique@demo.com</code> / <code className="bg-blue-100 px-1 rounded">password</code></div>
@@ -108,7 +108,7 @@ export default function Login({ status, canResetPassword }) {
                             </svg>
                         </div>
                         <div className="ml-3">
-                            <p className="text-sm font-medium text-blue-800">Signing you in...</p>
+                            <p className="text-sm font-medium text-blue-800">Συνδέουμε...</p>
                         </div>
                     </div>
                 </div>
@@ -127,14 +127,14 @@ export default function Login({ status, canResetPassword }) {
                         autoComplete="username"
                         isFocused={true}
                         onChange={(e) => setData('email', e.target.value)}
-                        placeholder="Enter your email address"
+                        placeholder="Εισάγετε τη διεύθυνση email σας"
                     />
 
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
                 <div>
-                    <InputLabel htmlFor="password" value="Password" />
+                    <InputLabel htmlFor="password" value="Κωδικός Πρόσβασης" />
 
                     <TextInput
                         id="password"
@@ -144,7 +144,7 @@ export default function Login({ status, canResetPassword }) {
                         className="mt-1 block w-full"
                         autoComplete="current-password"
                         onChange={(e) => setData('password', e.target.value)}
-                        placeholder="Enter your password"
+                        placeholder="Εισάγετε τον κωδικό πρόσβασης"
                     />
 
                     <InputError message={errors.password} className="mt-2" />
@@ -160,7 +160,7 @@ export default function Login({ status, canResetPassword }) {
                             }
                         />
                         <span className="ml-2 text-sm text-gray-600">
-                            Remember me
+                            Θυμήσου με
                         </span>
                     </div>
 
@@ -170,7 +170,7 @@ export default function Login({ status, canResetPassword }) {
                                 href={route('password.request')}
                                 className="font-medium text-blue-600 hover:text-blue-500"
                             >
-                                Forgot your password?
+                                Ξεχάσατε τον κωδικό σας;
                             </Link>
                         </div>
                     )}
@@ -187,10 +187,10 @@ export default function Login({ status, canResetPassword }) {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                Signing in...
+                                Σύνδεση...
                             </div>
                         ) : (
-                            'Sign in'
+                            'Σύνδεση'
                         )}
                     </PrimaryButton>
                 </div>

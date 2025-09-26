@@ -138,7 +138,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
                   AI Chatbot
                 </h1>
                 <p className="mt-2 text-gray-600">
-                  Intelligent customer support with AI-powered responses
+                  Έξυπνη εξυπηρέτηση πελατών με AI-powered απαντήσεις
                 </p>
               </div>
               <Button 
@@ -147,7 +147,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
                 className="flex items-center"
               >
                 <MessageSquare className="w-4 h-4 mr-2" />
-                {isStarting ? 'Starting...' : 'Start New Session'}
+                {isStarting ? 'Έναρξη...' : 'Νέα Συνεδρία'}
               </Button>
             </div>
           </div>
@@ -156,7 +156,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+                <CardTitle className="text-sm font-medium">Σύνολο Συνεδριών</CardTitle>
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -166,7 +166,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <CardTitle className="text-sm font-medium">Ενεργές</CardTitle>
                 <MessageSquare className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
@@ -176,7 +176,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+                <CardTitle className="text-sm font-medium">Επιλυμένες</CardTitle>
                 <CheckCircle className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -186,7 +186,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Escalated</CardTitle>
+                <CardTitle className="text-sm font-medium">Εκτονωμένες</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
@@ -196,7 +196,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Satisfaction</CardTitle>
+                <CardTitle className="text-sm font-medium">Μέση Ικανοποίηση</CardTitle>
                 <TrendingUp className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent>
@@ -210,9 +210,9 @@ const ChatbotIndex = ({ sessions, stats }) => {
           {/* Chat Sessions List */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Chat Sessions</CardTitle>
+              <CardTitle>Πρόσφατες Συνεδρίες Chat</CardTitle>
               <CardDescription>
-                AI-powered customer support conversations
+                AI-powered συνομιλίες εξυπηρέτησης πελατών
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -225,10 +225,10 @@ const ChatbotIndex = ({ sessions, stats }) => {
                           <div className="flex items-center space-x-4">
                             <div>
                               <p className="font-medium text-gray-900">
-                                Session {session.session_id?.slice(0, 8) || 'Unknown'}
+                                Συνεδρία {session.session_id?.slice(0, 8) || 'Άγνωστη'}
                               </p>
                               <p className="text-sm text-gray-500">
-                                {session.customer?.name || 'Anonymous Customer'} • {session.language?.toUpperCase() || 'EN'}
+                                {session.customer?.name || 'Ανώνυμος Πελάτης'} • {session.language?.toUpperCase() || 'EN'}
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -245,34 +245,34 @@ const ChatbotIndex = ({ sessions, stats }) => {
                           
                           <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Duration</p>
+                              <p className="text-xs text-gray-500 mb-1">Διάρκεια</p>
                               <p className="text-sm text-gray-900">
                                 {formatDuration(session.duration)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Last Activity</p>
+                              <p className="text-xs text-gray-500 mb-1">Τελευταία Δραστηριότητα</p>
                               <p className="text-sm text-gray-900">
                                 {formatDate(session.last_activity_at)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Messages</p>
+                              <p className="text-xs text-gray-500 mb-1">Μηνύματα</p>
                               <p className="text-sm text-gray-900">
-                                {session.messages?.length || 0} messages
+                                {session.messages?.length || 0} μηνύματα
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Satisfaction</p>
+                              <p className="text-xs text-gray-500 mb-1">Ικανοποίηση</p>
                               <p className="text-sm text-gray-900">
-                                {session.satisfaction_rating ? `${session.satisfaction_rating}/5` : 'Not rated'}
+                                {session.satisfaction_rating ? `${session.satisfaction_rating}/5` : 'Δεν αξιολογήθηκε'}
                               </p>
                             </div>
                           </div>
 
                           {session.messages && session.messages.length > 0 && (
                             <div className="mt-3">
-                              <p className="text-xs text-gray-500 mb-2">Last Message:</p>
+                              <p className="text-xs text-gray-500 mb-2">Τελευταίο Μήνυμα:</p>
                               <div className="bg-gray-50 rounded p-2">
                                 <div className="flex items-center space-x-2">
                                   <span className="text-xs text-gray-500">
@@ -298,7 +298,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
                               className="text-orange-600 border-orange-300 hover:bg-orange-50"
                             >
                               <AlertTriangle className="w-4 h-4 mr-1" />
-                              {isEscalating[session.id] ? 'Escalating...' : 'Escalate'}
+                              {isEscalating[session.id] ? 'Εκτόνωση...' : 'Εκτόνωση'}
                             </Button>
                           )}
                           
@@ -307,7 +307,7 @@ const ChatbotIndex = ({ sessions, stats }) => {
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                           >
                             <MessageSquare className="w-4 h-4 mr-1" />
-                            View Chat
+                            Προβολή Chat
                           </Link>
                         </div>
                       </div>
@@ -317,13 +317,13 @@ const ChatbotIndex = ({ sessions, stats }) => {
               ) : (
                 <div className="text-center py-12">
                   <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">No Chat Sessions</p>
+                  <p className="text-lg font-medium text-gray-900 mb-2">Δεν Υπάρχουν Συνεδρίες Chat</p>
                   <p className="text-gray-500 mb-4">
-                    Start a conversation with your AI assistant
+                    Ξεκινήστε μια συνομιλία με τον AI βοηθό σας
                   </p>
                   <Button onClick={handleStartNewSession} disabled={isStarting}>
                     <MessageSquare className="w-4 h-4 mr-2" />
-                    {isStarting ? 'Starting...' : 'Start New Session'}
+                    {isStarting ? 'Έναρξη...' : 'Νέα Συνεδρία'}
                   </Button>
                 </div>
               )}

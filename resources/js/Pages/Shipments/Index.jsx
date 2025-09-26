@@ -60,14 +60,14 @@ export default function Index({
 
   return (
     <AuthenticatedLayout>
-      <Head title="Shipments Dashboard" />
+      <Head title="Πίνακας Αποστολών" />
 
       <div className="py-4 lg:py-6 space-y-4 lg:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">📦 Shipments Dashboard</h1>
-            <p className="text-xs lg:text-sm text-gray-500 mt-1 hidden sm:block">Track and manage all your eShop deliveries in real time.</p>
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">📦 Πίνακας Αποστολών</h1>
+            <p className="text-xs lg:text-sm text-gray-500 mt-1 hidden sm:block">Παρακολουθήστε και διαχειριστείτε όλες τις αποστολές του eShop σας σε πραγματικό χρόνο.</p>
           </div>
           <div className="text-xs lg:text-sm text-gray-500 flex-shrink-0">
             {hasActiveFilters && (
@@ -75,27 +75,27 @@ export default function Index({
                 <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                 </svg>
-                Filtered
+                Φιλτραρισμένα
               </span>
             )}
-            Total: <span className="font-semibold">{shipments?.total || 0}</span> shipments
+            Σύνολο: <span className="font-semibold">{shipments?.total || 0}</span> αποστολές
           </div>
         </div>
 
         {/* Filters */}
         <form onSubmit={submit} className="bg-white p-4 lg:p-6 rounded-lg shadow-sm border">
           <div className="flex items-center justify-between mb-3 lg:mb-4">
-            <h3 className="text-base lg:text-lg font-medium text-gray-900">🔍 Search & Filter</h3>
+            <h3 className="text-base lg:text-lg font-medium text-gray-900">🔍 Αναζήτηση & Φίλτρο</h3>
             {hasActiveFilters && (
               <button type="button" onClick={clearFilters} className="text-xs lg:text-sm text-gray-500 hover:text-gray-700 underline">
-                Clear all filters
+                Καθαρισμός φίλτρων
               </button>
             )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-3 lg:mb-4">
             <div>
-              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Tracking Number</label>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Αριθμός Παρακολούθησης</label>
               <input
                 type="text"
                 value={data['filter[tracking_number]']}
@@ -106,25 +106,25 @@ export default function Index({
             </div>
 
             <div>
-              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Κατάσταση</label>
               <select
                 value={data['filter[status]']}
                 onChange={(e) => setData('filter[status]', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs lg:text-sm"
               >
-                <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
-                <option value="picked_up">Picked Up</option>
-                <option value="in_transit">In Transit</option>
-                <option value="out_for_delivery">Out for Delivery</option>
-                <option value="delivered">Delivered</option>
-                <option value="failed">Failed</option>
-                <option value="returned">Returned</option>
+                <option value="">Όλες οι Καταστάσεις</option>
+                <option value="pending">Εκκρεμεί</option>
+                <option value="picked_up">Παραλήφθηκε</option>
+                <option value="in_transit">Σε Μεταφορά</option>
+                <option value="out_for_delivery">Προς Παράδοση</option>
+                <option value="delivered">Παραδόθηκε</option>
+                <option value="failed">Απέτυχε</option>
+                <option value="returned">Επιστράφηκε</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Courier</label>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Μεταφορέας</label>
               <input
                 type="text"
                 value={data['filter[courier]']}
@@ -135,7 +135,7 @@ export default function Index({
             </div>
 
             <div>
-              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Customer</label>
+              <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-1">Πελάτης</label>
               <input
                 type="text"
                 value={data['filter[customer]']}
@@ -158,14 +158,14 @@ export default function Index({
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Searching...
+                  Αναζήτηση...
                 </>
               ) : (
                 <>
                   <svg className="-ml-1 mr-1 lg:mr-2 h-3 lg:h-4 w-3 lg:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
-                  Search
+                  Αναζήτηση
                 </>
               )}
             </button>

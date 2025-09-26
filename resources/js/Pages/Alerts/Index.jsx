@@ -146,7 +146,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Alert System" />
+      <Head title="Σύστημα Ειδοποιήσεων" />
       
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -156,10 +156,10 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                   <Bell className="w-8 h-8 mr-3 text-red-600" />
-                  Alert System
+                  Σύστημα Ειδοποιήσεων
                 </h1>
                 <p className="mt-2 text-gray-600">
-                  Automated problem detection and alert management
+                  Αυτόματη ανίχνευση προβλημάτων και διαχείριση ειδοποιήσεων
                 </p>
               </div>
               <div className="flex items-center space-x-3">
@@ -170,14 +170,14 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
                   className="flex items-center"
                 >
                   <RefreshCw className={`w-4 h-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-                  {isChecking ? 'Checking...' : 'Check Alerts'}
+                  {isChecking ? 'Έλεγχος...' : 'Έλεγχος Ειδοποιήσεων'}
                 </Button>
                 <Link
                   href="/alerts/rules"
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  Manage Rules
+                  Διαχείριση Κανόνων
                 </Link>
               </div>
             </div>
@@ -187,7 +187,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Alerts</CardTitle>
+                <CardTitle className="text-sm font-medium">Σύνολο Ειδοποιήσεων</CardTitle>
                 <Bell className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -197,7 +197,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <CardTitle className="text-sm font-medium">Ενεργές</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
@@ -207,7 +207,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Acknowledged</CardTitle>
+                <CardTitle className="text-sm font-medium">Αναγνωρισμένες</CardTitle>
                 <Clock className="h-4 w-4 text-yellow-600" />
               </CardHeader>
               <CardContent>
@@ -217,7 +217,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+                <CardTitle className="text-sm font-medium">Επιλυμένες</CardTitle>
                 <CheckCircle className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
@@ -227,7 +227,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Critical</CardTitle>
+                <CardTitle className="text-sm font-medium">Κρίσιμες</CardTitle>
                 <XCircle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
@@ -239,9 +239,9 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
           {/* Alerts List */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Alerts</CardTitle>
+              <CardTitle>Πρόσφατες Ειδοποιήσεις</CardTitle>
               <CardDescription>
-                Automated alerts for shipment problems and delays
+                Αυτόματες ειδοποιήσεις για προβλήματα και καθυστερήσεις αποστολών
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -277,19 +277,19 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">Triggered</p>
+                                <p className="text-xs text-gray-500 mb-1">Ενεργοποιήθηκε</p>
                                 <p className="text-sm text-gray-900">
                                   {formatDate(alert.triggered_at)}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">Rule</p>
+                                <p className="text-xs text-gray-500 mb-1">Κανόνας</p>
                                 <p className="text-sm text-gray-900">
                                   {alert.rule?.name || 'Unknown Rule'}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">Escalation</p>
+                                <p className="text-xs text-gray-500 mb-1">Εκτόνωση</p>
                                 <p className="text-sm text-gray-900">
                                   Level {alert.escalation_level || 0}
                                 </p>
@@ -308,7 +308,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
                               className="text-yellow-600 border-yellow-300 hover:bg-yellow-50"
                             >
                               <Clock className="w-4 h-4 mr-1" />
-                              {isAcknowledging[alert.id] ? 'Acknowledging...' : 'Acknowledge'}
+                              {isAcknowledging[alert.id] ? 'Αναγνώριση...' : 'Αναγνώριση'}
                             </Button>
                           )}
                           
@@ -321,7 +321,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
                               className="text-green-600 border-green-300 hover:bg-green-50"
                             >
                               <CheckCircle className="w-4 h-4 mr-1" />
-                              {isAcknowledging[alert.id] ? 'Resolving...' : 'Resolve'}
+                              {isAcknowledging[alert.id] ? 'Επίλυση...' : 'Επίλυση'}
                             </Button>
                           )}
                           
@@ -330,7 +330,7 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                           >
                             <Eye className="w-4 h-4 mr-1" />
-                            View Details
+                            Προβολή Λεπτομερειών
                           </Link>
                         </div>
                       </div>
@@ -340,13 +340,13 @@ const AlertsIndex = ({ alerts, stats, filters }) => {
               ) : (
                 <div className="text-center py-12">
                   <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">No Alerts</p>
+                  <p className="text-lg font-medium text-gray-900 mb-2">Δεν Υπάρχουν Ειδοποιήσεις</p>
                   <p className="text-gray-500 mb-4">
-                    Your shipments are running smoothly with no issues detected
+                    Οι αποστολές σας λειτουργούν ομαλά χωρίς προβλήματα
                   </p>
                   <Button onClick={handleCheckAlerts} disabled={isChecking}>
                     <RefreshCw className={`w-4 h-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-                    Check for Alerts
+                    Έλεγχος Ειδοποιήσεων
                   </Button>
                 </div>
               )}

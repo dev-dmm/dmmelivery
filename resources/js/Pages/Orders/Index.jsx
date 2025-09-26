@@ -59,11 +59,11 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
         <AuthenticatedLayout
             header={
                 <h2 className="text-lg lg:text-xl font-semibold leading-tight text-gray-800">
-                    📦 Orders
+                    📦 Παραγγελίες
                 </h2>
             }
         >
-            <Head title="Orders" />
+            <Head title="Παραγγελίες" />
 
             <div className="py-4 lg:py-12">
                 <div className="mx-auto space-y-4 lg:space-y-6">
@@ -80,7 +80,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
                                     <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Total Orders</dt>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Σύνολο Παραγγελιών</dt>
                                             <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.total}</dd>
                                         </dl>
                                     </div>
@@ -98,7 +98,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
                                     <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Pending</dt>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Εκκρεμεί</dt>
                                             <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.pending}</dd>
                                         </dl>
                                     </div>
@@ -116,7 +116,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
                                     <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Processing</dt>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Επεξεργασία</dt>
                                             <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.processing}</dd>
                                         </dl>
                                     </div>
@@ -134,7 +134,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
                                     <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Shipped</dt>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Απεστάλη</dt>
                                             <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.shipped}</dd>
                                         </dl>
                                     </div>
@@ -152,7 +152,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
                                     <div className="ml-3 lg:ml-5 w-0 flex-1 min-w-0">
                                         <dl>
-                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Completed</dt>
+                                            <dt className="text-xs lg:text-sm font-medium text-gray-500 truncate">Ολοκληρώθηκε</dt>
                                             <dd className="text-sm lg:text-lg font-medium text-gray-900">{stats.completed}</dd>
                                         </dl>
                                     </div>
@@ -167,26 +167,26 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                             <form onSubmit={handleSearch} className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
                                     <div>
-                                        <label htmlFor="search" className="block text-xs lg:text-sm font-medium text-gray-700">Search</label>
+                                        <label htmlFor="search" className="block text-xs lg:text-sm font-medium text-gray-700">Αναζήτηση</label>
                                         <input
                                             type="text"
                                             id="search"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
-                                            placeholder="Order ID, order number, customer name, email..."
+                                            placeholder="ID παραγγελίας, αριθμός παραγγελίας, όνομα πελάτη, email..."
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         />
                                     </div>
 
                                     <div>
-                                        <label htmlFor="status" className="block text-xs lg:text-sm font-medium text-gray-700">Status</label>
+                                        <label htmlFor="status" className="block text-xs lg:text-sm font-medium text-gray-700">Κατάσταση</label>
                                         <select
                                             id="status"
                                             value={selectedStatus}
                                             onChange={(e) => setSelectedStatus(e.target.value)}
                                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs lg:text-sm"
                                         >
-                                            <option value="">All Statuses</option>
+                                            <option value="">Όλες οι Καταστάσεις</option>
                                             {Object.entries(statusOptions).map(([value, label]) => (
                                                 <option key={value} value={value}>{label}</option>
                                             ))}
@@ -194,7 +194,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                     </div>
 
                                     <div>
-                                        <label htmlFor="per_page" className="block text-xs lg:text-sm font-medium text-gray-700">Per Page</label>
+                                        <label htmlFor="per_page" className="block text-xs lg:text-sm font-medium text-gray-700">Ανά Σελίδα</label>
                                         <select
                                             id="per_page"
                                             value={perPage}
@@ -213,14 +213,14 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                             type="submit"
                                             className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium"
                                         >
-                                            Search
+                                            Αναζήτηση
                                         </button>
                                         <button
                                             type="button"
                                             onClick={clearFilters}
                                             className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-3 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium"
                                         >
-                                            Clear
+                                            Καθαρισμός
                                         </button>
                                     </div>
                                 </div>
@@ -235,25 +235,25 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Order
+                                            Παραγγελία
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Customer
+                                            Πελάτης
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
+                                            Κατάσταση
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Total
+                                            Σύνολο
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Items
+                                            Προϊόντα
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Created
+                                            Δημιουργήθηκε
                                         </th>
                                         <th className="px-3 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
+                                            Ενέργειες
                                         </th>
                                     </tr>
                                 </thead>
@@ -266,10 +266,10 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                                         #{order.order_number}
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        External: {order.external_order_id}
+                                                        Εξωτερικό: {order.external_order_id}
                                                     </div>
                                                     <div className="text-xs text-gray-400 font-mono">
-                                                        Internal: {order.id}
+                                                        Εσωτερικό: {order.id}
                                                     </div>
                                                 </td>
                                                 <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
@@ -289,7 +289,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                                     €{parseFloat(order.total_amount).toFixed(2)}
                                                 </td>
                                                 <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
-                                                    {order.items?.length || 0} items
+                                                    {order.items?.length || 0} προϊόντα
                                                 </td>
                                                 <td className="px-3 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-500">
                                                     {new Date(order.created_at).toLocaleDateString()}
@@ -299,7 +299,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                                         href={route('orders.show', order.id)}
                                                         className="text-indigo-600 hover:text-indigo-900"
                                                     >
-                                                        View
+                                                        Προβολή
                                                     </Link>
                                                 </td>
                                             </tr>
@@ -309,11 +309,11 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                             <td colSpan="7" className="px-3 lg:px-6 py-8 lg:py-12 text-center">
                                                 <div className="text-gray-500">
                                                     <div className="text-3xl lg:text-4xl mb-4">📦</div>
-                                                    <h3 className="text-base lg:text-lg font-medium">No orders found</h3>
+                                                    <h3 className="text-base lg:text-lg font-medium">Δεν βρέθηκαν παραγγελίες</h3>
                                                     <p className="text-xs lg:text-sm mt-2">
                                                         {filters.search || filters.status 
-                                                            ? 'Try adjusting your filters or search terms.'
-                                                            : 'Orders will appear here when they are created or imported.'
+                                                            ? 'Προσπαθήστε να προσαρμόσετε τα φίλτρα ή τους όρους αναζήτησης.'
+                                                            : 'Οι παραγγελίες θα εμφανιστούν εδώ όταν δημιουργηθούν ή εισαχθούν.'
                                                         }
                                                     </p>
                                                 </div>
@@ -333,7 +333,7 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                             href={orders.prev_page_url}
                                             className="relative inline-flex items-center px-3 lg:px-4 py-2 border border-gray-300 text-xs lg:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                         >
-                                            Previous
+                                            Προηγούμενη
                                         </Link>
                                     )}
                                     {orders.next_page_url && (
@@ -341,16 +341,16 @@ export default function OrdersIndex({ orders, stats, statusOptions, filters }) {
                                             href={orders.next_page_url}
                                             className="ml-3 relative inline-flex items-center px-3 lg:px-4 py-2 border border-gray-300 text-xs lg:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                                         >
-                                            Next
+                                            Επόμενη
                                         </Link>
                                     )}
                                 </div>
                                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                                     <div>
                                         <p className="text-xs lg:text-sm text-gray-700">
-                                            Showing <span className="font-medium">{orders.from}</span> to{' '}
-                                            <span className="font-medium">{orders.to}</span> of{' '}
-                                            <span className="font-medium">{orders.total}</span> results
+                                            Εμφάνιση <span className="font-medium">{orders.from}</span> έως{' '}
+                                            <span className="font-medium">{orders.to}</span> από{' '}
+                                            <span className="font-medium">{orders.total}</span> αποτελέσματα
                                         </p>
                                     </div>
                                     <div>

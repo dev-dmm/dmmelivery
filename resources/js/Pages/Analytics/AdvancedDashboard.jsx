@@ -131,16 +131,16 @@ export default function AdvancedDashboard({ analytics, filters }) {
 
   return (
     <AuthenticatedLayout user={auth.user}>
-      <Head title="Advanced Analytics" />
+      <Head title="Προηγμένα Αναλυτικά" />
       
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Advanced Analytics</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Προηγμένα Αναλυτικά</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Comprehensive business intelligence and performance insights
+                Περιεκτική επιχειρηματική νοημοσύνη και πληροφορίες απόδοσης
               </p>
             </div>
             
@@ -150,10 +150,10 @@ export default function AdvancedDashboard({ analytics, filters }) {
                 onChange={(e) => setDateRange(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm"
               >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="1y">Last year</option>
+                <option value="7d">Τελευταίες 7 ημέρες</option>
+                <option value="30d">Τελευταίες 30 ημέρες</option>
+                <option value="90d">Τελευταίες 90 ημέρες</option>
+                <option value="1y">Τελευταίο έτος</option>
               </select>
               
               <Button
@@ -163,12 +163,12 @@ export default function AdvancedDashboard({ analytics, filters }) {
                 size="sm"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
+                Ανανέωση
               </Button>
               
               <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
-                Export
+                Εξαγωγή
               </Button>
             </div>
           </div>
@@ -179,7 +179,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Total Shipments</p>
+                    <p className="text-sm font-medium text-gray-600">Σύνολο Αποστολών</p>
                     <p className="text-2xl font-bold">{formatNumber(data.overview?.total_shipments)}</p>
                     <div className="flex items-center mt-1">
                       {getTrendIcon(data.trends?.trend_direction)}
@@ -197,7 +197,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                    <p className="text-sm font-medium text-gray-600">Ποσοστό Επιτυχίας</p>
                     <p className="text-2xl font-bold">{data.overview?.success_rate}%</p>
                     <div className="flex items-center mt-1">
                       <Activity className="w-4 h-4 text-green-600" />
@@ -215,10 +215,10 @@ export default function AdvancedDashboard({ analytics, filters }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Performance Score</p>
+                    <p className="text-sm font-medium text-gray-600">Βαθμολογία Απόδοσης</p>
                     <p className="text-2xl font-bold">{data.performance?.performance_score}</p>
                     <p className="text-sm text-gray-500 mt-1">
-                      Avg delay: {data.overview?.avg_delay_hours}h
+                      Μέση καθυστέρηση: {data.overview?.avg_delay_hours}ω
                     </p>
                   </div>
                   <Activity className="w-8 h-8 text-purple-600" />
@@ -230,10 +230,10 @@ export default function AdvancedDashboard({ analytics, filters }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Active Alerts</p>
+                    <p className="text-sm font-medium text-gray-600">Ενεργές Ειδοποιήσεις</p>
                     <p className="text-2xl font-bold">{data.alerts?.total_alerts || 0}</p>
                     <p className="text-sm text-gray-500 mt-1">
-                      {data.alerts?.severity_distribution?.high || 0} high priority
+                      {data.alerts?.severity_distribution?.high || 0} υψηλή προτεραιότητα
                     </p>
                   </div>
                   <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -245,19 +245,19 @@ export default function AdvancedDashboard({ analytics, filters }) {
           {/* Analytics Tabs */}
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="grid w-full grid-cols-6">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="trends">Trends</TabsTrigger>
-              <TabsTrigger value="performance">Performance</TabsTrigger>
-              <TabsTrigger value="geographic">Geographic</TabsTrigger>
-              <TabsTrigger value="customers">Customers</TabsTrigger>
-              <TabsTrigger value="predictions">Predictions</TabsTrigger>
+              <TabsTrigger value="overview">Επισκόπηση</TabsTrigger>
+              <TabsTrigger value="trends">Τάσεις</TabsTrigger>
+              <TabsTrigger value="performance">Απόδοση</TabsTrigger>
+              <TabsTrigger value="geographic">Γεωγραφικά</TabsTrigger>
+              <TabsTrigger value="customers">Πελάτες</TabsTrigger>
+              <TabsTrigger value="predictions">Προβλέψεις</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Shipment Trends</CardTitle>
+                    <CardTitle>Τάσεις Αποστολών</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -275,7 +275,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Courier Performance</CardTitle>
+                    <CardTitle>Απόδοση Μεταφορέων</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
@@ -295,7 +295,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
             <TabsContent value="trends" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Shipment Volume Trends</CardTitle>
+                  <CardTitle>Τάσεις Όγκου Αποστολών</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={400}>
@@ -317,20 +317,20 @@ export default function AdvancedDashboard({ analytics, filters }) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Delivery Performance</CardTitle>
+                    <CardTitle>Απόδοση Παράδοσης</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between">
-                        <span>On-time Rate</span>
+                        <span>Ποσοστό Εγκαίρων</span>
                         <span className="font-semibold">{data.performance?.on_time_rate}%</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Avg Delivery Time</span>
+                        <span>Μέσος Χρόνος Παράδοσης</span>
                         <span className="font-semibold">{data.performance?.delivery_times?.average}h</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Performance Score</span>
+                        <span>Βαθμολογία Απόδοσης</span>
                         <span className="font-semibold">{data.performance?.performance_score}</span>
                       </div>
                     </div>
@@ -339,7 +339,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Top Performing Couriers</CardTitle>
+                    <CardTitle>Κορυφαίοι Μεταφορείς</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -358,7 +358,7 @@ export default function AdvancedDashboard({ analytics, filters }) {
             <TabsContent value="geographic" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Geographic Distribution</CardTitle>
+                  <CardTitle>Γεωγραφική Κατανομή</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -377,20 +377,20 @@ export default function AdvancedDashboard({ analytics, filters }) {
             <TabsContent value="customers" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Customer Analytics</CardTitle>
+                  <CardTitle>Αναλυτικά Πελατών</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between">
-                      <span>Customer Retention</span>
+                      <span>Διατήρηση Πελατών</span>
                       <span className="font-semibold">{data.customer?.customer_retention}%</span>
                     </div>
                     <div className="space-y-3">
-                      <h4 className="font-medium">Top Customers</h4>
+                      <h4 className="font-medium">Κορυφαίοι Πελάτες</h4>
                       {data.customer?.top_customers?.slice(0, 5).map((customer, index) => (
                         <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                           <span className="text-sm">{customer.name}</span>
-                          <span className="text-sm font-medium">{customer.shipment_count} shipments</span>
+                          <span className="text-sm font-medium">{customer.shipment_count} αποστολές</span>
                         </div>
                       ))}
                     </div>
@@ -402,20 +402,20 @@ export default function AdvancedDashboard({ analytics, filters }) {
             <TabsContent value="predictions" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Predictive Analytics</CardTitle>
+                  <CardTitle>Προγνωστικά Αναλυτικά</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between">
-                      <span>Model Accuracy</span>
+                      <span>Ακρίβεια Μοντέλου</span>
                       <span className="font-semibold">{data.predictions?.accuracy_score}%</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Total Predictions</span>
+                      <span>Σύνολο Προβλέψεων</span>
                       <span className="font-semibold">{data.predictions?.model_performance?.total_predictions}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>High Confidence</span>
+                      <span>Υψηλή Εμπιστοσύνη</span>
                       <span className="font-semibold">{data.predictions?.model_performance?.high_confidence_predictions}</span>
                     </div>
                   </div>

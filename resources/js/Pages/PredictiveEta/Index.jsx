@@ -68,7 +68,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
 
   return (
     <AuthenticatedLayout>
-      <Head title="Predictive ETAs" />
+      <Head title="Προγνωστικά ETA" />
       
       <div className="py-12">
         <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -78,10 +78,10 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                   <Brain className="w-8 h-8 mr-3 text-blue-600" />
-                  Predictive ETAs
+                  Προγνωστικά ETA
                 </h1>
                 <p className="mt-2 text-gray-600">
-                  AI-powered delivery predictions with delay risk analysis
+                  Προβλέψεις παράδοσης με AI και ανάλυση κινδύνου καθυστέρησης
                 </p>
               </div>
               <Button 
@@ -90,7 +90,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
                 className="flex items-center"
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
-                {isUpdating ? 'Updating...' : 'Update All'}
+                {isUpdating ? 'Ενημέρωση...' : 'Ενημέρωση Όλων'}
               </Button>
             </div>
           </div>
@@ -99,7 +99,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Predictions</CardTitle>
+                <CardTitle className="text-sm font-medium">Σύνολο Προβλέψεων</CardTitle>
                 <Brain className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -109,7 +109,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">High Risk</CardTitle>
+                <CardTitle className="text-sm font-medium">Υψηλός Κίνδυνος</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-orange-600" />
               </CardHeader>
               <CardContent>
@@ -119,7 +119,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Low Confidence</CardTitle>
+                <CardTitle className="text-sm font-medium">Χαμηλή Εμπιστοσύνη</CardTitle>
                 <TrendingUp className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
@@ -129,7 +129,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+                <CardTitle className="text-sm font-medium">Μέση Εμπιστοσύνη</CardTitle>
                 <Zap className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent>
@@ -143,9 +143,9 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
           {/* Predictive ETAs List */}
           <Card>
             <CardHeader>
-              <CardTitle>Predictive ETA Analysis</CardTitle>
+              <CardTitle>Ανάλυση Προγνωστικών ETA</CardTitle>
               <CardDescription>
-                AI-powered delivery predictions with risk assessment
+                Προβλέψεις παράδοσης με AI και αξιολόγηση κινδύνου
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -161,7 +161,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
                                 {eta.shipment?.tracking_number || 'Unknown'}
                               </p>
                               <p className="text-sm text-gray-500">
-                                {eta.shipment?.customer?.name || 'Unknown Customer'}
+                                {eta.shipment?.customer?.name || 'Άγνωστος Πελάτης'}
                               </p>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -169,26 +169,26 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
                                 {getRiskIcon(eta.delay_risk_level)} {eta.delay_risk_level}
                               </Badge>
                               <span className="text-sm text-gray-500">
-                                {Math.round(eta.confidence_score * 100)}% confidence
+                                {Math.round(eta.confidence_score * 100)}% εμπιστοσύνη
                               </span>
                             </div>
                           </div>
                           
                           <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Original ETA</p>
+                              <p className="text-xs text-gray-500 mb-1">Αρχικό ETA</p>
                               <p className="text-sm text-gray-900">
                                 {formatDate(eta.original_eta)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Predicted ETA</p>
+                              <p className="text-xs text-gray-500 mb-1">Προβλεπόμενο ETA</p>
                               <p className="text-sm text-gray-900">
                                 {formatDate(eta.predicted_eta)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500 mb-1">Last Updated</p>
+                              <p className="text-xs text-gray-500 mb-1">Τελευταία Ενημέρωση</p>
                               <p className="text-sm text-gray-900">
                                 {formatDate(eta.last_updated_at)}
                               </p>
@@ -197,7 +197,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
 
                           {eta.delay_factors && Object.keys(eta.delay_factors).length > 0 && (
                             <div className="mt-3">
-                              <p className="text-xs text-gray-500 mb-2">Delay Factors:</p>
+                              <p className="text-xs text-gray-500 mb-2">Παράγοντες Καθυστέρησης:</p>
                               <div className="flex flex-wrap gap-2">
                                 {Object.entries(eta.delay_factors).map(([factor, value]) => (
                                   <Badge key={factor} variant="outline">
@@ -215,7 +215,7 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                           >
                             <Eye className="w-4 h-4 mr-1" />
-                            View Details
+                            Προβολή Λεπτομερειών
                           </Link>
                         </div>
                       </div>
@@ -225,13 +225,13 @@ const PredictiveEtaIndex = ({ predictiveEtas, stats }) => {
               ) : (
                 <div className="text-center py-12">
                   <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-900 mb-2">No Predictive ETAs</p>
+                  <p className="text-lg font-medium text-gray-900 mb-2">Δεν Υπάρχουν Προγνωστικά ETA</p>
                   <p className="text-gray-500 mb-4">
-                    Generate AI-powered delivery predictions for your shipments
+                    Δημιουργήστε προβλέψεις παράδοσης με AI για τις αποστολές σας
                   </p>
                   <Button onClick={handleUpdateAll} disabled={isUpdating}>
                     <RefreshCw className={`w-4 h-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
-                    Generate Predictions
+                    Δημιουργία Προβλέψεων
                   </Button>
                 </div>
               )}

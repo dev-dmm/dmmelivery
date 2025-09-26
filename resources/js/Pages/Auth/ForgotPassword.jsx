@@ -28,12 +28,12 @@ export default function ForgotPassword({ status }) {
 
     return (
         <GuestLayout>
-            <Head title="Forgot Password" />
+            <Head title="Ξεχάσατε τον Κωδικό" />
 
             <div className="mb-4 text-sm text-gray-600">
-                Forgot your password? No problem. Just let us know your email
-                address and we will email you a password reset link that will
-                allow you to choose a new one.
+                Ξεχάσατε τον κωδικό σας; Κανένα πρόβλημα. Απλά ενημερώστε μας τη διεύθυνση email
+                σας και θα σας στείλουμε έναν σύνδεσμο επαναφοράς κωδικού που θα
+                σας επιτρέψει να επιλέξετε έναν νέο.
             </div>
 
             {status && (
@@ -57,7 +57,7 @@ export default function ForgotPassword({ status }) {
 
                 <div className="mt-4 flex items-center justify-end">
                     <PrimaryButton className="ms-4" disabled={processing}>
-                        Email Password Reset Link
+                        Αποστολή Συνδέσμου Επαναφοράς
                     </PrimaryButton>
                 </div>
             </form>

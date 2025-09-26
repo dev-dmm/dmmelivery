@@ -13,26 +13,26 @@ export default function VerifyEmail({ status }) {
 
     return (
         <GuestLayout>
-            <Head title="Email Verification" />
+            <Head title="Επαλήθευση Email" />
 
             <div className="mb-4 text-sm text-gray-600">
-                Thanks for signing up! Before getting started, could you verify
-                your email address by clicking on the link we just emailed to
-                you? If you didn't receive the email, we will gladly send you
-                another.
+                Ευχαριστούμε για την εγγραφή! Πριν ξεκινήσετε, θα μπορούσατε να επαληθεύσετε
+                τη διεύθυνση email σας κάνοντας κλικ στον σύνδεσμο που μόλις σας στείλαμε;
+                Αν δεν λάβατε το email, θα σας στείλουμε ευχαρίστως
+                ένα άλλο.
             </div>
 
             {status === 'verification-link-sent' && (
                 <div className="mb-4 text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address
-                    you provided during registration.
+                    Ένας νέος σύνδεσμος επαλήθευσης έχει σταλεί στη διεύθυνση email
+                    που δώσατε κατά την εγγραφή.
                 </div>
             )}
 
             <form onSubmit={submit}>
                 <div className="mt-4 flex items-center justify-between">
                     <PrimaryButton disabled={processing}>
-                        Resend Verification Email
+                        Επανάληψη Email Επαλήθευσης
                     </PrimaryButton>
 
                     <Link
@@ -41,7 +41,7 @@ export default function VerifyEmail({ status }) {
                         as="button"
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                     >
-                        Log Out
+                        Αποσύνδεση
                     </Link>
                 </div>
             </form>

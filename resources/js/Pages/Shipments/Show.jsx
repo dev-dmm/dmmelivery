@@ -49,7 +49,7 @@ export default function Show({ shipment, statusHistory }) {
 
   return (
     <AuthenticatedLayout>
-      <Head title={`Tracking ${shipmentData.tracking_number}`} />
+      <Head title={`Παρακολούθηση ${shipmentData.tracking_number}`} />
 
       <div className="py-6 space-y-6">
         {/* Header */}
@@ -59,16 +59,16 @@ export default function Show({ shipment, statusHistory }) {
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Shipments
+              Επιστροφή στις Αποστολές
             </Link>
-            <h1 className="text-3xl font-bold text-gray-800">📦 Tracking #{shipmentData.tracking_number}</h1>
-            <p className="text-gray-600">Order: {shipmentData.order_id}</p>
+            <h1 className="text-3xl font-bold text-gray-800">📦 Παρακολούθηση #{shipmentData.tracking_number}</h1>
+            <p className="text-gray-600">Παραγγελία: {shipmentData.order_id}</p>
           </div>
           <div className="text-right">
             <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full border ${getStatusBadgeColor(shipmentData.status)}`}>
               {formatStatus(shipmentData.status)}
             </span>
-            <p className="text-sm text-gray-500 mt-1">Last updated: {formatDate(shipmentData.updated_at)}</p>
+            <p className="text-sm text-gray-500 mt-1">Τελευταία ενημέρωση: {formatDate(shipmentData.updated_at)}</p>
           </div>
         </div>
 
@@ -77,32 +77,32 @@ export default function Show({ shipment, statusHistory }) {
           <div className="lg:col-span-2 space-y-6">
             {/* Details */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">📋 Shipment Details</h3>
+              <h3 className="text-lg font-semibold mb-4">📋 Λεπτομέρειες Αποστολής</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Tracking Number</label>
+                  <label className="text-sm font-medium text-gray-500">Αριθμός Παρακολούθησης</label>
                   <p className="text-lg font-mono">{shipmentData.tracking_number}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Courier Tracking ID</label>
+                  <label className="text-sm font-medium text-gray-500">ID Παρακολούθησης Μεταφορέα</label>
                   <p className="text-lg font-mono">{shipmentData.courier_tracking_id || '-'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Weight</label>
+                  <label className="text-sm font-medium text-gray-500">Βάρος</label>
                   <p>{shipmentData.weight ? `${shipmentData.weight} kg` : '-'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Shipping Cost</label>
+                  <label className="text-sm font-medium text-gray-500">Κόστος Αποστολής</label>
                   <p>{shipmentData.shipping_cost ? `€${shipmentData.shipping_cost}` : '-'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Estimated Delivery</label>
+                  <label className="text-sm font-medium text-gray-500">Εκτιμώμενη Παράδοση</label>
                   <p>{formatDate(shipmentData.estimated_delivery)}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Actual Delivery</label>
+                  <label className="text-sm font-medium text-gray-500">Πραγματική Παράδοση</label>
                   <p className={shipmentData.actual_delivery ? 'text-green-600 font-medium' : 'text-gray-400'}>
-                    {shipmentData.actual_delivery ? formatDate(shipmentData.actual_delivery) : 'Pending'}
+                    {shipmentData.actual_delivery ? formatDate(shipmentData.actual_delivery) : 'Εκκρεμεί'}
                   </p>
                 </div>
               </div>
@@ -110,7 +110,7 @@ export default function Show({ shipment, statusHistory }) {
 
             {/* Timeline */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">📈 Tracking Timeline</h3>
+              <h3 className="text-lg font-semibold mb-4">📈 Χρονοδιάγραμμα Παρακολούθησης</h3>
               {Array.isArray(statusHistory) && statusHistory.length > 0 ? (
                 <div className="space-y-4">
                   {statusHistory.map((item, idx) => (
@@ -136,7 +136,7 @@ export default function Show({ shipment, statusHistory }) {
                   <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <p>No tracking history available yet</p>
+                  <p>Δεν υπάρχει ακόμα ιστορικό παρακολούθησης</p>
                 </div>
               )}
             </div>
@@ -146,10 +146,10 @@ export default function Show({ shipment, statusHistory }) {
           <div className="space-y-6">
             {/* Customer */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">👤 Customer</h3>
+              <h3 className="text-lg font-semibold mb-4">👤 Πελάτης</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Name</label>
+                  <label className="text-sm font-medium text-gray-500">Όνομα</label>
                   <p className="font-medium">{shipmentData?.customer?.name || 'N/A'}</p>
                 </div>
                 <div>
@@ -157,7 +157,7 @@ export default function Show({ shipment, statusHistory }) {
                   <p className="text-sm">{shipmentData?.customer?.email || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Phone</label>
+                  <label className="text-sm font-medium text-gray-500">Τηλέφωνο</label>
                   <p className="text-sm">{shipmentData?.customer?.phone || 'N/A'}</p>
                 </div>
               </div>
@@ -165,10 +165,10 @@ export default function Show({ shipment, statusHistory }) {
 
             {/* Courier */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">🚚 Courier</h3>
+              <h3 className="text-lg font-semibold mb-4">🚚 Μεταφορέας</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Company</label>
+                  <label className="text-sm font-medium text-gray-500">Εταιρεία</label>
                   <p className="font-medium">{shipmentData?.courier?.name || 'N/A'}</p>
                 </div>
                 <div>
@@ -186,7 +186,7 @@ export default function Show({ shipment, statusHistory }) {
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
-                      Track on courier site
+                      Παρακολούθηση στον ιστότοπο του μεταφορέα
                     </a>
                   </div>
                 )}
@@ -195,15 +195,15 @@ export default function Show({ shipment, statusHistory }) {
 
             {/* Addresses */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">📍 Addresses</h3>
+              <h3 className="text-lg font-semibold mb-4">📍 Διευθύνσεις</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-500">Shipping Address</label>
+                  <label className="text-sm font-medium text-gray-500">Διεύθυνση Αποστολής</label>
                   <p className="text-sm whitespace-pre-line">{shipmentData.shipping_address || 'N/A'}</p>
                 </div>
                 {shipmentData.billing_address && (
                   <div>
-                    <label className="text-sm font-medium text-gray-500">Billing Address</label>
+                    <label className="text-sm font-medium text-gray-500">Διεύθυνση Χρέωσης</label>
                     <p className="text-sm whitespace-pre-line">{shipmentData.billing_address}</p>
                   </div>
                 )}

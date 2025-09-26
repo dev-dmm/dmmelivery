@@ -262,12 +262,12 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
       header={
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold leading-tight text-gray-800">
-            📊 Courier Reports Import
+            📊 Εισαγωγή Αναφορών Courier
           </h2>
         </div>
       }
     >
-      <Head title="Courier Reports Import" />
+      <Head title="Εισαγωγή Αναφορών Courier" />
 
       <div className="py-12">
         <div className="mx-auto max-w-7xl space-y-6">
@@ -282,7 +282,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Imports</dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Σύνολο Εισαγωγών</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.total_imports}</dd>
                     </dl>
                   </div>
@@ -298,7 +298,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Ολοκληρώθηκαν</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.completed_imports}</dd>
                     </dl>
                   </div>
@@ -314,7 +314,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Failed</dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Απέτυχαν</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.failed_imports}</dd>
                     </dl>
                   </div>
@@ -330,7 +330,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                   </div>
                   <div className="ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">In Progress</dt>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Σε Εξέλιξη</dt>
                       <dd className="text-lg font-medium text-gray-900">{stats.pending_imports}</dd>
                     </dl>
                   </div>
@@ -342,7 +342,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
           {/* Upload Section */}
           <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Upload Courier Report</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Ανέβασμα Αναφοράς Courier</h3>
               
               <form onSubmit={handleUpload} className="space-y-6">
                 {/* File Upload Area */}
@@ -355,7 +355,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                   <div className="mt-4">
                     <label htmlFor="file-upload" className="cursor-pointer">
                       <span className="mt-2 block text-sm font-medium text-gray-900">
-                        {selectedFile ? selectedFile.name : 'Drop your CSV file here or click to browse'}
+                        {selectedFile ? selectedFile.name : 'Αφήστε το αρχείο CSV σας εδώ ή κάντε κλικ για αναζήτηση'}
                       </span>
                       <input
                         ref={fileInputRef}
@@ -368,7 +368,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                       />
                     </label>
                     <p className="mt-1 text-xs text-gray-500">
-                      CSV files up to {formatFileSize(maxFileSize * 1024)}
+                      Αρχεία CSV έως {formatFileSize(maxFileSize * 1024)}
                     </p>
                   </div>
                 </div>
@@ -378,14 +378,14 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                 {/* Notes */}
                 <div>
                   <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                    Notes (Optional)
+                    Σημειώσεις (Προαιρετικά)
                   </label>
                   <textarea
                     id="notes"
                     name="notes"
                     rows={3}
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Add any notes about this import..."
+                    placeholder="Προσθέστε σημειώσεις για αυτή την εισαγωγή..."
                     value={data.notes}
                     onChange={(e) => setData('notes', e.target.value)}
                   />
@@ -401,12 +401,12 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                     {isUploading ? (
                       <>
                         <ArrowPathIcon className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
-                        Uploading...
+                        Ανεβάζοντας...
                       </>
                     ) : (
                       <>
                         <CloudArrowUpIcon className="-ml-1 mr-3 h-5 w-5 text-white" />
-                        Upload & Process
+                        Ανέβασμα & Επεξεργασία
                       </>
                     )}
                   </PrimaryButton>
@@ -418,14 +418,14 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
           {/* Recent Imports */}
           <div className="bg-white shadow-sm sm:rounded-lg">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Recent Imports</h3>
+              <h3 className="text-lg font-medium text-gray-900">Πρόσφατες Εισαγωγές</h3>
             </div>
             
             {recentImports.length === 0 ? (
               <div className="text-center py-8">
                 <DocumentCheckIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No imports yet</h3>
-                <p className="mt-1 text-sm text-gray-500">Upload your first courier report to get started.</p>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Δεν υπάρχουν εισαγωγές ακόμα</h3>
+                <p className="mt-1 text-sm text-gray-500">Ανεβάστε την πρώτη σας αναφορά courier για να ξεκινήσετε.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
@@ -451,7 +451,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                         {['pending', 'processing'].includes(importItem.status) && (
                           <div className="mt-2">
                             <div className="flex justify-between text-sm text-gray-600 mb-1">
-                              <span>Processing...</span>
+                              <span>Επεξεργασία...</span>
                               <span>{importItem.progress}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -468,19 +468,19 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                           <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div className="text-center">
                               <div className="text-lg font-semibold text-green-600">{importItem.matched_rows}</div>
-                              <div className="text-gray-500">Matched</div>
+                              <div className="text-gray-500">Ταιριάζουν</div>
                             </div>
                             <div className="text-center">
                               <div className="text-lg font-semibold text-red-600">{importItem.unmatched_rows}</div>
-                              <div className="text-gray-500">Unmatched</div>
+                              <div className="text-gray-500">Δεν Ταιριάζουν</div>
                             </div>
                             <div className="text-center">
                               <div className="text-lg font-semibold text-orange-600">{importItem.price_mismatch_rows}</div>
-                              <div className="text-gray-500">Price Mismatch</div>
+                              <div className="text-gray-500">Αντιστοιχία Τιμής</div>
                             </div>
                             <div className="text-center">
                               <div className="text-lg font-semibold text-blue-600">{importItem.match_rate}%</div>
-                              <div className="text-gray-500">Match Rate</div>
+                              <div className="text-gray-500">Ποσοστό Ταίριασματος</div>
                             </div>
                           </div>
                         )}
@@ -519,7 +519,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                     {showDetails[importItem.uuid] && (
                       <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                         <div className="flex justify-between items-start mb-2">
-                          <h4 className="text-sm font-medium text-gray-900">Import Details</h4>
+                          <h4 className="text-sm font-medium text-gray-900">Λεπτομέρειες Εισαγωγής</h4>
                           <button
                             onClick={() => setShowDetails(prev => ({ ...prev, [importItem.uuid]: false }))}
                             className="text-gray-400 hover:text-gray-600"
@@ -530,26 +530,26 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="font-medium text-gray-700">File Size:</span>
+                            <span className="font-medium text-gray-700">Μέγεθος Αρχείου:</span>
                             <span className="ml-2 text-gray-600">{formatFileSize(importItem.file_size || 0)}</span>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-700">Processing Time:</span>
+                            <span className="font-medium text-gray-700">Χρόνος Επεξεργασίας:</span>
                             <span className="ml-2 text-gray-600">{importItem.processing_time || 'N/A'}</span>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-700">Match Rate:</span>
+                            <span className="font-medium text-gray-700">Ποσοστό Ταίριασματος:</span>
                             <span className="ml-2 text-gray-600">{importItem.match_rate}%</span>
                           </div>
                           <div>
-                            <span className="font-medium text-gray-700">Price Match Rate:</span>
+                            <span className="font-medium text-gray-700">Ποσοστό Ταίριασματος Τιμής:</span>
                             <span className="ml-2 text-gray-600">{importItem.price_match_rate}%</span>
                           </div>
                         </div>
                         
                         {importItem.errors && importItem.errors.length > 0 && (
                           <div className="mt-3">
-                            <h5 className="text-sm font-medium text-red-700 mb-1">Errors:</h5>
+                            <h5 className="text-sm font-medium text-red-700 mb-1">Σφάλματα:</h5>
                             <div className="text-xs text-red-600 space-y-1">
                               {importItem.errors.slice(0, 3).map((error, index) => (
                                 <div key={index}>Row {error.row}: {error.message}</div>
@@ -570,12 +570,12 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
 
           {/* Help Section */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-blue-900 mb-2">How it works</h3>
+            <h3 className="text-lg font-medium text-blue-900 mb-2">Πώς λειτουργεί</h3>
             <div className="text-sm text-blue-800 space-y-2">
-              <p>1. Upload a CSV file with courier report data (tracking numbers, prices, dates, customer info)</p>
-              <p>2. The system will automatically match tracking numbers with your existing orders and shipments</p>
-              <p>3. Compare prices between the courier report and your order totals</p>
-              <p>4. View detailed results showing matches, mismatches, and price discrepancies</p>
+              <p>1. Ανεβάστε ένα αρχείο CSV με δεδομένα αναφοράς courier (αριθμοί παρακολούθησης, τιμές, ημερομηνίες, πληροφορίες πελατών)</p>
+              <p>2. Το σύστημα θα ταιριάξει αυτόματα τους αριθμούς παρακολούθησης με τις υπάρχουσες παραγγελίες και αποστολές σας</p>
+              <p>3. Συγκρίνετε τις τιμές μεταξύ της αναφοράς courier και των συνολικών παραγγελιών σας</p>
+              <p>4. Προβάλετε λεπτομερή αποτελέσματα που δείχνουν ταιριάσματα, μη-ταιριάσματα και διαφορές τιμών</p>
             </div>
             <div className="mt-4">
               <a
@@ -583,7 +583,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
                 className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
               >
                 <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
-                Download CSV Template
+                Λήψη Προτύπου CSV
               </a>
             </div>
           </div>
