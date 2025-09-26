@@ -306,10 +306,14 @@ class ChatbotService
                     ];
                     
                     // Update the response with actual shipment data
-                    $response = $this->formatShipmentResponse($shipment);
+                    $response = $this->formatShipmentResponse($shipment, $session);
                 } else {
                     // No shipment found - update response to indicate this
-                    $response = "I couldn't find a shipment with tracking number {$trackingNumber}. Please verify the tracking number is correct, or contact our support team for assistance.";
+                    if ($session->language === 'el') {
+                        $response = "Δεν μπόρεσα να βρω αποστολή με αριθμό παρακολούθησης {$trackingNumber}. Παρακαλώ επιβεβαιώστε ότι ο αριθμός είναι σωστός ή επικοινωνήστε με την ομάδα υποστήριξης.";
+                    } else {
+                        $response = "I couldn't find a shipment with tracking number {$trackingNumber}. Please verify the tracking number is correct, or contact our support team for assistance.";
+                    }
                     $messageType = 'error';
                 }
             }
@@ -376,27 +380,72 @@ class ChatbotService
     /**
      * Format shipment response with actual data
      */
-    private function formatShipmentResponse(Shipment $shipment): string
+    private function formatShipmentResponse(Shipment $shipment, ChatSession $session): string
     {
-        $response = "📦 SHIPMENT STATUS UPDATE\n\n";
-        $response .= "🔍 Tracking Number: {$shipment->tracking_number}\n";
-        $response .= "📊 Current Status: " . ucfirst(str_replace('_', ' ', $shipment->status)) . "\n";
+        $language = $session->language ?? 'en';
         
-        if ($shipment->courier) {
-            $response .= "🚚 Courier: {$shipment->courier->name}\n";
+        if ($language === 'el') {
+            // Greek response
+            $response = "📦 ΕΝΗΜΕΡΩΣΗ ΚΑΤΑΣΤΑΣΗΣ ΑΠΟΣΤΟΛΗΣ\n\n";
+            $response .= "🔍 Αριθμός Παρακολούθησης: {$shipment->tracking_number}\n";
+            $response .= "📊 Τρέχουσα Κατάσταση: " . $this->translateStatus($shipment->status, 'el') . "\n";
+            
+            if ($shipment->courier) {
+                $response .= "🚚 Μεταφορέας: {$shipment->courier->name}\n";
+            }
+            
+            if ($shipment->estimated_delivery) {
+                $response .= "📅 Εκτιμώμενη Παράδοση: {$shipment->estimated_delivery->format('d/m/Y \a\t H:i')}\n";
+            }
+            
+            if ($shipment->shipping_address) {
+                $response .= "📍 Διεύθυνση Αποστολής: {$shipment->shipping_address}\n";
+            }
+            
+            $response .= "\n💬 Αν χρειάζεστε περισσότερες λεπτομέρειες ή έχετε ερωτήσεις, παρακαλώ ενημερώστε με!";
+        } else {
+            // English response (default)
+            $response = "📦 SHIPMENT STATUS UPDATE\n\n";
+            $response .= "🔍 Tracking Number: {$shipment->tracking_number}\n";
+            $response .= "📊 Current Status: " . ucfirst(str_replace('_', ' ', $shipment->status)) . "\n";
+            
+            if ($shipment->courier) {
+                $response .= "🚚 Courier: {$shipment->courier->name}\n";
+            }
+            
+            if ($shipment->estimated_delivery) {
+                $response .= "📅 Estimated Delivery: {$shipment->estimated_delivery->format('M j, Y \a\t g:i A')}\n";
+            }
+            
+            if ($shipment->shipping_address) {
+                $response .= "📍 Shipping Address: {$shipment->shipping_address}\n";
+            }
+            
+            $response .= "\n💬 If you need more detailed information or have any questions, please let me know!";
         }
-        
-        if ($shipment->estimated_delivery) {
-            $response .= "📅 Estimated Delivery: {$shipment->estimated_delivery->format('M j, Y \a\t g:i A')}\n";
-        }
-        
-        if ($shipment->shipping_address) {
-            $response .= "📍 Shipping Address: {$shipment->shipping_address}\n";
-        }
-        
-        $response .= "\n💬 If you need more detailed information or have any questions, please let me know!";
         
         return $response;
+    }
+
+    /**
+     * Translate status to Greek
+     */
+    private function translateStatus(string $status, string $language): string
+    {
+        if ($language !== 'el') {
+            return ucfirst(str_replace('_', ' ', $status));
+        }
+        
+        $translations = [
+            'pending' => 'Εκκρεμεί',
+            'in_transit' => 'Σε Μεταφορά',
+            'delivered' => 'Παραδόθηκε',
+            'failed' => 'Αποτυχία',
+            'cancelled' => 'Ακυρώθηκε',
+            'processing' => 'Επεξεργασία',
+        ];
+        
+        return $translations[$status] ?? ucfirst(str_replace('_', ' ', $status));
     }
 
     /**
