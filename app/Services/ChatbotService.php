@@ -449,7 +449,7 @@ class ChatbotService
     /**
      * Create new chat session
      */
-    public function createSession(string $tenantId, string $customerId = null, string $language = 'en'): ChatSession
+    public function createSession(string $tenantId, string $customerId = null, string $language = 'el'): ChatSession
     {
         return ChatSession::create([
             'tenant_id' => $tenantId,

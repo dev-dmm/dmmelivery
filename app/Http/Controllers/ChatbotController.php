@@ -72,7 +72,7 @@ class ChatbotController extends Controller
             $session = $this->chatbotService->createSession(
                 $tenant->id,
                 $request->customer_id,
-                $request->language ?? 'en'
+                $request->language ?? 'el'
             );
 
             return response()->json([
