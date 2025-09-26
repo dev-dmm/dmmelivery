@@ -184,7 +184,6 @@ class OnboardingController extends Controller
         return Inertia::render('Onboarding/ApiConfiguration', [
             'tenant' => $tenant,
             'progress' => $tenant->getOnboardingProgress(),
-            'hasACSCredentials' => $tenant->hasACSCredentials(),
             'supportedCouriers' => $this->getSupportedCouriers(),
         ]);
     }
@@ -200,56 +199,11 @@ class OnboardingController extends Controller
             return redirect()->route('register');
         }
 
-        $validator = Validator::make($request->all(), [
-            // ACS API Credentials
-            'acs_api_key' => 'required|string|max:255',
-            'acs_company_id' => 'required|string|max:100',
-            'acs_company_password' => 'required|string|max:255',
-            'acs_user_id' => 'required|string|max:100',
-            'acs_user_password' => 'required|string|max:255',
-            
-            // Optional other courier credentials
-            'elta_api_key' => 'nullable|string|max:255',
-            'speedex_api_key' => 'nullable|string|max:255',
-            
-            // Test credentials option
-            'use_demo_credentials' => 'boolean',
+        // Note: ACS credentials are now managed through the WordPress plugin
+        // Skip API configuration step and move to testing
+        $tenant->update([
+            'onboarding_status' => 'api_configured',
         ]);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator);
-        }
-
-        // If using demo credentials, set them
-        if ($request->boolean('use_demo_credentials')) {
-            $tenant->update([
-                'acs_api_key' => 'demo',
-                'acs_company_id' => 'demo',
-                'acs_company_password' => 'demo',
-                'acs_user_id' => 'demo',
-                'acs_user_password' => 'demo',
-                'onboarding_status' => 'api_configured',
-            ]);
-        } else {
-            // Use provided credentials
-            $courierApiKeys = [];
-            if ($request->elta_api_key) {
-                $courierApiKeys['elta'] = $request->elta_api_key;
-            }
-            if ($request->speedex_api_key) {
-                $courierApiKeys['speedex'] = $request->speedex_api_key;
-            }
-
-            $tenant->update([
-                'acs_api_key' => $request->acs_api_key,
-                'acs_company_id' => $request->acs_company_id,
-                'acs_company_password' => $request->acs_company_password,
-                'acs_user_id' => $request->acs_user_id,
-                'acs_user_password' => $request->acs_user_password,
-                'courier_api_keys' => $courierApiKeys,
-                'onboarding_status' => 'api_configured',
-            ]);
-        }
 
         return redirect()->route('onboarding.testing')
             ->with('success', 'API configuration saved successfully!');
@@ -269,7 +223,6 @@ class OnboardingController extends Controller
         return Inertia::render('Onboarding/Testing', [
             'tenant' => $tenant,
             'progress' => $tenant->getOnboardingProgress(),
-            'hasACSCredentials' => $tenant->hasACSCredentials(),
             'testResults' => session('test_results'),
         ]);
     }
@@ -281,8 +234,8 @@ class OnboardingController extends Controller
     {
         $tenant = $this->getCurrentTenant();
         
-        if (!$tenant || !$tenant->hasACSCredentials()) {
-            return back()->withErrors(['api' => 'API credentials not configured']);
+        if (!$tenant) {
+            return back()->withErrors(['api' => 'Tenant not found']);
         }
 
         try {

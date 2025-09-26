@@ -61,12 +61,7 @@ class TenantRegistrationController extends Controller
             'admin_email' => 'required|email|max:255|unique:users,email',
             'admin_password' => 'required|string|min:8|confirmed',
             
-            // ACS API Credentials (optional at registration)
-            'acs_api_key' => 'nullable|string|max:255',
-            'acs_company_id' => 'nullable|string|max:100',
-            'acs_company_password' => 'nullable|string|max:255',
-            'acs_user_id' => 'nullable|string|max:100',
-            'acs_user_password' => 'nullable|string|max:255',
+            // Note: ACS credentials are now managed through WordPress plugin
             
             // Subscription Plan
             'subscription_plan' => 'required|in:free,starter,business,enterprise',
@@ -112,12 +107,7 @@ class TenantRegistrationController extends Controller
                 'vat_number' => $request->vat_number,
                 'tax_office' => $request->tax_office,
                 
-                // ACS API Credentials
-                'acs_api_key' => $request->acs_api_key,
-                'acs_company_id' => $request->acs_company_id,
-                'acs_company_password' => $request->acs_company_password,
-                'acs_user_id' => $request->acs_user_id,
-                'acs_user_password' => $request->acs_user_password,
+                // Note: ACS credentials are now managed through WordPress plugin
                 
                 // Subscription & Status
                 'subscription_plan' => $request->subscription_plan,

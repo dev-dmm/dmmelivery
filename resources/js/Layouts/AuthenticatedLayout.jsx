@@ -165,19 +165,6 @@ export default function AuthenticatedLayout({ header, children }) {
                   </div>
                 )}
 
-                {/* Test links - only show on larger screens to reduce clutter */}
-                <div className="hidden xl:flex space-x-2">
-                  {hasRoute('test.courier-api') && (
-                    <NavLink href={route('test.courier-api')} active={route().current('test.courier-api')}>
-                      🧪 API Test
-                    </NavLink>
-                  )}
-                  {hasRoute('test.acs-credentials') && (
-                    <NavLink href={route('test.acs-credentials')} active={route().current('test.acs-credentials')}>
-                      🔑 ACS Test
-                    </NavLink>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -332,16 +319,6 @@ export default function AuthenticatedLayout({ header, children }) {
               </>
             )}
 
-            {hasRoute('test.courier-api') && (
-              <ResponsiveNavLink href={route('test.courier-api')} active={route().current('test.courier-api')}>
-                🧪 API Test
-              </ResponsiveNavLink>
-            )}
-            {hasRoute('test.acs-credentials') && (
-              <ResponsiveNavLink href={route('test.acs-credentials')} active={route().current('test.acs-credentials')}>
-                🔑 ACS Test
-              </ResponsiveNavLink>
-            )}
           </div>
 
           <div className="border-t border-gray-200 pb-1 pt-4">
