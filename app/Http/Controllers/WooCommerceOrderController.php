@@ -247,7 +247,8 @@ class WooCommerceOrderController extends Controller
                     'tenant_id' => $tenant->id
                 ]);
                 
-                $order = Order::create([
+                try {
+                    $order = Order::create([
                     'tenant_id'        => $tenant->id,
                     'external_order_id'=> $externalId,
                     'order_number'     => data_get($request, 'order.order_number'),
@@ -272,12 +273,23 @@ class WooCommerceOrderController extends Controller
                     'shipping_city'        => data_get($request, 'shipping.address.city'),
                     'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
                     'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
-                ]);
-                
-                \Log::info('Order created successfully', [
-                    'order_id' => $order->id,
-                    'external_order_id' => $externalId
-                ]);
+                    ]);
+                    
+                    \Log::info('Order created successfully', [
+                        'order_id' => $order->id,
+                        'external_order_id' => $externalId
+                    ]);
+                } catch (\Exception $orderCreateException) {
+                    \Log::error('Failed to create order in transaction', [
+                        'external_order_id' => $externalId,
+                        'tenant_id' => $tenant->id,
+                        'error' => $orderCreateException->getMessage(),
+                        'error_code' => $orderCreateException->getCode(),
+                        'error_file' => $orderCreateException->getFile(),
+                        'error_line' => $orderCreateException->getLine()
+                    ]);
+                    throw $orderCreateException;
+                }
                 
                 // Create order items if provided
                 $this->createOrderItems($order, $request);
