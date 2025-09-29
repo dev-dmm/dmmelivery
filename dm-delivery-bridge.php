@@ -3219,6 +3219,11 @@ class DMM_Delivery_Bridge {
         $api_key = isset($this->options['api_key']) ? $this->options['api_key'] : '';
         $tenant_id = isset($this->options['tenant_id']) ? $this->options['tenant_id'] : '';
         
+        // Debug: Log the API endpoint being used
+        error_log('DMM Delivery Bridge - API Endpoint: ' . $api_endpoint);
+        error_log('DMM Delivery Bridge - API Key: ' . (empty($api_key) ? 'EMPTY' : 'SET'));
+        error_log('DMM Delivery Bridge - Tenant ID: ' . (empty($tenant_id) ? 'EMPTY' : 'SET'));
+        
         if (empty($api_endpoint) || empty($api_key) || empty($tenant_id)) {
             return [
                 'success' => false,
@@ -3241,9 +3246,14 @@ class DMM_Delivery_Bridge {
             'body' => json_encode($data),
         ];
         
+        // Debug: Log the request details
+        error_log('DMM Delivery Bridge - Making request to: ' . $api_endpoint);
+        error_log('DMM Delivery Bridge - Request headers: ' . json_encode($args['headers']));
+        
         $response = wp_remote_request($api_endpoint, $args);
         
         if (is_wp_error($response)) {
+            error_log('DMM Delivery Bridge - wp_remote_request error: ' . $response->get_error_message());
             return [
                 'success' => false,
                 'message' => $response->get_error_message(),
@@ -3254,6 +3264,10 @@ class DMM_Delivery_Bridge {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
         $response_data = json_decode($response_body, true);
+        
+        // Debug: Log the response details
+        error_log('DMM Delivery Bridge - Response Code: ' . $response_code);
+        error_log('DMM Delivery Bridge - Response Body: ' . $response_body);
         
         // Handle rate limiting (HTTP 429) with retry
         if ($response_code === 429) {
