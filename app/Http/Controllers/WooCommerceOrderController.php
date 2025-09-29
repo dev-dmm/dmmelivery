@@ -144,9 +144,14 @@ class WooCommerceOrderController extends Controller
 
         // If order already exists, update customer info and return it (idempotency)
         $externalId = data_get($request, 'order.external_order_id');
-        $existing = Order::where('tenant_id', $tenant->id)
-            ->where('external_order_id', $externalId)
-            ->first();
+        
+        // Use a more robust check with database lock to prevent race conditions
+        $existing = \DB::transaction(function () use ($tenant, $externalId) {
+            return Order::where('tenant_id', $tenant->id)
+                ->where('external_order_id', $externalId)
+                ->lockForUpdate()
+                ->first();
+        });
 
         if ($existing) {
             // Update customer information if it's missing
@@ -223,34 +228,96 @@ class WooCommerceOrderController extends Controller
             }
         }
 
-        // Create order with duplicate handling
+        // Create order with duplicate handling in a transaction
         try {
-            $order = Order::create([
-                'tenant_id'        => $tenant->id,
-                'external_order_id'=> $externalId,
-                'order_number'     => data_get($request, 'order.order_number'),
-                'status'           => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
-                'total_amount'     => (float) data_get($request, 'order.total_amount', 0),
-                'subtotal'         => (float) data_get($request, 'order.subtotal', 0),
-                'tax_amount'       => (float) data_get($request, 'order.tax_amount', 0),
-                'shipping_cost'    => (float) data_get($request, 'order.shipping_cost', 0),
-                'discount_amount'  => (float) data_get($request, 'order.discount_amount', 0),
-                'currency'         => data_get($request, 'order.currency', 'EUR'),
-                'payment_status'   => data_get($request, 'order.payment_status', 'pending'),
-                'payment_method'   => data_get($request, 'order.payment_method'),
-                'customer_id'      => $customer->id,
+            $result = \DB::transaction(function () use ($tenant, $externalId, $customer, $request) {
+                $order = Order::create([
+                    'tenant_id'        => $tenant->id,
+                    'external_order_id'=> $externalId,
+                    'order_number'     => data_get($request, 'order.order_number'),
+                    'status'           => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
+                    'total_amount'     => (float) data_get($request, 'order.total_amount', 0),
+                    'subtotal'         => (float) data_get($request, 'order.subtotal', 0),
+                    'tax_amount'       => (float) data_get($request, 'order.tax_amount', 0),
+                    'shipping_cost'    => (float) data_get($request, 'order.shipping_cost', 0),
+                    'discount_amount'  => (float) data_get($request, 'order.discount_amount', 0),
+                    'currency'         => data_get($request, 'order.currency', 'EUR'),
+                    'payment_status'   => data_get($request, 'order.payment_status', 'pending'),
+                    'payment_method'   => data_get($request, 'order.payment_method'),
+                    'customer_id'      => $customer->id,
+                    
+                    // Customer Information (populate for admin panel display)
+                    'customer_name'    => $customer->name,
+                    'customer_email'   => $customer->email,
+                    'customer_phone'   => $customer->phone,
+                    
+                    // Shipping address
+                    'shipping_address'     => data_get($request, 'shipping.address.address_1'),
+                    'shipping_city'        => data_get($request, 'shipping.address.city'),
+                    'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
+                    'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
+                ]);
                 
-                // Customer Information (populate for admin panel display)
-                'customer_name'    => $customer->name,
-                'customer_email'   => $customer->email,
-                'customer_phone'   => $customer->phone,
+                // Create order items if provided
+                $this->createOrderItems($order, $request);
                 
-                // Shipping address
-                'shipping_address'     => data_get($request, 'shipping.address.address_1'),
-                'shipping_city'        => data_get($request, 'shipping.address.city'),
-                'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
-                'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
-            ]);
+                // Create shipment (default true)
+                $shipment = null;
+                if ($request->boolean('create_shipment', true)) {
+                    $courier = Courier::where('tenant_id', $tenant->id)
+                        ->where('is_default', true)
+                        ->first() ?? Courier::where('tenant_id', $tenant->id)->first();
+
+                    if (!$courier) {
+                        \Log::error('WooCommerce order failed: No courier configured for tenant', [
+                            'tenant_id' => $tenant->id,
+                            'order_id' => $order->id
+                        ]);
+                        throw new \Exception('No courier configured for tenant');
+                    }
+
+                    $addr = $request->input('shipping.address');
+
+                    // collision-safe tracking number generation
+                    $tracking = null;
+                    do {
+                        $tracking = strtoupper(Str::random(12));
+                    } while (
+                        Shipment::where('tenant_id', $tenant->id)
+                            ->where('tracking_number', $tracking)
+                            ->exists()
+                    );
+
+                    $shipment = Shipment::create([
+                        'tenant_id'       => $tenant->id,
+                        'order_id'        => $order->id,
+                        'courier_id'      => $courier->id,
+                        'tracking_number' => $tracking,
+                        'status'          => 'pending',
+                        'recipient_name'  => trim(implode(' ', array_filter([
+                            $addr['first_name'] ?? '',
+                            $addr['last_name'] ?? ''
+                        ]))),
+                        'recipient_phone' => $addr['phone'] ?? '',
+                        'recipient_email' => $addr['email'] ?? '',
+                        'address_line_1'  => $addr['address_1'] ?? '',
+                        'address_line_2'  => $addr['address_2'] ?? '',
+                        'city'            => $addr['city'] ?? '',
+                        'postal_code'     => $addr['postcode'] ?? '',
+                        'country'         => $addr['country'] ?? 'GR',
+                        'weight'          => (float) data_get($request, 'shipping.weight', 0),
+                        'dimensions'      => null,
+                        'special_instructions' => null,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ]);
+                }
+                
+                return ['order' => $order, 'shipment' => $shipment];
+            });
+            
+            $order = $result['order'];
+            $shipment = $result['shipment'];
         } catch (\Illuminate\Database\QueryException $e) {
             // Handle duplicate entry constraint violation
             if ($e->getCode() == 23000 && str_contains($e->getMessage(), 'Duplicate entry')) {
@@ -307,57 +374,6 @@ class WooCommerceOrderController extends Controller
             
             // Re-throw if it's not a duplicate entry error
             throw $e;
-        }
-
-        // Create order items if provided
-        $this->createOrderItems($order, $request);
-
-        // Create shipment (default true)
-        $shipment = null;
-        if ($request->boolean('create_shipment', true)) {
-            $courier = Courier::where('tenant_id', $tenant->id)
-                ->where('is_default', true)
-                ->first() ?? Courier::where('tenant_id', $tenant->id)->first();
-
-            if (!$courier) {
-                \Log::error('WooCommerce order failed: No courier configured for tenant', [
-                    'tenant_id' => $tenant->id,
-                    'order_id' => $order->id
-                ]);
-                return response()->json(['success'=>false,'message'=>'No courier configured for tenant'], 422);
-            }
-
-            $addr = $request->input('shipping.address');
-
-            // collision-safe tracking number generation
-            $tracking = null;
-            do {
-                $tracking = strtoupper(Str::random(12));
-            } while (
-                Shipment::where('tenant_id', $tenant->id)
-                    ->where('tracking_number', $tracking)
-                    ->exists()
-            );
-
-            $shipment = Shipment::create([
-                'id'                  => Str::uuid(),
-                'tenant_id'           => $tenant->id,
-                'order_id'            => $order->id,
-                'customer_id'         => $customer->id,
-                'courier_id'          => $courier->id,
-                'tracking_number'     => $tracking,
-                'courier_tracking_id' => '',
-                'status'              => $request->input('desired_shipment_status', 'pending'),
-                'weight'              => data_get($request, 'shipping.weight'),
-                'dimensions'          => null,
-                'shipping_address'    => $this->formatAddress($addr),
-                'shipping_city'       => $addr['city'] ?? null,
-                'billing_address'     => null,
-                'shipping_cost'       => (float) data_get($request, 'order.shipping_cost', 0),
-                'estimated_delivery'  => null,
-                'actual_delivery'     => null,
-                'courier_response'    => null,
-            ]);
         }
 
         \Log::info('WooCommerce order processed successfully', [
