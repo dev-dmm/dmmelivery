@@ -3096,16 +3096,17 @@ class DMM_Delivery_Bridge {
      * Prepare order data for API
      */
     private function prepare_order_data($order) {
-        $shipping_address = $order->get_address('shipping');
-        if (empty($shipping_address['address_1'])) {
-            $shipping_address = $order->get_address('billing');
-        }
-        
-        // Debug customer data extraction
-        $billing_email = $order->get_billing_email();
-        $billing_phone = $order->get_billing_phone();
-        $billing_first_name = $order->get_billing_first_name();
-        $billing_last_name = $order->get_billing_last_name();
+        try {
+            $shipping_address = $order->get_address('shipping');
+            if (empty($shipping_address['address_1'])) {
+                $shipping_address = $order->get_address('billing');
+            }
+            
+            // Debug customer data extraction
+            $billing_email = $order->get_billing_email();
+            $billing_phone = $order->get_billing_phone();
+            $billing_first_name = $order->get_billing_first_name();
+            $billing_last_name = $order->get_billing_last_name();
         
         if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
             error_log('DMM Delivery Bridge - Debug Customer Data:');
@@ -3118,28 +3119,38 @@ class DMM_Delivery_Bridge {
         // Prepare order items
         $order_items = [];
         foreach ($order->get_items() as $item) {
-            $product = $item->get_product();
-            
-            // Get product image URL
-            $image_url = '';
-            if ($product) {
-                $image_id = $product->get_image_id();
-                if ($image_id) {
-                    $image_url = wp_get_attachment_image_url($image_id, 'full');
-                }
+            try {
+                $product = $item->get_product();
                 
-                // If no main image, try to get the first gallery image
-                if (!$image_url) {
-                    $gallery_ids = $product->get_gallery_image_ids();
-                    if (!empty($gallery_ids)) {
-                        $image_url = wp_get_attachment_image_url($gallery_ids[0], 'full');
+                // Get product image URL
+                $image_url = '';
+                if ($product) {
+                    try {
+                        $image_id = $product->get_image_id();
+                        if ($image_id) {
+                            $image_url = wp_get_attachment_image_url($image_id, 'full');
+                        }
+                        
+                        // If no main image, try to get the first gallery image
+                        if (!$image_url) {
+                            $gallery_ids = $product->get_gallery_image_ids();
+                            if (!empty($gallery_ids)) {
+                                $image_url = wp_get_attachment_image_url($gallery_ids[0], 'full');
+                            }
+                        }
+                        
+                        // If still no image, try to get placeholder image
+                        if (!$image_url) {
+                            $image_url = wc_placeholder_img_src('full');
+                        }
+                    } catch (Exception $e) {
+                        error_log('DMM Delivery Bridge - Error getting product image: ' . $e->getMessage());
+                        $image_url = '';
                     }
                 }
-                
-                // If still no image, try to get placeholder image
-                if (!$image_url) {
-                    $image_url = wc_placeholder_img_src('full');
-                }
+            } catch (Exception $e) {
+                error_log('DMM Delivery Bridge - Error processing product: ' . $e->getMessage());
+                continue; // Skip this item if there's an error
             }
             
             $order_items[] = [
@@ -3195,6 +3206,53 @@ class DMM_Delivery_Bridge {
             'create_shipment' => isset($this->options['create_shipment']) && $this->options['create_shipment'] === 'yes',
             'preferred_courier' => $this->get_courier_from_order($order),
         ];
+        
+        } catch (Exception $e) {
+            error_log('DMM Delivery Bridge - Fatal error in prepare_order_data: ' . $e->getMessage());
+            error_log('DMM Delivery Bridge - Stack trace: ' . $e->getTraceAsString());
+            
+            // Return minimal data to prevent complete failure
+            return [
+                'source' => 'woocommerce',
+                'order' => [
+                    'external_order_id' => (string) $order->get_id(),
+                    'order_number' => $order->get_order_number(),
+                    'status' => $order->get_status(),
+                    'total_amount' => (float) $order->get_total(),
+                    'subtotal' => (float) $order->get_subtotal(),
+                    'tax_amount' => (float) $order->get_total_tax(),
+                    'shipping_cost' => (float) $order->get_shipping_total(),
+                    'discount_amount' => (float) $order->get_discount_total(),
+                    'currency' => $order->get_currency(),
+                    'payment_status' => $order->is_paid() ? 'paid' : 'pending',
+                    'payment_method' => $order->get_payment_method(),
+                    'items' => [], // Empty items array to prevent further errors
+                ],
+                'customer' => [
+                    'first_name' => $order->get_billing_first_name(),
+                    'last_name' => $order->get_billing_last_name(),
+                    'email' => $order->get_billing_email(),
+                    'phone' => $order->get_billing_phone(),
+                ],
+                'shipping' => [
+                    'address' => [
+                        'first_name' => $order->get_billing_first_name(),
+                        'last_name' => $order->get_billing_last_name(),
+                        'company' => '',
+                        'address_1' => $order->get_billing_address_1(),
+                        'address_2' => $order->get_billing_address_2(),
+                        'city' => $order->get_billing_city(),
+                        'postcode' => $order->get_billing_postcode(),
+                        'country' => $order->get_billing_country(),
+                        'phone' => $order->get_billing_phone(),
+                        'email' => $order->get_billing_email(),
+                    ],
+                    'weight' => 0,
+                ],
+                'create_shipment' => false, // Disable shipment creation on error
+                'preferred_courier' => null,
+            ];
+        }
     }
     
     /**
