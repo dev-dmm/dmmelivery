@@ -3155,7 +3155,7 @@ class DMM_Delivery_Bridge {
             
             $order_items[] = [
                 'sku' => $product ? $product->get_sku() : '',
-                'name' => $item->get_name(),
+                'name' => strip_tags($item->get_name()), // Strip HTML tags from product name
                 'quantity' => $item->get_quantity(),
                 'price' => (float) $item->get_total() / $item->get_quantity(), // Unit price
                 'total' => (float) $item->get_total(),
@@ -3183,19 +3183,19 @@ class DMM_Delivery_Bridge {
                 'items' => $order_items,
             ],
             'customer' => [
-                'first_name' => $billing_first_name,
-                'last_name' => $billing_last_name,
+                'first_name' => strip_tags($billing_first_name),
+                'last_name' => strip_tags($billing_last_name),
                 'email' => $billing_email,
                 'phone' => $billing_phone,
             ],
             'shipping' => [
                 'address' => [
-                    'first_name' => $shipping_address['first_name'] ?? $billing_first_name,
-                    'last_name' => $shipping_address['last_name'] ?? $billing_last_name,
-                    'company' => $shipping_address['company'] ?? '',
-                    'address_1' => $shipping_address['address_1'] ?? '',
-                    'address_2' => $shipping_address['address_2'] ?? '',
-                    'city' => $shipping_address['city'] ?? '',
+                    'first_name' => strip_tags($shipping_address['first_name'] ?? $billing_first_name),
+                    'last_name' => strip_tags($shipping_address['last_name'] ?? $billing_last_name),
+                    'company' => strip_tags($shipping_address['company'] ?? ''),
+                    'address_1' => strip_tags($shipping_address['address_1'] ?? ''),
+                    'address_2' => strip_tags($shipping_address['address_2'] ?? ''),
+                    'city' => strip_tags($shipping_address['city'] ?? ''),
                     'postcode' => $shipping_address['postcode'] ?? '',
                     'country' => $shipping_address['country'] ?? 'GR',
                     'phone' => $shipping_address['phone'] ?? $billing_phone,
@@ -3229,19 +3229,19 @@ class DMM_Delivery_Bridge {
                     'items' => [], // Empty items array to prevent further errors
                 ],
                 'customer' => [
-                    'first_name' => $order->get_billing_first_name(),
-                    'last_name' => $order->get_billing_last_name(),
+                    'first_name' => strip_tags($order->get_billing_first_name()),
+                    'last_name' => strip_tags($order->get_billing_last_name()),
                     'email' => $order->get_billing_email(),
                     'phone' => $order->get_billing_phone(),
                 ],
                 'shipping' => [
                     'address' => [
-                        'first_name' => $order->get_billing_first_name(),
-                        'last_name' => $order->get_billing_last_name(),
+                        'first_name' => strip_tags($order->get_billing_first_name()),
+                        'last_name' => strip_tags($order->get_billing_last_name()),
                         'company' => '',
-                        'address_1' => $order->get_billing_address_1(),
-                        'address_2' => $order->get_billing_address_2(),
-                        'city' => $order->get_billing_city(),
+                        'address_1' => strip_tags($order->get_billing_address_1()),
+                        'address_2' => strip_tags($order->get_billing_address_2()),
+                        'city' => strip_tags($order->get_billing_city()),
                         'postcode' => $order->get_billing_postcode(),
                         'country' => $order->get_billing_country(),
                         'phone' => $order->get_billing_phone(),
