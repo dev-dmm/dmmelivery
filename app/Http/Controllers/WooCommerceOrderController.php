@@ -378,41 +378,65 @@ class WooCommerceOrderController extends Controller
                     'tenant_id' => $tenant->id
                 ]);
                 
-                // Small delay to allow the other transaction to complete
-                usleep(100000); // 100ms delay
+                // Try multiple times with increasing delays to find the existing order
+                $order = null;
+                $attempts = 0;
+                $maxAttempts = 5;
                 
-                // Fetch the existing order that was created by another request
-                $order = Order::where('tenant_id', $tenant->id)
-                    ->where('external_order_id', $externalId)
-                    ->first();
-                
-                if (!$order) {
-                    // Try to find the order without tenant filter (in case of tenant mismatch)
-                    $order = Order::where('external_order_id', $externalId)->first();
+                while (!$order && $attempts < $maxAttempts) {
+                    $delay = ($attempts + 1) * 100000; // 100ms, 200ms, 300ms, 400ms, 500ms
+                    usleep($delay);
                     
+                    \Log::info('Attempting to find existing order', [
+                        'attempt' => $attempts + 1,
+                        'delay_ms' => $delay / 1000
+                    ]);
+                    
+                    // Try to find the order with tenant filter first
+                    $order = Order::where('tenant_id', $tenant->id)
+                        ->where('external_order_id', $externalId)
+                        ->first();
+                    
+                    // If not found, try without tenant filter
                     if (!$order) {
-                        \Log::error('Failed to find existing order after duplicate constraint violation', [
-                            'external_order_id' => $externalId,
-                            'tenant_id' => $tenant->id,
-                            'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
-                        ]);
-                        return response()->json(['success'=>false,'message'=>'Order processing failed'], 500);
+                        $order = Order::where('external_order_id', $externalId)->first();
                     }
                     
-                    \Log::warning('Found order with different tenant', [
-                        'external_order_id' => $externalId,
-                        'requested_tenant_id' => $tenant->id,
-                        'found_tenant_id' => $order->tenant_id
-                    ]);
+                    $attempts++;
                 }
                 
-                // Update customer information if needed
-                if (empty($order->customer_name) || empty($order->customer_email)) {
-                    $order->update([
-                        'customer_name'  => $customer->name,
-                        'customer_email' => $customer->email,
-                        'customer_phone' => $customer->phone,
+                if (!$order) {
+                    \Log::error('Failed to find existing order after multiple attempts', [
+                        'external_order_id' => $externalId,
+                        'tenant_id' => $tenant->id,
+                        'attempts' => $attempts,
+                        'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'created_at'])
                     ]);
+                    return response()->json(['success'=>false,'message'=>'Order processing failed - could not find existing order'], 500);
+                }
+                
+                \Log::info('Found existing order after race condition', [
+                    'order_id' => $order->id,
+                    'external_order_id' => $externalId,
+                    'attempts' => $attempts
+                ]);
+                
+                // Update customer information if needed
+                $customerData = data_get($request, 'customer', []);
+                $updateData = [];
+                
+                if (empty($order->customer_name) && !empty($customerData['first_name'])) {
+                    $updateData['customer_name'] = trim($customerData['first_name'] . ' ' . $customerData['last_name']);
+                }
+                if (empty($order->customer_email) && !empty($customerData['email'])) {
+                    $updateData['customer_email'] = $customerData['email'];
+                }
+                if (empty($order->customer_phone) && !empty($customerData['phone'])) {
+                    $updateData['customer_phone'] = $customerData['phone'];
+                }
+                
+                if (!empty($updateData)) {
+                    $order->update($updateData);
                 }
                 
                 // Return existing order (idempotency)
