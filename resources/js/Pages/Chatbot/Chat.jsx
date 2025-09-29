@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/Card';
 import { Button } from '@/Components/ui/Button';
 import { Badge } from '@/Components/ui/Badge';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { 
   MessageSquare, 
   Bot, 
@@ -167,20 +168,50 @@ const ChatbotChat = ({ session, messages = [] }) => {
             </div>
           ) : (
             chatMessages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.sender_type === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                  msg.sender_type === 'customer' 
-                    ? 'bg-blue-600 text-white' 
-                    : msg.sender_type === 'ai'
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'bg-red-100 text-red-900'
-                }`}>
+              <div
+                key={msg.id}
+                className={`flex ${
+                  msg.sender_type === "customer" ? "justify-end" : "justify-start"
+                }`}
+              >
+                <div
+                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                    msg.sender_type === "customer"
+                      ? "bg-blue-600 text-white"
+                      : msg.sender_type === "ai"
+                      ? "bg-gray-100 text-gray-900"
+                      : "bg-red-100 text-red-900"
+                  }`}
+                >
                   <div className="flex items-center space-x-2 mb-1">
                     {getMessageIcon(msg.sender_type)}
-                    <span className="text-xs font-medium">{msg.sender_display_name}</span>
-                    <span className="text-xs opacity-75">{formatDate(msg.created_at)}</span>
+                    <span className="text-xs font-medium">
+                      {msg.sender_display_name}
+                    </span>
+                    <span className="text-xs opacity-75">
+                      {formatDate(msg.created_at)}
+                    </span>
                   </div>
-                  <p className="text-sm">{msg.message}</p>
+            
+                  {/* 👇 Only AI messages rendered with markdown */}
+                  {msg.sender_type === "ai" ? (
+                    <div className={`prose prose-sm max-w-none 
+                      prose-p:my-1 prose-ul:my-1 prose-ol:my-1 
+                      prose-li:my-0 prose-headings:my-1 
+                      prose-h1:text-base prose-h2:text-base
+                      prose-strong:font-semibold 
+                      prose-a:no-underline hover:prose-a:underline 
+                      prose-ul:pl-4 prose-ol:pl-5
+                      ${msg.sender_type === "customer" ? "prose-invert" : ""}
+                    `}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.message}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-line">{msg.message}</p>
+                  )}
+            
                   {msg.confidence_score && (
                     <div className="mt-1 text-xs opacity-75">
                       Confidence: {Math.round(msg.confidence_score * 100)}%

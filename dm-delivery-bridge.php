@@ -117,6 +117,20 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_acs_test_connection', [$this, 'ajax_acs_test_connection']);
         add_action('wp_ajax_dmm_acs_sync_shipment', [$this, 'ajax_acs_sync_shipment']);
         
+        // Geniki Taxidromiki AJAX handlers
+        add_action('wp_ajax_dmm_geniki_test_connection', [$this, 'ajax_geniki_test_connection']);
+        add_action('wp_ajax_dmm_geniki_track_shipment', [$this, 'ajax_geniki_track_shipment']);
+        add_action('wp_ajax_dmm_geniki_get_shops', [$this, 'ajax_geniki_get_shops']);
+        add_action('wp_ajax_dmm_geniki_create_voucher', [$this, 'ajax_geniki_create_voucher']);
+        add_action('wp_ajax_dmm_geniki_get_pdf', [$this, 'ajax_geniki_get_pdf']);
+        
+        // ELTA Hellenic Post AJAX handlers
+        add_action('wp_ajax_dmm_elta_test_connection', [$this, 'ajax_elta_test_connection']);
+        add_action('wp_ajax_dmm_elta_track_shipment', [$this, 'ajax_elta_track_shipment']);
+        add_action('wp_ajax_dmm_elta_create_tracking', [$this, 'ajax_elta_create_tracking']);
+        add_action('wp_ajax_dmm_elta_update_tracking', [$this, 'ajax_elta_update_tracking']);
+        add_action('wp_ajax_dmm_elta_delete_tracking', [$this, 'ajax_elta_delete_tracking']);
+        
         // Meta field monitoring for ACS vouchers
         add_action('updated_post_meta', [$this, 'on_meta_updated'], 10, 4);
         add_action('added_post_meta', [$this, 'on_meta_added'], 10, 4);
@@ -146,6 +160,11 @@ class DMM_Delivery_Bridge {
         // Background processing
         add_action('wp_ajax_dmm_process_bulk_orders', [$this, 'ajax_process_bulk_orders']);
         add_action('wp_ajax_nopriv_dmm_process_bulk_orders', [$this, 'ajax_process_bulk_orders']);
+        
+        // Orders management AJAX handlers (simplified)
+        add_action('wp_ajax_dmm_resend_order', [$this, 'ajax_resend_order']);
+        add_action('wp_ajax_dmm_sync_order', [$this, 'ajax_sync_order']);
+        add_action('wp_ajax_dmm_export_orders', [$this, 'ajax_export_orders']);
     }
     
     /**
@@ -170,6 +189,16 @@ class DMM_Delivery_Bridge {
             'acs_company_password' => '',
             'acs_user_id' => '',
             'acs_user_password' => '',
+            // Geniki Taxidromiki settings
+            'geniki_enabled' => 'no',
+            'geniki_soap_endpoint' => 'https://testvoucher.taxydromiki.gr/JobServicesV2.asmx?WSDL',
+            'geniki_username' => '',
+            'geniki_password' => '',
+            'geniki_application_key' => '',
+            // ELTA Hellenic Post settings
+            'elta_enabled' => 'no',
+            'elta_api_endpoint' => 'https://api.aftership.com/tracking/2024-04',
+            'elta_api_key' => '',
             'acs_enabled' => 'no'
         ];
         
@@ -398,6 +427,86 @@ class DMM_Delivery_Bridge {
             'dmm_delivery_bridge_settings',
             'dmm_delivery_bridge_acs_section'
         );
+        
+        // Geniki Taxidromiki Settings Section
+        add_settings_section(
+            'dmm_delivery_bridge_geniki_section',
+            __('Geniki Taxidromiki Integration', 'dmm-delivery-bridge'),
+            [$this, 'geniki_section_callback'],
+            'dmm_delivery_bridge_settings'
+        );
+        
+        add_settings_field(
+            'geniki_enabled',
+            __('Enable Geniki Taxidromiki', 'dmm-delivery-bridge'),
+            [$this, 'geniki_enabled_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_geniki_section'
+        );
+        
+        add_settings_field(
+            'geniki_soap_endpoint',
+            __('Geniki SOAP Endpoint', 'dmm-delivery-bridge'),
+            [$this, 'geniki_soap_endpoint_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_geniki_section'
+        );
+        
+        add_settings_field(
+            'geniki_username',
+            __('Geniki Username', 'dmm-delivery-bridge'),
+            [$this, 'geniki_username_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_geniki_section'
+        );
+        
+        add_settings_field(
+            'geniki_password',
+            __('Geniki Password', 'dmm-delivery-bridge'),
+            [$this, 'geniki_password_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_geniki_section'
+        );
+        
+        add_settings_field(
+            'geniki_application_key',
+            __('Geniki Application Key', 'dmm-delivery-bridge'),
+            [$this, 'geniki_application_key_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_geniki_section'
+        );
+        
+        // ELTA Hellenic Post Settings Section
+        add_settings_section(
+            'dmm_delivery_bridge_elta_section',
+            __('ELTA Hellenic Post Integration', 'dmm-delivery-bridge'),
+            [$this, 'elta_section_callback'],
+            'dmm_delivery_bridge_settings'
+        );
+        
+        add_settings_field(
+            'elta_enabled',
+            __('Enable ELTA Hellenic Post', 'dmm-delivery-bridge'),
+            [$this, 'elta_enabled_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_elta_section'
+        );
+        
+        add_settings_field(
+            'elta_api_endpoint',
+            __('ELTA API Endpoint', 'dmm-delivery-bridge'),
+            [$this, 'elta_api_endpoint_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_elta_section'
+        );
+        
+        add_settings_field(
+            'elta_api_key',
+            __('ELTA API Key', 'dmm-delivery-bridge'),
+            [$this, 'elta_api_key_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_elta_section'
+        );
     }
     
     /**
@@ -416,13 +525,19 @@ class DMM_Delivery_Bridge {
             <div class="dmm-tab-navigation">
                 <nav class="nav-tab-wrapper">
                     <a href="#dmm-tab-settings" class="nav-tab nav-tab-active" data-tab="settings">
-                        <?php _e('⚙️ Settings', 'dmm-delivery-bridge'); ?>
-                    </a>
-                    <a href="#dmm-tab-testing" class="nav-tab" data-tab="testing">
-                        <?php _e('🔧 Testing & Debug', 'dmm-delivery-bridge'); ?>
+                        <?php _e('⚙️ API Configuration', 'dmm-delivery-bridge'); ?>
                     </a>
                     <a href="#dmm-tab-acs" class="nav-tab" data-tab="acs">
-                        <?php _e('🚚 ACS Integration', 'dmm-delivery-bridge'); ?>
+                        <?php _e('🚚 ACS Courier', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-geniki" class="nav-tab" data-tab="geniki">
+                        <?php _e('📮 Geniki Taxidromiki', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-elta" class="nav-tab" data-tab="elta">
+                        <?php _e('📬 ELTA Hellenic Post', 'dmm-delivery-bridge'); ?>
+                    </a>
+                    <a href="#dmm-tab-debug" class="nav-tab" data-tab="debug">
+                        <?php _e('🔧 Debug & Testing', 'dmm-delivery-bridge'); ?>
                     </a>
                     <a href="#dmm-tab-bulk" class="nav-tab" data-tab="bulk">
                         <?php _e('📦 Bulk Processing', 'dmm-delivery-bridge'); ?>
@@ -430,12 +545,15 @@ class DMM_Delivery_Bridge {
                     <a href="#dmm-tab-logs" class="nav-tab" data-tab="logs">
                         <?php _e('📋 Logs & History', 'dmm-delivery-bridge'); ?>
                     </a>
+                    <a href="#dmm-tab-orders" class="nav-tab" data-tab="orders">
+                        <?php _e('📊 Orders Status', 'dmm-delivery-bridge'); ?>
+                    </a>
                 </nav>
             </div>
             
             <!-- Tab Content -->
             <div class="dmm-tab-content">
-                <!-- Settings Tab -->
+                <!-- API Configuration Tab -->
                 <div id="dmm-tab-settings" class="dmm-tab-panel active">
                     <form method="post" action="options.php">
                         <?php
@@ -446,33 +564,59 @@ class DMM_Delivery_Bridge {
                     </form>
                 </div>
                 
-                <!-- Testing & Debug Tab -->
-                <div id="dmm-tab-testing" class="dmm-tab-panel">
-                    <div class="dmm-test-section" style="padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px;">
-                        <h3><?php _e('Test Connection', 'dmm-delivery-bridge'); ?></h3>
-                        <p><?php _e('Test your API connection with the current settings.', 'dmm-delivery-bridge'); ?></p>
-                        <button type="button" id="dmm-test-connection" class="button button-secondary">
-                            <?php _e('Test DMM API Connection', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-acs-test-connection" class="button button-secondary">
-                            <?php _e('Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <div id="dmm-test-result" style="margin-top: 10px;"></div>
-                    </div>
-                    
-                    <div class="dmm-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px;">
-                        <h3><?php _e('Debug & Maintenance', 'dmm-delivery-bridge'); ?></h3>
-                        <p><?php _e('Debug logging and maintenance tools.', 'dmm-delivery-bridge'); ?></p>
-                        <button type="button" id="dmm-check-logs" class="button button-secondary">
-                            <?php _e('Check Log Table', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-create-log-table" class="button button-secondary">
-                            <?php _e('Recreate Log Table', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <button type="button" id="dmm-diagnose-orders" class="button button-secondary">
-                            <?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>
-                        </button>
-                        <div id="dmm-debug-result" style="margin-top: 10px;"></div>
+                <!-- Debug & Testing Tab -->
+                <div id="dmm-tab-debug" class="dmm-tab-panel">
+                    <div class="dmm-debug-section" style="padding: 20px; border: 1px solid #ddd; background: #f9f9f9; border-radius: 4px;">
+                        <h3><?php _e('Debug & Testing', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Test connections and debug integration issues.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Connection Tests', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <button type="button" id="dmm-test-connection" class="button button-primary" style="width: 100%;">
+                                    <?php _e('🔗 Test DMM API Connection', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-acs-test-connection" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('🚚 Test ACS Courier Connection', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button type="button" id="dmm-geniki-test-connection" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('📮 Test Geniki Taxidromiki Connection', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-elta-test-connection" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('📬 Test ELTA Hellenic Post Connection', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Log Management', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button type="button" id="dmm-check-logs" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('📋 Check Recent Logs', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-create-log-table" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('🔧 Create Log Table', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Order Management', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <button type="button" id="dmm-diagnose-orders" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('🔍 Diagnose Orders', 'dmm-delivery-bridge'); ?>
+                                </button>
+                                <button type="button" id="dmm-refresh-meta-fields" class="button button-secondary" style="width: 100%;">
+                                    <?php _e('🔄 Refresh Meta Fields', 'dmm-delivery-bridge'); ?>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-test-result" style="margin-top: 15px;"></div>
+                        <div id="dmm-logs-result" style="margin-top: 15px;"></div>
+                        <div id="dmm-diagnose-result" style="margin-top: 15px;"></div>
                     </div>
                 </div>
                 
@@ -560,6 +704,200 @@ class DMM_Delivery_Bridge {
                         
                         <div id="dmm-acs-sync-result" style="margin-top: 10px;"></div>
                     </div>
+                    
+                    <div class="dmm-geniki-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff; border-radius: 4px;">
+                        <h3><?php _e('Geniki Taxidromiki Debug Tools', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Test and debug Geniki Taxidromiki API integration. Track shipments, create vouchers, and manage shops.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Geniki Taxidromiki Tools', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="geniki-voucher-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <select id="geniki-language" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                        <option value="el"><?php _e('Greek (el)', 'dmm-delivery-bridge'); ?></option>
+                                        <option value="en"><?php _e('English (en)', 'dmm-delivery-bridge'); ?></option>
+                                    </select>
+                                    <button type="button" id="dmm-geniki-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Get Shops:', 'dmm-delivery-bridge'); ?></label>
+                                    <button type="button" id="dmm-geniki-get-shops" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🏢 Get Shops List', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Create Test Voucher:', 'dmm-delivery-bridge'); ?></label>
+                                    <button type="button" id="dmm-geniki-create-test" class="button button-primary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📦 Create Test Voucher', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Get Voucher PDF:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="geniki-pdf-voucher" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <select id="geniki-pdf-format" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                        <option value="Flyer"><?php _e('Flyer Format', 'dmm-delivery-bridge'); ?></option>
+                                        <option value="Sticker"><?php _e('Sticker Format', 'dmm-delivery-bridge'); ?></option>
+                                    </select>
+                                    <button type="button" id="dmm-geniki-get-pdf" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📄 Get PDF', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-geniki-result" style="margin-top: 10px;"></div>
+                    </div>
+                    
+                    <div class="dmm-elta-debug-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; background: #f0f8ff; border-radius: 4px;">
+                        <h3><?php _e('ELTA Hellenic Post Debug Tools', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Test and debug ELTA Hellenic Post integration via AfterShip API. Track shipments, create tracking, and manage deliveries.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('ELTA Hellenic Post Tools', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-tracking-number" placeholder="<?php _e('Enter tracking number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-elta-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Create Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-create-tracking-number" placeholder="<?php _e('Enter tracking number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <input type="text" id="elta-create-title" placeholder="<?php _e('Enter title', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                    <button type="button" id="dmm-elta-create" class="button button-primary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📦 Create Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Update Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-update-tracking-id" placeholder="<?php _e('Enter tracking ID', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <input type="text" id="elta-update-title" placeholder="<?php _e('Enter new title', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                    <button type="button" id="dmm-elta-update" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('✏️ Update Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Delete Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-delete-tracking-id" placeholder="<?php _e('Enter tracking ID', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-elta-delete" class="button button-secondary" style="margin-top: 5px; width: 100%; background: #dc3545; color: white; border-color: #dc3545;">
+                                        <?php _e('🗑️ Delete Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-elta-result" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+                
+                <!-- Geniki Taxidromiki Tab -->
+                <div id="dmm-tab-geniki" class="dmm-tab-panel">
+                    <div class="dmm-geniki-section" style="padding: 20px; border: 1px solid #ddd; background: #f0f8ff; border-radius: 4px;">
+                        <h3><?php _e('Geniki Taxidromiki Integration', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Configure and test Geniki Taxidromiki SOAP API integration for direct courier services.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('Geniki Taxidromiki Tools', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="geniki-tracking-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <select id="geniki-language" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                        <option value="el"><?php _e('Greek (el)', 'dmm-delivery-bridge'); ?></option>
+                                        <option value="en"><?php _e('English (en)', 'dmm-delivery-bridge'); ?></option>
+                                    </select>
+                                    <button type="button" id="dmm-geniki-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Get Shops:', 'dmm-delivery-bridge'); ?></label>
+                                    <button type="button" id="dmm-geniki-get-shops" class="button button-secondary" style="width: 100%;">
+                                        <?php _e('🏪 Get Shops List', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Create Test Voucher:', 'dmm-delivery-bridge'); ?></label>
+                                    <button type="button" id="dmm-geniki-create-test" class="button button-primary" style="width: 100%;">
+                                        <?php _e('📦 Create Test Voucher', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Get Voucher PDF:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="geniki-voucher-number" placeholder="<?php _e('Enter voucher number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <select id="geniki-pdf-format" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                        <option value="Flyer"><?php _e('Flyer', 'dmm-delivery-bridge'); ?></option>
+                                        <option value="Sticker"><?php _e('Sticker', 'dmm-delivery-bridge'); ?></option>
+                                    </select>
+                                    <button type="button" id="dmm-geniki-get-pdf" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📄 Get PDF', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-geniki-result" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+                
+                <!-- ELTA Hellenic Post Tab -->
+                <div id="dmm-tab-elta" class="dmm-tab-panel">
+                    <div class="dmm-elta-section" style="padding: 20px; border: 1px solid #ddd; background: #f0f8ff; border-radius: 4px;">
+                        <h3><?php _e('ELTA Hellenic Post Integration', 'dmm-delivery-bridge'); ?></h3>
+                        <p><?php _e('Configure and test ELTA Hellenic Post integration via AfterShip API for tracking services.', 'dmm-delivery-bridge'); ?></p>
+                        
+                        <div style="background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+                            <h4 style="margin: 0 0 10px 0; color: #333;"><?php _e('ELTA Hellenic Post Tools', 'dmm-delivery-bridge'); ?></h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Track Shipment:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-tracking-number" placeholder="<?php _e('Enter tracking number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-elta-track" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Create Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-create-tracking-number" placeholder="<?php _e('Enter tracking number', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <input type="text" id="elta-create-title" placeholder="<?php _e('Enter title', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                    <button type="button" id="dmm-elta-create" class="button button-primary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('📦 Create Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Update Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-update-tracking-id" placeholder="<?php _e('Enter tracking ID', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <input type="text" id="elta-update-title" placeholder="<?php _e('Enter new title', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px; margin-top: 5px;">
+                                    <button type="button" id="dmm-elta-update" class="button button-secondary" style="margin-top: 5px; width: 100%;">
+                                        <?php _e('✏️ Update Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 5px; font-weight: bold;"><?php _e('Delete Tracking:', 'dmm-delivery-bridge'); ?></label>
+                                    <input type="text" id="elta-delete-tracking-id" placeholder="<?php _e('Enter tracking ID', 'dmm-delivery-bridge'); ?>" style="width: 100%; padding: 5px;">
+                                    <button type="button" id="dmm-elta-delete" class="button button-secondary" style="margin-top: 5px; width: 100%; background: #dc3545; color: white; border-color: #dc3545;">
+                                        <?php _e('🗑️ Delete Tracking', 'dmm-delivery-bridge'); ?>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="dmm-elta-result" style="margin-top: 10px;"></div>
+                    </div>
                 </div>
                 
                 <!-- Bulk Processing Tab -->
@@ -630,6 +968,11 @@ class DMM_Delivery_Bridge {
                 <!-- Logs Tab -->
                 <div id="dmm-tab-logs" class="dmm-tab-panel">
                     <?php $this->render_logs_section(); ?>
+                </div>
+                
+                <!-- Orders Tab -->
+                <div id="dmm-tab-orders" class="dmm-tab-panel">
+                    <?php $this->render_orders_section(); ?>
                 </div>
             </div>
         </div>
@@ -1056,6 +1399,444 @@ class DMM_Delivery_Bridge {
                     },
                     complete: function() {
                         button.prop('disabled', false).text('<?php _e('🔄 Sync All ACS Shipments', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            // Geniki Taxidromiki functionality
+            $('#dmm-geniki-test-connection').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-test-result');
+                
+                button.prop('disabled', true).text('<?php _e('Testing Geniki...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_geniki_test_connection',
+                        nonce: '<?php echo wp_create_nonce('dmm_geniki_test_connection'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Geniki connection test failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('Test Geniki Taxidromiki Connection', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-geniki-track').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-geniki-result');
+                var voucherNumber = $('#geniki-voucher-number').val();
+                var language = $('#geniki-language').val();
+                
+                if (!voucherNumber) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a voucher number.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('🔍 Tracking...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_geniki_track_shipment',
+                        voucher_number: voucherNumber,
+                        language: language,
+                        nonce: '<?php echo wp_create_nonce('dmm_geniki_track_shipment'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            if (response.data.checkpoints && response.data.checkpoints.length > 0) {
+                                html += '<h4><?php _e('Tracking History:', 'dmm-delivery-bridge'); ?></h4>';
+                                html += '<table class="widefat"><thead><tr><th><?php _e('Date', 'dmm-delivery-bridge'); ?></th><th><?php _e('Status', 'dmm-delivery-bridge'); ?></th><th><?php _e('Location', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                response.data.checkpoints.forEach(function(checkpoint) {
+                                    html += '<tr><td>' + checkpoint.StatusDate + '</td><td>' + checkpoint.Status + '</td><td>' + (checkpoint.Shop || '') + '</td></tr>';
+                                });
+                                html += '</tbody></table>';
+                            }
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-geniki-get-shops').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-geniki-result');
+                
+                button.prop('disabled', true).text('<?php _e('🏢 Loading...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_geniki_get_shops',
+                        nonce: '<?php echo wp_create_nonce('dmm_geniki_get_shops'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            if (response.data.shops && response.data.shops.length > 0) {
+                                html += '<h4><?php _e('Available Shops:', 'dmm-delivery-bridge'); ?></h4>';
+                                html += '<table class="widefat"><thead><tr><th><?php _e('Code', 'dmm-delivery-bridge'); ?></th><th><?php _e('Name', 'dmm-delivery-bridge'); ?></th><th><?php _e('City', 'dmm-delivery-bridge'); ?></th><th><?php _e('Address', 'dmm-delivery-bridge'); ?></th><th><?php _e('Phone', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                response.data.shops.forEach(function(shop) {
+                                    html += '<tr><td>' + (shop.Code || '') + '</td><td>' + (shop.Name || '') + '</td><td>' + (shop.City || '') + '</td><td>' + (shop.Address || '') + '</td><td>' + (shop.Telephone || '') + '</td></tr>';
+                                });
+                                html += '</tbody></table>';
+                            }
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Failed to get shops.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🏢 Get Shops List', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-geniki-create-test').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-geniki-result');
+                
+                button.prop('disabled', true).text('<?php _e('📦 Creating...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                // Create test order data
+                var testOrderData = {
+                    order_id: 'TEST-' + Date.now(),
+                    recipient_name: 'Test Recipient',
+                    recipient_address: 'Test Address 123',
+                    recipient_city: 'Athens',
+                    recipient_country: 'Greece',
+                    recipient_email: 'test@example.com',
+                    recipient_phone: '2101234567',
+                    recipient_zip: '12345',
+                    weight: 1.0,
+                    pieces: 1,
+                    comments: 'Test shipment from DMM Delivery Bridge',
+                    services: '',
+                    cod_amount: '',
+                    insurance_amount: 0,
+                    received_date: new Date().toISOString().split('T')[0]
+                };
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_geniki_create_voucher',
+                        order_id: testOrderData.order_id,
+                        recipient_name: testOrderData.recipient_name,
+                        recipient_address: testOrderData.recipient_address,
+                        recipient_city: testOrderData.recipient_city,
+                        recipient_country: testOrderData.recipient_country,
+                        recipient_email: testOrderData.recipient_email,
+                        recipient_phone: testOrderData.recipient_phone,
+                        recipient_zip: testOrderData.recipient_zip,
+                        weight: testOrderData.weight,
+                        pieces: testOrderData.pieces,
+                        comments: testOrderData.comments,
+                        services: testOrderData.services,
+                        cod_amount: testOrderData.cod_amount,
+                        insurance_amount: testOrderData.insurance_amount,
+                        received_date: testOrderData.received_date,
+                        nonce: '<?php echo wp_create_nonce('dmm_geniki_create_voucher'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            html += '<p><strong><?php _e('Voucher Number:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.voucher_number + '</p>';
+                            html += '<p><strong><?php _e('Job ID:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.job_id + '</p>';
+                            if (response.data.sub_vouchers && response.data.sub_vouchers.length > 0) {
+                                html += '<p><strong><?php _e('Sub Vouchers:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.sub_vouchers.length + '</p>';
+                            }
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Voucher creation failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('📦 Create Test Voucher', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-geniki-get-pdf').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-geniki-result');
+                var voucherNumber = $('#geniki-pdf-voucher').val();
+                var format = $('#geniki-pdf-format').val();
+                
+                if (!voucherNumber) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a voucher number.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('📄 Generating...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                // Create a form to download the PDF
+                var form = $('<form method="POST" action="' + ajaxurl + '" target="_blank">');
+                form.append('<input type="hidden" name="action" value="dmm_geniki_get_pdf">');
+                form.append('<input type="hidden" name="voucher_number" value="' + voucherNumber + '">');
+                form.append('<input type="hidden" name="format" value="' + format + '">');
+                form.append('<input type="hidden" name="nonce" value="<?php echo wp_create_nonce('dmm_geniki_get_pdf'); ?>">');
+                $('body').append(form);
+                form.submit();
+                form.remove();
+                
+                result.html('<div class="notice notice-info inline"><p><?php _e('PDF download started. Check your downloads folder.', 'dmm-delivery-bridge'); ?></p></div>');
+                
+                button.prop('disabled', false).text('<?php _e('📄 Get PDF', 'dmm-delivery-bridge'); ?>');
+            });
+            
+            // ELTA Hellenic Post functionality
+            $('#dmm-elta-test-connection').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-test-result');
+                
+                button.prop('disabled', true).text('<?php _e('Testing ELTA...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_elta_test_connection',
+                        nonce: '<?php echo wp_create_nonce('dmm_elta_test_connection'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('ELTA connection test failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('Test ELTA Hellenic Post Connection', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-elta-track').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-elta-result');
+                var trackingNumber = $('#elta-tracking-number').val();
+                
+                if (!trackingNumber) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a tracking number.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('🔍 Tracking...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_elta_track_shipment',
+                        tracking_number: trackingNumber,
+                        nonce: '<?php echo wp_create_nonce('dmm_elta_track_shipment'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            if (response.data.tracking) {
+                                html += '<h4><?php _e('Tracking Information:', 'dmm-delivery-bridge'); ?></h4>';
+                                html += '<table class="widefat"><thead><tr><th><?php _e('Field', 'dmm-delivery-bridge'); ?></th><th><?php _e('Value', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                html += '<tr><td><strong><?php _e('Tracking Number:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.tracking_number || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Status:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.tag || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Title:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.title || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Customer Name:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.customer_name || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Order ID:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.order_id || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Created At:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.created_at || '') + '</td></tr>';
+                                html += '<tr><td><strong><?php _e('Last Updated:', 'dmm-delivery-bridge'); ?></strong></td><td>' + (response.data.tracking.last_updated_at || '') + '</td></tr>';
+                                html += '</tbody></table>';
+                                
+                                if (response.data.tracking.checkpoints && response.data.tracking.checkpoints.length > 0) {
+                                    html += '<h4><?php _e('Tracking History:', 'dmm-delivery-bridge'); ?></h4>';
+                                    html += '<table class="widefat"><thead><tr><th><?php _e('Date', 'dmm-delivery-bridge'); ?></th><th><?php _e('Status', 'dmm-delivery-bridge'); ?></th><th><?php _e('Message', 'dmm-delivery-bridge'); ?></th><th><?php _e('Location', 'dmm-delivery-bridge'); ?></th></tr></thead><tbody>';
+                                    response.data.tracking.checkpoints.forEach(function(checkpoint) {
+                                        html += '<tr><td>' + (checkpoint.checkpoint_time || '') + '</td><td>' + (checkpoint.tag || '') + '</td><td>' + (checkpoint.message || '') + '</td><td>' + (checkpoint.location || '') + '</td></tr>';
+                                    });
+                                    html += '</tbody></table>';
+                                }
+                            }
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🔍 Track Shipment', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-elta-create').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-elta-result');
+                var trackingNumber = $('#elta-create-tracking-number').val();
+                var title = $('#elta-create-title').val();
+                
+                if (!trackingNumber) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a tracking number.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('📦 Creating...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_elta_create_tracking',
+                        tracking_number: trackingNumber,
+                        title: title || trackingNumber,
+                        order_id: 'TEST-' + Date.now(),
+                        customer_name: 'Test Customer',
+                        language: 'en',
+                        nonce: '<?php echo wp_create_nonce('dmm_elta_create_tracking'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            html += '<p><strong><?php _e('Tracking ID:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.tracking_id + '</p>';
+                            html += '<p><strong><?php _e('Tracking Number:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.tracking_number + '</p>';
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking creation failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('📦 Create Tracking', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-elta-update').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-elta-result');
+                var trackingId = $('#elta-update-tracking-id').val();
+                var title = $('#elta-update-title').val();
+                
+                if (!trackingId) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a tracking ID.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('✏️ Updating...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_elta_update_tracking',
+                        tracking_id: trackingId,
+                        title: title,
+                        customer_name: 'Updated Customer',
+                        language: 'en',
+                        nonce: '<?php echo wp_create_nonce('dmm_elta_update_tracking'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var html = '<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>';
+                            if (response.data.tracking) {
+                                html += '<p><strong><?php _e('Updated Tracking:', 'dmm-delivery-bridge'); ?></strong> ' + response.data.tracking.title + '</p>';
+                            }
+                            result.html(html);
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking update failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('✏️ Update Tracking', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+            
+            $('#dmm-elta-delete').on('click', function() {
+                var button = $(this);
+                var result = $('#dmm-elta-result');
+                var trackingId = $('#elta-delete-tracking-id').val();
+                
+                if (!trackingId) {
+                    result.html('<div class="notice notice-error inline"><p><?php _e('Please enter a tracking ID.', 'dmm-delivery-bridge'); ?></p></div>');
+                    return;
+                }
+                
+                if (!confirm('<?php _e('Are you sure you want to delete this tracking? This action cannot be undone.', 'dmm-delivery-bridge'); ?>')) {
+                    return;
+                }
+                
+                button.prop('disabled', true).text('<?php _e('🗑️ Deleting...', 'dmm-delivery-bridge'); ?>');
+                result.html('');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'dmm_elta_delete_tracking',
+                        tracking_id: trackingId,
+                        nonce: '<?php echo wp_create_nonce('dmm_elta_delete_tracking'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            result.html('<div class="notice notice-success inline"><p>' + response.data.message + '</p></div>');
+                        } else {
+                            result.html('<div class="notice notice-error inline"><p>' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        result.html('<div class="notice notice-error inline"><p><?php _e('Tracking deletion failed.', 'dmm-delivery-bridge'); ?></p></div>');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).text('<?php _e('🗑️ Delete Tracking', 'dmm-delivery-bridge'); ?>');
                     }
                 });
             });
@@ -1544,6 +2325,273 @@ class DMM_Delivery_Bridge {
         <?php
     }
     
+    /**
+     * Render orders section
+     */
+    private function render_orders_section() {
+        // Get orders directly (no AJAX needed)
+        $orders = $this->get_orders_data();
+        ?>
+        <div class="dmm-orders-section">
+            <h3><?php _e('Orders Status Overview', 'dmm-delivery-bridge'); ?></h3>
+            <p><?php _e('View and manage all orders and their DMM Delivery status.', 'dmm-delivery-bridge'); ?></p>
+            
+            <!-- Simple Refresh Button -->
+            <div style="margin: 20px 0;">
+                <button type="button" id="dmm-orders-refresh" class="button button-primary" onclick="location.reload();">
+                    <?php _e('🔄 Refresh Page', 'dmm-delivery-bridge'); ?>
+                </button>
+                <button type="button" id="dmm-orders-export" class="button" onclick="exportOrders();">
+                    <?php _e('📊 Export CSV', 'dmm-delivery-bridge'); ?>
+                </button>
+            </div>
+            
+            <!-- Orders Table -->
+            <div id="dmm-orders-table-container">
+                <table id="dmm-orders-table" class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><?php _e('Order ID', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('Customer', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('Order Date', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('Total', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('DMM Status', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('Last Attempt', 'dmm-delivery-bridge'); ?></th>
+                            <th><?php _e('Actions', 'dmm-delivery-bridge'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($orders)): ?>
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: #666; padding: 40px;">
+                                    <?php _e('No orders found.', 'dmm-delivery-bridge'); ?>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($orders as $order): ?>
+                                <tr>
+                                    <td>
+                                        <a href="<?php echo admin_url('post.php?post=' . $order['order_id'] . '&action=edit'); ?>" target="_blank">
+                                            #<?php echo $order['order_id']; ?>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight: bold; margin-bottom: 2px;">
+                                            <?php echo esc_html($order['customer_name'] ?: '—'); ?>
+                                        </div>
+                                        <div style="font-size: 12px; color: #666;">
+                                            <?php echo esc_html($order['customer_email'] ?: '—'); ?>
+                                        </div>
+                                        <div style="font-size: 12px; color: #666;">
+                                            <?php echo esc_html($order['customer_phone'] ?: '—'); ?>
+                                        </div>
+                                    </td>
+                                    <td><?php echo date('Y-m-d', strtotime($order['order_date'])); ?></td>
+                                    <td>€<?php echo number_format($order['total_amount'], 2); ?></td>
+                                    <td>
+                                        <span class="dmm-status-<?php echo $order['dmm_status']; ?>">
+                                            <?php 
+                                            switch($order['dmm_status']) {
+                                                case 'sent': echo __('Sent', 'dmm-delivery-bridge'); break;
+                                                case 'error': echo __('Error', 'dmm-delivery-bridge'); break;
+                                                case 'not_sent': echo __('Not Sent', 'dmm-delivery-bridge'); break;
+                                                default: echo __('Unknown', 'dmm-delivery-bridge');
+                                            }
+                                            ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo $order['last_attempt'] ? date('Y-m-d H:i', strtotime($order['last_attempt'])) : '—'; ?></td>
+                                    <td>
+                                        <div class="dmm-orders-actions">
+                                            <?php if ($order['dmm_status'] === 'error' || $order['dmm_status'] === 'not_sent'): ?>
+                                                <button type="button" class="button button-small" onclick="resendOrder(<?php echo $order['order_id']; ?>)">
+                                                    <?php _e('Resend', 'dmm-delivery-bridge'); ?>
+                                                </button>
+                                            <?php endif; ?>
+                                            
+                                            <?php if ($order['dmm_status'] === 'sent'): ?>
+                                                <button type="button" class="button button-small" onclick="syncOrder(<?php echo $order['order_id']; ?>)">
+                                                    <?php _e('Sync', 'dmm-delivery-bridge'); ?>
+                                                </button>
+                                            <?php endif; ?>
+                                            
+                                            <button type="button" class="button button-small" onclick="window.open('<?php echo admin_url('post.php?post=' . $order['order_id'] . '&action=edit'); ?>', '_blank')">
+                                                <?php _e('Details', 'dmm-delivery-bridge'); ?>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <style>
+        .dmm-orders-section {
+            margin-top: 20px;
+        }
+        
+        #dmm-orders-table {
+            margin-top: 20px;
+        }
+        
+        .dmm-status-sent {
+            color: #46b450;
+            font-weight: bold;
+        }
+        
+        .dmm-status-error {
+            color: #dc3232;
+            font-weight: bold;
+        }
+        
+        .dmm-status-not-sent {
+            color: #ffb900;
+            font-weight: bold;
+        }
+        
+        .dmm-orders-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .dmm-orders-actions .button {
+            font-size: 11px;
+            padding: 4px 8px;
+            height: auto;
+            line-height: 1.2;
+        }
+        </style>
+        
+        <script>
+        function resendOrder(orderId) {
+            if (!confirm('<?php _e('Are you sure you want to resend this order?', 'dmm-delivery-bridge'); ?>')) {
+                return;
+            }
+            
+            // Simple form submission instead of AJAX
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?php echo admin_url('admin-ajax.php'); ?>';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'dmm_resend_order';
+            form.appendChild(actionInput);
+            
+            const orderInput = document.createElement('input');
+            orderInput.type = 'hidden';
+            orderInput.name = 'order_id';
+            orderInput.value = orderId;
+            form.appendChild(orderInput);
+            
+            const nonceInput = document.createElement('input');
+            nonceInput.type = 'hidden';
+            nonceInput.name = 'nonce';
+            nonceInput.value = '<?php echo wp_create_nonce('dmm_resend_order'); ?>';
+            form.appendChild(nonceInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+        
+        function syncOrder(orderId) {
+            // Simple form submission instead of AJAX
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?php echo admin_url('admin-ajax.php'); ?>';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'dmm_sync_order';
+            form.appendChild(actionInput);
+            
+            const orderInput = document.createElement('input');
+            orderInput.type = 'hidden';
+            orderInput.name = 'order_id';
+            orderInput.value = orderId;
+            form.appendChild(orderInput);
+            
+            const nonceInput = document.createElement('input');
+            nonceInput.type = 'hidden';
+            nonceInput.name = 'nonce';
+            nonceInput.value = '<?php echo wp_create_nonce('dmm_sync_order'); ?>';
+            form.appendChild(nonceInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+        
+        function exportOrders() {
+            window.open('<?php echo admin_url('admin-ajax.php'); ?>?action=dmm_export_orders', '_blank');
+        }
+        </script>
+        <?php
+    }
+    
+    /**
+     * Get orders data directly (no AJAX)
+     */
+    private function get_orders_data() {
+        global $wpdb;
+        
+        try {
+            // Get recent orders (last 50)
+            $query = "
+                SELECT 
+                    p.ID as order_id,
+                    p.post_date as order_date
+                FROM {$wpdb->posts} p
+                WHERE p.post_type = 'shop_order'
+                ORDER BY p.ID DESC
+                LIMIT 50
+            ";
+            
+            $orders = $wpdb->get_results($query);
+            $processed_orders = [];
+            
+            foreach ($orders as $order) {
+                $order_id = $order->order_id;
+                
+                // Get customer data
+                $customer_name = get_post_meta($order_id, '_billing_first_name', true) . ' ' . get_post_meta($order_id, '_billing_last_name', true);
+                $customer_email = get_post_meta($order_id, '_billing_email', true);
+                $customer_phone = get_post_meta($order_id, '_billing_phone', true);
+                $total_amount = get_post_meta($order_id, '_order_total', true);
+                
+                // Get DMM status
+                $dmm_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
+                if (empty($dmm_status)) {
+                    $dmm_status = 'not_sent';
+                }
+                
+                // Get last attempt
+                $last_attempt = get_post_meta($order_id, '_dmm_delivery_last_attempt', true);
+                
+                $processed_orders[] = [
+                    'order_id' => $order_id,
+                    'order_date' => $order->order_date,
+                    'customer_name' => trim($customer_name),
+                    'customer_email' => $customer_email,
+                    'customer_phone' => $customer_phone,
+                    'total_amount' => $total_amount ?: 0,
+                    'dmm_status' => $dmm_status,
+                    'last_attempt' => $last_attempt
+                ];
+            }
+            
+            return $processed_orders;
+            
+        } catch (Exception $e) {
+            error_log('DMM Orders Data Error: ' . $e->getMessage());
+            return [];
+        }
+    }
+    
     // Settings callbacks
     public function api_section_callback() {
         echo '<p>' . __('Enter your DMM Delivery API configuration details.', 'dmm-delivery-bridge') . '</p>';
@@ -1820,6 +2868,62 @@ class DMM_Delivery_Bridge {
         echo '<p class="description">' . __('Your ACS User Password.', 'dmm-delivery-bridge') . '</p>';
     }
     
+    public function geniki_section_callback() {
+        echo '<p>' . __('Configure Geniki Taxidromiki SOAP API integration for direct courier services.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function geniki_enabled_callback() {
+        $value = isset($this->options['geniki_enabled']) ? $this->options['geniki_enabled'] : 'no';
+        echo '<label><input type="checkbox" name="dmm_delivery_bridge_options[geniki_enabled]" value="yes" ' . checked($value, 'yes', false) . ' /> ' . __('Enable Geniki Taxidromiki integration', 'dmm-delivery-bridge') . '</label>';
+        echo '<p class="description">' . __('Allow direct Geniki Taxidromiki API calls from this WordPress site.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function geniki_soap_endpoint_callback() {
+        $value = isset($this->options['geniki_soap_endpoint']) ? $this->options['geniki_soap_endpoint'] : 'https://testvoucher.taxydromiki.gr/JobServicesV2.asmx?WSDL';
+        echo '<input type="url" name="dmm_delivery_bridge_options[geniki_soap_endpoint]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Geniki Taxidromiki SOAP endpoint URL. Use test endpoint for testing: https://testvoucher.taxydromiki.gr/JobServicesV2.asmx?WSDL', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function geniki_username_callback() {
+        $value = isset($this->options['geniki_username']) ? $this->options['geniki_username'] : '';
+        echo '<input type="text" name="dmm_delivery_bridge_options[geniki_username]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your Geniki Taxidromiki username.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function geniki_password_callback() {
+        $value = isset($this->options['geniki_password']) ? $this->options['geniki_password'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[geniki_password]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your Geniki Taxidromiki password.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function geniki_application_key_callback() {
+        $value = isset($this->options['geniki_application_key']) ? $this->options['geniki_application_key'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[geniki_application_key]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your Geniki Taxidromiki application key.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function elta_section_callback() {
+        echo '<p>' . __('Configure ELTA Hellenic Post integration via AfterShip API for tracking services.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function elta_enabled_callback() {
+        $value = isset($this->options['elta_enabled']) ? $this->options['elta_enabled'] : 'no';
+        echo '<label><input type="checkbox" name="dmm_delivery_bridge_options[elta_enabled]" value="yes" ' . checked($value, 'yes', false) . ' /> ' . __('Enable ELTA Hellenic Post integration', 'dmm-delivery-bridge') . '</label>';
+        echo '<p class="description">' . __('Allow ELTA tracking via AfterShip API from this WordPress site.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function elta_api_endpoint_callback() {
+        $value = isset($this->options['elta_api_endpoint']) ? $this->options['elta_api_endpoint'] : 'https://api.aftership.com/tracking/2024-04';
+        echo '<input type="url" name="dmm_delivery_bridge_options[elta_api_endpoint]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('AfterShip API endpoint URL. Default: https://api.aftership.com/tracking/2024-04', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function elta_api_key_callback() {
+        $value = isset($this->options['elta_api_key']) ? $this->options['elta_api_key'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[elta_api_key]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your AfterShip API key for ELTA tracking.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
     /**
      * Send order to API
      */
@@ -1849,10 +2953,19 @@ class DMM_Delivery_Bridge {
     }
     
     /**
-     * Process order and send to API
+     * Process order and send to API (with duplicate check)
      */
     public function process_order($order) {
         $order_id = $order->get_id();
+        
+        // Check if already sent successfully
+        if (get_post_meta($order_id, '_dmm_delivery_sent', true) === 'yes') {
+            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+                error_log('DMM Delivery Bridge - Order ' . $order_id . ' already sent, skipping');
+            }
+            return;
+        }
+        
         $order_data = null;
         $response = null;
         
@@ -1914,6 +3027,67 @@ class DMM_Delivery_Bridge {
             $error_message = $response ? $response['message'] : 'Unknown error occurred';
             $order->add_order_note(
                 sprintf(__('Failed to send order to DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
+            );
+        }
+    }
+    
+    /**
+     * Process order and send to API (force mode - bypasses duplicate check)
+     */
+    public function process_order_force($order) {
+        $order_id = $order->get_id();
+        $order_data = null;
+        $response = null;
+        
+        try {
+            // Prepare order data
+            $order_data = $this->prepare_order_data($order);
+            
+            // Debug logging
+            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+                error_log('DMM Delivery Bridge - Force Processing Order ID: ' . $order_id);
+                error_log('DMM Delivery Bridge - Order Data: ' . print_r($order_data, true));
+            }
+            
+            // Send to API
+            $response = $this->send_to_api($order_data);
+            
+            // Debug API response
+            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+                error_log('DMM Delivery Bridge - Force API Response: ' . print_r($response, true));
+            }
+            
+        } catch (Exception $e) {
+            // Handle any exceptions during processing
+            error_log('DMM Delivery Bridge - Exception during force order processing: ' . $e->getMessage());
+            
+            $response = [
+                'success' => false,
+                'message' => 'Exception during processing: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+        
+        // Always log the result, even if there was an exception
+        if ($order_data && $response) {
+            $this->log_request($order_id, $order_data, $response);
+        }
+        
+        // Update order meta
+        if ($response && $response['success']) {
+            update_post_meta($order_id, '_dmm_delivery_sent', 'yes');
+            update_post_meta($order_id, '_dmm_delivery_order_id', $response['data']['order_id'] ?? '');
+            update_post_meta($order_id, '_dmm_delivery_shipment_id', $response['data']['shipment_id'] ?? '');
+            
+            // Add order note
+            $order->add_order_note(__('Order force-sent to DMM Delivery system successfully.', 'dmm-delivery-bridge'));
+        } else {
+            update_post_meta($order_id, '_dmm_delivery_sent', 'error');
+            
+            // Add order note with error
+            $error_message = $response ? $response['message'] : 'Unknown error occurred';
+            $order->add_order_note(
+                sprintf(__('Failed to force-send order to DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
             );
         }
     }
@@ -2393,38 +3567,56 @@ class DMM_Delivery_Bridge {
      * AJAX: Resend order
      */
     public function ajax_resend_order() {
-        check_ajax_referer('dmm_resend_order', 'nonce');
-        
+        // Check permissions
         if (!current_user_can('manage_woocommerce')) {
             wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
         }
         
-        $order_id = intval($_POST['order_id']);
-        $order = wc_get_order($order_id);
+        // Verify nonce
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'dmm_resend_order')) {
+            wp_die(__('Security check failed.', 'dmm-delivery-bridge'));
+        }
         
+        $order_id = intval($_POST['order_id'] ?? 0);
+        
+        if (!$order_id) {
+            wp_send_json_error([
+                'message' => __('Invalid order ID.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $order = wc_get_order($order_id);
         if (!$order) {
             wp_send_json_error([
                 'message' => __('Order not found.', 'dmm-delivery-bridge')
             ]);
         }
         
-        // Reset the sent status
-        delete_post_meta($order_id, '_dmm_delivery_sent');
-        delete_post_meta($order_id, '_dmm_delivery_order_id');
-        delete_post_meta($order_id, '_dmm_delivery_shipment_id');
-        
-        // Process the order
-        $this->process_order($order);
-        
-        $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
-        
-        if ($sent_status === 'yes') {
-            wp_send_json_success([
-                'message' => __('Order sent successfully!', 'dmm-delivery-bridge')
-            ]);
-        } else {
+        try {
+            // Reset the sent status
+            delete_post_meta($order_id, '_dmm_delivery_sent');
+            delete_post_meta($order_id, '_dmm_delivery_order_id');
+            delete_post_meta($order_id, '_dmm_delivery_shipment_id');
+            
+            // Process the order using force method to bypass duplicate check
+            $this->process_order_force($order);
+            
+            $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
+            
+            if ($sent_status === 'yes') {
+                wp_send_json_success([
+                    'message' => __('Order resent successfully!', 'dmm-delivery-bridge')
+                ]);
+            } else {
+                wp_send_json_error([
+                    'message' => __('Failed to resend order. Check the logs for details.', 'dmm-delivery-bridge')
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            error_log('DMM Resend Order Error: ' . $e->getMessage());
             wp_send_json_error([
-                'message' => __('Failed to send order. Check the logs for details.', 'dmm-delivery-bridge')
+                'message' => __('Error: ' . $e->getMessage(), 'dmm-delivery-bridge')
             ]);
         }
     }
@@ -3390,8 +4582,8 @@ class DMM_Delivery_Bridge {
                     delete_post_meta($order_id, '_dmm_delivery_order_id');
                     delete_post_meta($order_id, '_dmm_delivery_shipment_id');
                     
-                    // Process order as new
-                    $this->process_order($order);
+                    // Process order as new (bypass duplicate check for force resend)
+                    $this->process_order_force($order);
                     
                     // Check if it was successful
                     $sent_status = get_post_meta($order_id, '_dmm_delivery_sent', true);
@@ -4153,6 +5345,20 @@ class DMM_Delivery_Bridge {
     }
     
     /**
+     * Geniki Taxidromiki Service Class
+     */
+    private function get_geniki_service() {
+        return new DMM_Geniki_Courier_Service($this->options);
+    }
+    
+    /**
+     * ELTA Hellenic Post Service Class
+     */
+    private function get_elta_service() {
+        return new DMM_ELTA_Courier_Service($this->options);
+    }
+    
+    /**
      * AJAX: Test ACS connection
      */
     public function ajax_acs_test_connection() {
@@ -4324,6 +5530,343 @@ class DMM_Delivery_Bridge {
         } else {
             wp_send_json_error([
                 'message' => sprintf(__('Address validation failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Test Geniki connection
+     */
+    public function ajax_geniki_test_connection() {
+        check_ajax_referer('dmm_geniki_test_connection', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $geniki_service = $this->get_geniki_service();
+        $response = $geniki_service->test_connection();
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Geniki Taxidromiki connection test successful!', 'dmm-delivery-bridge')
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Geniki connection test failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Track Geniki shipment
+     */
+    public function ajax_geniki_track_shipment() {
+        check_ajax_referer('dmm_geniki_track_shipment', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $voucher_number = sanitize_text_field($_POST['voucher_number']);
+        $language = sanitize_text_field($_POST['language']) ?: 'el';
+        
+        if (empty($voucher_number)) {
+            wp_send_json_error([
+                'message' => __('Voucher number is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $geniki_service = $this->get_geniki_service();
+        $response = $geniki_service->track_voucher($voucher_number, $language);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Shipment tracking successful.', 'dmm-delivery-bridge'),
+                'checkpoints' => $response['checkpoints'],
+                'status' => $response['status'],
+                'delivery_date' => $response['delivery_date'],
+                'consignee' => $response['consignee']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Shipment tracking failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Get Geniki shops
+     */
+    public function ajax_geniki_get_shops() {
+        check_ajax_referer('dmm_geniki_get_shops', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $geniki_service = $this->get_geniki_service();
+        $response = $geniki_service->get_shops();
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Shops retrieved successfully.', 'dmm-delivery-bridge'),
+                'shops' => $response['shops']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Failed to get shops: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Create Geniki voucher
+     */
+    public function ajax_geniki_create_voucher() {
+        check_ajax_referer('dmm_geniki_create_voucher', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $order_data = [
+            'order_id' => sanitize_text_field($_POST['order_id']),
+            'recipient_name' => sanitize_text_field($_POST['recipient_name']),
+            'recipient_address' => sanitize_text_field($_POST['recipient_address']),
+            'recipient_city' => sanitize_text_field($_POST['recipient_city']),
+            'recipient_country' => sanitize_text_field($_POST['recipient_country']),
+            'recipient_email' => sanitize_email($_POST['recipient_email']),
+            'recipient_phone' => sanitize_text_field($_POST['recipient_phone']),
+            'recipient_zip' => sanitize_text_field($_POST['recipient_zip']),
+            'weight' => floatval($_POST['weight']),
+            'pieces' => intval($_POST['pieces']),
+            'comments' => sanitize_textarea_field($_POST['comments']),
+            'services' => sanitize_text_field($_POST['services']),
+            'cod_amount' => sanitize_text_field($_POST['cod_amount']),
+            'insurance_amount' => floatval($_POST['insurance_amount']),
+            'received_date' => sanitize_text_field($_POST['received_date'])
+        ];
+        
+        $geniki_service = $this->get_geniki_service();
+        $response = $geniki_service->create_voucher($order_data);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Voucher created successfully.', 'dmm-delivery-bridge'),
+                'voucher_number' => $response['voucher_number'],
+                'job_id' => $response['job_id'],
+                'sub_vouchers' => $response['sub_vouchers']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Voucher creation failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Get Geniki voucher PDF
+     */
+    public function ajax_geniki_get_pdf() {
+        check_ajax_referer('dmm_geniki_get_pdf', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $voucher_number = sanitize_text_field($_POST['voucher_number']);
+        $format = sanitize_text_field($_POST['format']) ?: 'Flyer';
+        
+        if (empty($voucher_number)) {
+            wp_die(__('Voucher number is required.', 'dmm-delivery-bridge'));
+        }
+        
+        $geniki_service = $this->get_geniki_service();
+        $response = $geniki_service->get_voucher_pdf($voucher_number, $format);
+        
+        if ($response['success']) {
+            // Set headers for PDF download
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="geniki_voucher_' . $voucher_number . '.pdf"');
+            header('Content-Length: ' . strlen($response['pdf_content']));
+            
+            echo $response['pdf_content'];
+            exit;
+        } else {
+            wp_die($response['error']);
+        }
+    }
+    
+    /**
+     * AJAX: Test ELTA connection
+     */
+    public function ajax_elta_test_connection() {
+        check_ajax_referer('dmm_elta_test_connection', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $elta_service = $this->get_elta_service();
+        $response = $elta_service->test_connection();
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('ELTA Hellenic Post connection test successful!', 'dmm-delivery-bridge')
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('ELTA connection test failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Track ELTA shipment
+     */
+    public function ajax_elta_track_shipment() {
+        check_ajax_referer('dmm_elta_track_shipment', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $tracking_number = sanitize_text_field($_POST['tracking_number']);
+        
+        if (empty($tracking_number)) {
+            wp_send_json_error([
+                'message' => __('Tracking number is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $elta_service = $this->get_elta_service();
+        $response = $elta_service->get_tracking_details($tracking_number);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Shipment tracking successful.', 'dmm-delivery-bridge'),
+                'tracking' => $response['tracking'],
+                'data' => $response['data']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Shipment tracking failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Create ELTA tracking
+     */
+    public function ajax_elta_create_tracking() {
+        check_ajax_referer('dmm_elta_create_tracking', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $tracking_data = [
+            'tracking_number' => sanitize_text_field($_POST['tracking_number']),
+            'title' => sanitize_text_field($_POST['title']),
+            'order_id' => sanitize_text_field($_POST['order_id']),
+            'order_promised_delivery_date' => sanitize_text_field($_POST['order_promised_delivery_date']),
+            'customer_name' => sanitize_text_field($_POST['customer_name']),
+            'emails' => isset($_POST['emails']) ? array_map('sanitize_email', $_POST['emails']) : [],
+            'smses' => isset($_POST['smses']) ? array_map('sanitize_text_field', $_POST['smses']) : [],
+            'language' => sanitize_text_field($_POST['language']) ?: 'en',
+            'origin_city' => sanitize_text_field($_POST['origin_city']),
+            'origin_state' => sanitize_text_field($_POST['origin_state']),
+            'origin_country_iso3' => sanitize_text_field($_POST['origin_country_iso3']),
+            'origin_postal_code' => sanitize_text_field($_POST['origin_postal_code']),
+            'destination_city' => sanitize_text_field($_POST['destination_city']),
+            'destination_state' => sanitize_text_field($_POST['destination_state']),
+            'destination_country_iso3' => sanitize_text_field($_POST['destination_country_iso3']),
+            'destination_postal_code' => sanitize_text_field($_POST['destination_postal_code']),
+            'custom_fields' => isset($_POST['custom_fields']) ? $_POST['custom_fields'] : null
+        ];
+        
+        $elta_service = $this->get_elta_service();
+        $response = $elta_service->create_tracking($tracking_data);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Tracking created successfully.', 'dmm-delivery-bridge'),
+                'tracking_id' => $response['tracking_id'],
+                'tracking_number' => $response['tracking_number'],
+                'data' => $response['data']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Tracking creation failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Update ELTA tracking
+     */
+    public function ajax_elta_update_tracking() {
+        check_ajax_referer('dmm_elta_update_tracking', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $tracking_id = sanitize_text_field($_POST['tracking_id']);
+        $update_data = [
+            'title' => sanitize_text_field($_POST['title']),
+            'customer_name' => sanitize_text_field($_POST['customer_name']),
+            'emails' => isset($_POST['emails']) ? array_map('sanitize_email', $_POST['emails']) : [],
+            'smses' => isset($_POST['smses']) ? array_map('sanitize_text_field', $_POST['smses']) : [],
+            'language' => sanitize_text_field($_POST['language']) ?: 'en'
+        ];
+        
+        $elta_service = $this->get_elta_service();
+        $response = $elta_service->update_tracking($tracking_id, $update_data);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Tracking updated successfully.', 'dmm-delivery-bridge'),
+                'tracking' => $response['tracking'],
+                'data' => $response['data']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Tracking update failed: %s', 'dmm-delivery-bridge'), $response['error'])
+            ]);
+        }
+    }
+    
+    /**
+     * AJAX: Delete ELTA tracking
+     */
+    public function ajax_elta_delete_tracking() {
+        check_ajax_referer('dmm_elta_delete_tracking', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $tracking_id = sanitize_text_field($_POST['tracking_id']);
+        
+        if (empty($tracking_id)) {
+            wp_send_json_error([
+                'message' => __('Tracking ID is required.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $elta_service = $this->get_elta_service();
+        $response = $elta_service->delete_tracking($tracking_id);
+        
+        if ($response['success']) {
+            wp_send_json_success([
+                'message' => __('Tracking deleted successfully.', 'dmm-delivery-bridge'),
+                'data' => $response['data']
+            ]);
+        } else {
+            wp_send_json_error([
+                'message' => sprintf(__('Tracking deletion failed: %s', 'dmm-delivery-bridge'), $response['error'])
             ]);
         }
     }
@@ -4683,6 +6226,920 @@ class DMM_ACS_Courier_Service {
         // Default to in_transit for unknown statuses
         return 'in_transit';
     }
+}
+
+/**
+ * Geniki Taxidromiki Courier Service
+ * Handles integration with Geniki Taxidromiki SOAP API
+ */
+class DMM_Geniki_Courier_Service {
+    private $options;
+    private $soap_endpoint;
+    private $soap_client;
+    private $username;
+    private $password;
+    private $application_key;
+    private $auth_key;
+    private $auth_expires;
+    
+    public function __construct($options) {
+        $this->options = $options;
+        $this->soap_endpoint = isset($options['geniki_soap_endpoint']) ? $options['geniki_soap_endpoint'] : 'https://testvoucher.taxydromiki.gr/JobServicesV2.asmx?WSDL';
+        $this->username = isset($options['geniki_username']) ? $options['geniki_username'] : '';
+        $this->password = isset($options['geniki_password']) ? $options['geniki_password'] : '';
+        $this->application_key = isset($options['geniki_application_key']) ? $options['geniki_application_key'] : '';
+        $this->auth_key = null;
+        $this->auth_expires = null;
+    }
+    
+    /**
+     * Initialize SOAP client
+     */
+    private function init_soap_client() {
+        if (!$this->soap_client) {
+            try {
+                $this->soap_client = new SoapClient($this->soap_endpoint, [
+                    'soap_version' => SOAP_1_2,
+                    'exceptions' => true,
+                    'trace' => true,
+                    'connection_timeout' => 30,
+                    'cache_wsdl' => WSDL_CACHE_NONE
+                ]);
+            } catch (SoapFault $e) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to initialize SOAP client: ' . $e->getMessage(),
+                    'data' => null
+                ];
+            }
+        }
+        return ['success' => true];
+    }
+    
+    /**
+     * Authenticate with Geniki API
+     */
+    private function authenticate() {
+        // Check if we have a valid auth key
+        if ($this->auth_key && $this->auth_expires && time() < $this->auth_expires) {
+            return ['success' => true, 'auth_key' => $this->auth_key];
+        }
+        
+        $init_result = $this->init_soap_client();
+        if (!$init_result['success']) {
+            return $init_result;
+        }
+        
+        try {
+            $result = $this->soap_client->Authenticate([
+                'sUsrName' => $this->username,
+                'sUsrPwd' => $this->password,
+                'applicationKey' => $this->application_key
+            ]);
+            
+            if ($result->AuthenticateResult->Result == 0) {
+                $this->auth_key = $result->AuthenticateResult->Key;
+                // Set expiration to 1 hour from now (Geniki keys typically last longer)
+                $this->auth_expires = time() + 3600;
+                
+                return [
+                    'success' => true,
+                    'auth_key' => $this->auth_key,
+                    'data' => $result->AuthenticateResult
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Authentication failed. Result code: ' . $result->AuthenticateResult->Result,
+                    'data' => $result->AuthenticateResult
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP authentication error: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Test Geniki connection
+     */
+    public function test_connection() {
+        if (empty($this->username) || empty($this->password) || empty($this->application_key)) {
+            return [
+                'success' => false,
+                'error' => 'Geniki credentials not configured. Please enter Username, Password, and Application Key.',
+                'data' => null
+            ];
+        }
+        
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Geniki connection successful! Authentication key obtained.',
+            'data' => $auth_result['data']
+        ];
+    }
+    
+    /**
+     * Create a voucher/shipment
+     */
+    public function create_voucher($order_data) {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            // Prepare voucher record
+            $voucher = [
+                'OrderId' => $order_data['order_id'],
+                'Name' => $order_data['recipient_name'],
+                'Address' => $order_data['recipient_address'],
+                'City' => $order_data['recipient_city'],
+                'Country' => isset($order_data['recipient_country']) ? $order_data['recipient_country'] : '',
+                'Email' => isset($order_data['recipient_email']) ? $order_data['recipient_email'] : '',
+                'Telephone' => isset($order_data['recipient_phone']) ? $order_data['recipient_phone'] : '',
+                'Zip' => isset($order_data['recipient_zip']) ? $order_data['recipient_zip'] : '',
+                'Weight' => isset($order_data['weight']) ? (float)$order_data['weight'] : 1.0,
+                'Pieces' => isset($order_data['pieces']) ? (int)$order_data['pieces'] : 1,
+                'Comments' => isset($order_data['comments']) ? $order_data['comments'] : '',
+                'Services' => isset($order_data['services']) ? $order_data['services'] : '',
+                'CodAmount' => isset($order_data['cod_amount']) ? $order_data['cod_amount'] : '',
+                'InsAmount' => isset($order_data['insurance_amount']) ? (float)$order_data['insurance_amount'] : 0,
+                'VoucherNo' => '',
+                'SubCode' => '',
+                'BelongsTo' => '',
+                'DeliverTo' => '',
+                'ReceivedDate' => isset($order_data['received_date']) ? $order_data['received_date'] : date('Y-m-d')
+            ];
+            
+            $result = $this->soap_client->CreateJob([
+                'sAuthKey' => $this->auth_key,
+                'oVoucher' => $voucher,
+                'eType' => 'Voucher'
+            ]);
+            
+            if ($result->CreateJobResult->Result == 0) {
+                return [
+                    'success' => true,
+                    'voucher_number' => $result->CreateJobResult->Voucher,
+                    'job_id' => $result->CreateJobResult->JobId,
+                    'sub_vouchers' => isset($result->CreateJobResult->SubVouchers) ? $result->CreateJobResult->SubVouchers : [],
+                    'data' => $result->CreateJobResult
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to create voucher. Result code: ' . $result->CreateJobResult->Result,
+                    'data' => $result->CreateJobResult
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP error creating voucher: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Track and trace a voucher
+     */
+    public function track_voucher($voucher_number, $language = 'el') {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            $result = $this->soap_client->TrackAndTrace([
+                'authKey' => $this->auth_key,
+                'voucherNo' => $voucher_number,
+                'language' => $language
+            ]);
+            
+            if ($result->TrackAndTraceResult->Result == 0) {
+                return [
+                    'success' => true,
+                    'checkpoints' => isset($result->TrackAndTraceResult->Checkpoints) ? $result->TrackAndTraceResult->Checkpoints : [],
+                    'status' => isset($result->TrackAndTraceResult->Status) ? $result->TrackAndTraceResult->Status : '',
+                    'delivery_date' => isset($result->TrackAndTraceResult->DeliveryDate) ? $result->TrackAndTraceResult->DeliveryDate : null,
+                    'consignee' => isset($result->TrackAndTraceResult->Consignee) ? $result->TrackAndTraceResult->Consignee : '',
+                    'data' => $result->TrackAndTraceResult
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to track voucher. Result code: ' . $result->TrackAndTraceResult->Result,
+                    'data' => $result->TrackAndTraceResult
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP error tracking voucher: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Get voucher PDF
+     */
+    public function get_voucher_pdf($voucher_number, $format = 'Flyer') {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            // Use HTTP GET request for PDF
+            $url = str_replace('?WSDL', '', $this->soap_endpoint);
+            $url = str_replace('.asmx?WSDL', '.asmx/GetVoucherPdf', $url);
+            $url .= '?authKey=' . urlencode($this->auth_key);
+            $url .= '&voucherNo=' . urlencode($voucher_number);
+            $url .= '&format=' . urlencode($format);
+            $url .= '&extraInfoFormat=None';
+            
+            $response = wp_remote_get($url, [
+                'timeout' => 30,
+                'headers' => [
+                    'Accept' => 'application/pdf'
+                ]
+            ]);
+            
+            if (is_wp_error($response)) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to get PDF: ' . $response->get_error_message(),
+                    'data' => null
+                ];
+            }
+            
+            $content_type = wp_remote_retrieve_header($response, 'content-type');
+            if (strpos($content_type, 'application/pdf') !== false) {
+                return [
+                    'success' => true,
+                    'pdf_content' => wp_remote_retrieve_body($response),
+                    'content_type' => $content_type
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Expected PDF but got: ' . $content_type,
+                    'data' => wp_remote_retrieve_body($response)
+                ];
+            }
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Error getting PDF: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Cancel a job/voucher
+     */
+    public function cancel_job($job_id, $cancel = true) {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            $result = $this->soap_client->CancelJob([
+                'sAuthKey' => $this->auth_key,
+                'nJobId' => $job_id,
+                'bCancel' => $cancel
+            ]);
+            
+            if ($result == 0) {
+                return [
+                    'success' => true,
+                    'message' => $cancel ? 'Job canceled successfully' : 'Job reactivated successfully',
+                    'data' => $result
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to cancel job. Result code: ' . $result,
+                    'data' => $result
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP error canceling job: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Close pending jobs
+     */
+    public function close_pending_jobs() {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            $result = $this->soap_client->ClosePendingJobs([
+                'sAuthKey' => $this->auth_key
+            ]);
+            
+            if ($result == 0) {
+                return [
+                    'success' => true,
+                    'message' => 'Pending jobs closed successfully',
+                    'data' => $result
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to close pending jobs. Result code: ' . $result,
+                    'data' => $result
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP error closing jobs: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Get shops list
+     */
+    public function get_shops() {
+        $auth_result = $this->authenticate();
+        if (!$auth_result['success']) {
+            return $auth_result;
+        }
+        
+        try {
+            $result = $this->soap_client->GetShopsList([
+                'sAuthKey' => $this->auth_key
+            ]);
+            
+            if ($result->GetShopsResult->Result == 0) {
+                return [
+                    'success' => true,
+                    'shops' => isset($result->GetShopsResult->Shops) ? $result->GetShopsResult->Shops : [],
+                    'data' => $result->GetShopsResult
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to get shops. Result code: ' . $result->GetShopsResult->Result,
+                    'data' => $result->GetShopsResult
+                ];
+            }
+        } catch (SoapFault $e) {
+            return [
+                'success' => false,
+                'error' => 'SOAP error getting shops: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+    
+    /**
+     * Map Geniki status to internal status
+     */
+    public function map_status_to_internal($geniki_status) {
+        $status_map = [
+            'DELIVERED' => 'delivered',
+            'IN_TRANSIT' => 'in_transit',
+            'IN_RETURN' => 'returned',
+            'PENDING' => 'pending',
+            'CANCELED' => 'canceled'
+        ];
+        
+        return isset($status_map[$geniki_status]) ? $status_map[$geniki_status] : 'unknown';
+    }
+}
+
+/**
+ * ELTA Hellenic Post Courier Service
+ * Handles integration with ELTA via AfterShip API
+ */
+class DMM_ELTA_Courier_Service {
+    private $options;
+    private $api_endpoint;
+    private $api_key;
+    
+    public function __construct($options) {
+        $this->options = $options;
+        $this->api_endpoint = isset($options['elta_api_endpoint']) ? $options['elta_api_endpoint'] : 'https://api.aftership.com/tracking/2024-04';
+        $this->api_key = isset($options['elta_api_key']) ? $options['elta_api_key'] : '';
+    }
+    
+    /**
+     * Test ELTA connection
+     */
+    public function test_connection() {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured. Please enter your AfterShip API Key.',
+                'data' => null
+            ];
+        }
+        
+        // Test connection by trying to get tracking info with a test tracking number
+        $test_tracking_number = '123456789';
+        $response = $this->get_tracking_details($test_tracking_number);
+        
+        // If we get a response (even if tracking not found), the connection works
+        if (isset($response['success'])) {
+            return [
+                'success' => true,
+                'message' => 'ELTA connection successful! AfterShip API is responding correctly.',
+                'data' => $response
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'error' => 'Failed to connect to AfterShip API. Please check your API key and endpoint.',
+            'data' => null
+        ];
+    }
+    
+    /**
+     * Create a tracking
+     */
+    public function create_tracking($tracking_data) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $payload = [
+            'tracking' => [
+                'tracking_number' => $tracking_data['tracking_number'],
+                'slug' => 'elta-courier',
+                'title' => isset($tracking_data['title']) ? $tracking_data['title'] : $tracking_data['tracking_number'],
+                'order_id' => isset($tracking_data['order_id']) ? $tracking_data['order_id'] : '',
+                'order_promised_delivery_date' => isset($tracking_data['order_promised_delivery_date']) ? $tracking_data['order_promised_delivery_date'] : '',
+                'customer_name' => isset($tracking_data['customer_name']) ? $tracking_data['customer_name'] : '',
+                'emails' => isset($tracking_data['emails']) ? $tracking_data['emails'] : [],
+                'smses' => isset($tracking_data['smses']) ? $tracking_data['smses'] : [],
+                'language' => isset($tracking_data['language']) ? $tracking_data['language'] : 'en',
+                'origin_city' => isset($tracking_data['origin_city']) ? $tracking_data['origin_city'] : '',
+                'origin_state' => isset($tracking_data['origin_state']) ? $tracking_data['origin_state'] : '',
+                'origin_country_iso3' => isset($tracking_data['origin_country_iso3']) ? $tracking_data['origin_country_iso3'] : '',
+                'origin_postal_code' => isset($tracking_data['origin_postal_code']) ? $tracking_data['origin_postal_code'] : '',
+                'destination_city' => isset($tracking_data['destination_city']) ? $tracking_data['destination_city'] : '',
+                'destination_state' => isset($tracking_data['destination_state']) ? $tracking_data['destination_state'] : '',
+                'destination_country_iso3' => isset($tracking_data['destination_country_iso3']) ? $tracking_data['destination_country_iso3'] : '',
+                'destination_postal_code' => isset($tracking_data['destination_postal_code']) ? $tracking_data['destination_postal_code'] : '',
+                'custom_fields' => isset($tracking_data['custom_fields']) ? $tracking_data['custom_fields'] : null
+            ]
+        ];
+        
+        $result = $this->make_api_call('POST', '/trackings', $payload);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'tracking_id' => $result['data']['tracking']['id'],
+                'tracking_number' => $result['data']['tracking']['tracking_number'],
+                'data' => $result['data']['tracking']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Get tracking details
+     */
+    public function get_tracking_details($tracking_number) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $result = $this->make_api_call('GET', '/trackings/elta-courier/' . urlencode($tracking_number));
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'tracking' => $result['data']['tracking'],
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Update tracking
+     */
+    public function update_tracking($tracking_id, $update_data) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $payload = [
+            'tracking' => $update_data
+        ];
+        
+        $result = $this->make_api_call('PUT', '/trackings/' . $tracking_id, $payload);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'tracking' => $result['data']['tracking'],
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Delete tracking
+     */
+    public function delete_tracking($tracking_id) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $result = $this->make_api_call('DELETE', '/trackings/' . $tracking_id);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'message' => 'Tracking deleted successfully',
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Get last checkpoint
+     */
+    public function get_last_checkpoint($tracking_id) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $result = $this->make_api_call('GET', '/last_checkpoint/' . $tracking_id);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'checkpoint' => $result['data']['checkpoint'],
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Mark tracking as completed
+     */
+    public function mark_tracking_completed($tracking_id, $reason) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $payload = [
+            'reason' => $reason
+        ];
+        
+        $result = $this->make_api_call('POST', '/trackings/' . $tracking_id . '/mark-as-completed', $payload);
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'tracking' => $result['data']['tracking'],
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Retrack expired tracking
+     */
+    public function retrack_tracking($tracking_id) {
+        if (empty($this->api_key)) {
+            return [
+                'success' => false,
+                'error' => 'ELTA API Key not configured.',
+                'data' => null
+            ];
+        }
+        
+        $result = $this->make_api_call('POST', '/trackings/' . $tracking_id . '/retrack');
+        
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'tracking' => $result['data']['tracking'],
+                'data' => $result['data']
+            ];
+        } else {
+            return [
+                'success' => false,
+                'error' => $result['error'],
+                'data' => $result['data']
+            ];
+        }
+    }
+    
+    /**
+     * Make API call to AfterShip
+     */
+    private function make_api_call($method, $endpoint, $data = null) {
+        $url = rtrim($this->api_endpoint, '/') . $endpoint;
+        
+        $headers = [
+            'Content-Type' => 'application/json',
+            'aftership-api-key' => $this->api_key
+        ];
+        
+        $args = [
+            'method' => $method,
+            'headers' => $headers,
+            'timeout' => 30
+        ];
+        
+        if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
+            $args['body'] = json_encode($data);
+        }
+        
+        $response = wp_remote_request($url, $args);
+        
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'error' => 'API request failed: ' . $response->get_error_message(),
+                'data' => null
+            ];
+        }
+        
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $decoded_body = json_decode($body, true);
+        
+        if ($status_code >= 200 && $status_code < 300) {
+            return [
+                'success' => true,
+                'data' => $decoded_body,
+                'status_code' => $status_code
+            ];
+        } else {
+            $error_message = 'API request failed with status ' . $status_code;
+            if (isset($decoded_body['meta']['message'])) {
+                $error_message .= ': ' . $decoded_body['meta']['message'];
+            }
+            
+            return [
+                'success' => false,
+                'error' => $error_message,
+                'data' => $decoded_body,
+                'status_code' => $status_code
+            ];
+        }
+    }
+    
+    /**
+     * Map ELTA status to internal status
+     */
+    public function map_status_to_internal($elta_status) {
+        $status_map = [
+            'Pending' => 'pending',
+            'InfoReceived' => 'info_received',
+            'InTransit' => 'in_transit',
+            'OutForDelivery' => 'out_for_delivery',
+            'Delivered' => 'delivered',
+            'AvailableForPickup' => 'available_for_pickup',
+            'Exception' => 'exception',
+            'Expired' => 'expired'
+        ];
+        
+        return isset($status_map[$elta_status]) ? $status_map[$elta_status] : 'unknown';
+    }
+    
+    
+    
+    /**
+     * AJAX handler to sync a single order
+     */
+    public function ajax_sync_order() {
+        $order_id = intval($_POST['order_id'] ?? 0);
+        
+        if (!$order_id) {
+            wp_send_json_error(['message' => __('Invalid order ID.', 'dmm-delivery-bridge')]);
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(['message' => __('Order not found.', 'dmm-delivery-bridge')]);
+        }
+        
+        // Sync order
+        $this->sync_order($order);
+        
+        wp_send_json_success(['message' => __('Order synced successfully.', 'dmm-delivery-bridge')]);
+    }
+    
+    /**
+     * AJAX handler to export orders as CSV
+     */
+    public function ajax_export_orders() {
+        global $wpdb;
+        
+        $search = sanitize_text_field($_GET['search'] ?? '');
+        $status_filter = sanitize_text_field($_GET['status_filter'] ?? '');
+        $date_filter = sanitize_text_field($_GET['date_filter'] ?? '');
+        
+        // Build query (similar to ajax_get_orders but without pagination)
+        $where_conditions = ["p.post_type = 'shop_order'"];
+        $where_params = [];
+        
+        if (!empty($search)) {
+            $where_conditions[] = "(p.ID LIKE %s OR pm_customer.meta_value LIKE %s OR pm_email.meta_value LIKE %s)";
+            $search_term = '%' . $wpdb->esc_like($search) . '%';
+            $where_params[] = $search_term;
+            $where_params[] = $search_term;
+            $where_params[] = $search_term;
+        }
+        
+        if (!empty($date_filter)) {
+            switch ($date_filter) {
+                case 'today':
+                    $where_conditions[] = "DATE(p.post_date) = CURDATE()";
+                    break;
+                case 'week':
+                    $where_conditions[] = "p.post_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)";
+                    break;
+                case 'month':
+                    $where_conditions[] = "p.post_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+                    break;
+            }
+        }
+        
+        $where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
+        
+        // Build status filter
+        $status_join = '';
+        $status_where = '';
+        if (!empty($status_filter)) {
+            $status_join = "LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_dmm_delivery_sent'";
+            
+            switch ($status_filter) {
+                case 'sent':
+                    $status_where = "AND pm_status.meta_value = 'yes'";
+                    break;
+                case 'error':
+                    $status_where = "AND pm_status.meta_value = 'error'";
+                    break;
+                case 'not_sent':
+                    $status_where = "AND (pm_status.meta_value IS NULL OR pm_status.meta_value NOT IN ('yes', 'error'))";
+                    break;
+            }
+        }
+        
+        $export_query = "
+            SELECT 
+                p.ID as order_id,
+                p.post_date as order_date,
+                pm_customer.meta_value as customer_name,
+                pm_email.meta_value as customer_email,
+                pm_phone.meta_value as customer_phone,
+                pm_total.meta_value as total_amount,
+                pm_status.meta_value as dmm_status,
+                pm_last_attempt.meta_value as last_attempt
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} pm_customer ON p.ID = pm_customer.post_id AND pm_customer.meta_key = '_billing_first_name'
+            LEFT JOIN {$wpdb->postmeta} pm_email ON p.ID = pm_email.post_id AND pm_email.meta_key = '_billing_email'
+            LEFT JOIN {$wpdb->postmeta} pm_phone ON p.ID = pm_phone.post_id AND pm_phone.meta_key = '_billing_phone'
+            LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
+            LEFT JOIN {$wpdb->postmeta} pm_last_attempt ON p.ID = pm_last_attempt.post_id AND pm_last_attempt.meta_key = '_dmm_delivery_last_attempt'
+            {$status_join}
+            {$where_clause}
+            {$status_where}
+            ORDER BY p.ID DESC
+        ";
+        
+        if (!empty($where_params)) {
+            $orders = $wpdb->get_results($wpdb->prepare($export_query, $where_params));
+        } else {
+            $orders = $wpdb->get_results($export_query);
+        }
+        
+        // Generate CSV
+        $filename = 'dmm-orders-export-' . date('Y-m-d-H-i-s') . '.csv';
+        
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        
+        $output = fopen('php://output', 'w');
+        
+        // CSV headers
+        fputcsv($output, [
+            'Order ID',
+            'Order Date',
+            'Customer Name',
+            'Customer Email',
+            'Customer Phone',
+            'Total Amount',
+            'DMM Status',
+            'Last Attempt'
+        ]);
+        
+        // CSV data
+        foreach ($orders as $order) {
+            $dmm_status = $order->dmm_status;
+            if (empty($dmm_status)) {
+                $dmm_status = 'not_sent';
+            }
+            
+            fputcsv($output, [
+                $order->order_id,
+                $order->order_date,
+                $order->customer_name,
+                $order->customer_email,
+                $order->customer_phone,
+                $order->total_amount,
+                $dmm_status,
+                $order->last_attempt
+            ]);
+        }
+        
+        fclose($output);
+        exit;
+    }
+    
 }
 
 // Initialize the plugin

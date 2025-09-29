@@ -223,33 +223,76 @@ class WooCommerceOrderController extends Controller
             }
         }
 
-        // Create order
-        $order = Order::create([
-            'tenant_id'        => $tenant->id,
-            'external_order_id'=> $externalId,
-            'order_number'     => data_get($request, 'order.order_number'),
-            'status'           => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
-            'total_amount'     => (float) data_get($request, 'order.total_amount', 0),
-            'subtotal'         => (float) data_get($request, 'order.subtotal', 0),
-            'tax_amount'       => (float) data_get($request, 'order.tax_amount', 0),
-            'shipping_cost'    => (float) data_get($request, 'order.shipping_cost', 0),
-            'discount_amount'  => (float) data_get($request, 'order.discount_amount', 0),
-            'currency'         => data_get($request, 'order.currency', 'EUR'),
-            'payment_status'   => data_get($request, 'order.payment_status', 'pending'),
-            'payment_method'   => data_get($request, 'order.payment_method'),
-            'customer_id'      => $customer->id,
+        // Create order with duplicate handling
+        try {
+            $order = Order::create([
+                'tenant_id'        => $tenant->id,
+                'external_order_id'=> $externalId,
+                'order_number'     => data_get($request, 'order.order_number'),
+                'status'           => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
+                'total_amount'     => (float) data_get($request, 'order.total_amount', 0),
+                'subtotal'         => (float) data_get($request, 'order.subtotal', 0),
+                'tax_amount'       => (float) data_get($request, 'order.tax_amount', 0),
+                'shipping_cost'    => (float) data_get($request, 'order.shipping_cost', 0),
+                'discount_amount'  => (float) data_get($request, 'order.discount_amount', 0),
+                'currency'         => data_get($request, 'order.currency', 'EUR'),
+                'payment_status'   => data_get($request, 'order.payment_status', 'pending'),
+                'payment_method'   => data_get($request, 'order.payment_method'),
+                'customer_id'      => $customer->id,
+                
+                // Customer Information (populate for admin panel display)
+                'customer_name'    => $customer->name,
+                'customer_email'   => $customer->email,
+                'customer_phone'   => $customer->phone,
+                
+                // Shipping address
+                'shipping_address'     => data_get($request, 'shipping.address.address_1'),
+                'shipping_city'        => data_get($request, 'shipping.address.city'),
+                'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
+                'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle duplicate entry constraint violation
+            if ($e->getCode() == 23000 && str_contains($e->getMessage(), 'Duplicate entry')) {
+                \Log::info('Order already exists (race condition), fetching existing order', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id
+                ]);
+                
+                // Fetch the existing order that was created by another request
+                $order = Order::where('tenant_id', $tenant->id)
+                    ->where('external_order_id', $externalId)
+                    ->first();
+                
+                if (!$order) {
+                    \Log::error('Failed to find existing order after duplicate constraint violation', [
+                        'external_order_id' => $externalId,
+                        'tenant_id' => $tenant->id
+                    ]);
+                    return response()->json(['success'=>false,'message'=>'Order processing failed'], 500);
+                }
+                
+                // Update customer information if needed
+                if (empty($order->customer_name) || empty($order->customer_email)) {
+                    $order->update([
+                        'customer_name'  => $customer->name,
+                        'customer_email' => $customer->email,
+                        'customer_phone' => $customer->phone,
+                    ]);
+                }
+                
+                // Return existing order (idempotency)
+                return response()->json([
+                    'success'     => true,
+                    'message'     => 'Order already exists',
+                    'order_id'    => $order->id,
+                    'shipment_id' => Shipment::where('order_id', $order->id)->value('id'),
+                ], 200);
+            }
             
-            // Customer Information (populate for admin panel display)
-            'customer_name'    => $customer->name,
-            'customer_email'   => $customer->email,
-            'customer_phone'   => $customer->phone,
-            
-            // Shipping address
-            'shipping_address'     => data_get($request, 'shipping.address.address_1'),
-            'shipping_city'        => data_get($request, 'shipping.address.city'),
-            'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
-            'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
-        ]);
+            // Re-throw if it's not a duplicate entry error
+            throw $e;
+        }
 
         // Create order items if provided
         $this->createOrderItems($order, $request);
