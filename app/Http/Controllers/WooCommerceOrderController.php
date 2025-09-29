@@ -147,7 +147,7 @@ class WooCommerceOrderController extends Controller
         
         // Use a single transaction for the entire process to prevent race conditions
         try {
-            $result = \DB::transaction(function () use ($tenant, $externalId, $customer, $request) {
+            $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
                 // Check if order already exists within the same transaction
                 $existing = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
