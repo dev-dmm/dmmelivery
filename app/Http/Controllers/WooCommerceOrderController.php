@@ -157,7 +157,21 @@ class WooCommerceOrderController extends Controller
                 \Log::info('Checked for existing order in transaction', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
-                    'existing_order_id' => $existing?->id
+                    'existing_order_id' => $existing?->id,
+                    'query_sql' => Order::where('tenant_id', $tenant->id)->where('external_order_id', $externalId)->toSql(),
+                    'query_bindings' => [$tenant->id, $externalId]
+                ]);
+                
+                // Also check without lockForUpdate to see if there's a locking issue
+                $existingWithoutLock = Order::where('tenant_id', $tenant->id)
+                    ->where('external_order_id', $externalId)
+                    ->first();
+                    
+                \Log::info('Checked for existing order without lock', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id,
+                    'existing_order_id' => $existingWithoutLock?->id,
+                    'order_exists_without_lock' => $existingWithoutLock ? 'YES' : 'NO'
                 ]);
 
                 if ($existing) {
@@ -322,7 +336,32 @@ class WooCommerceOrderController extends Controller
                                         'external_order_id' => $externalId
                                     ]);
                                 } else {
-                                    throw $createException; // Re-throw if we can't find the order
+                                    // If we still can't find the order, try a different approach
+                                    \Log::warning('Could not find existing order after duplicate constraint, trying alternative approach', [
+                                        'external_order_id' => $externalId,
+                                        'tenant_id' => $tenant->id
+                                    ]);
+                                    
+                                    // Try to find the order without tenant filter
+                                    $order = Order::where('external_order_id', $externalId)->first();
+                                    
+                                    if ($order) {
+                                        \Log::info('Found order without tenant filter, updating tenant', [
+                                            'order_id' => $order->id,
+                                            'old_tenant_id' => $order->tenant_id,
+                                            'new_tenant_id' => $tenant->id
+                                        ]);
+                                        
+                                        // Update the order with new tenant and data
+                                        $order->update(array_merge($orderData, ['tenant_id' => $tenant->id]));
+                                    } else {
+                                        \Log::error('Order not found even without tenant filter', [
+                                            'external_order_id' => $externalId,
+                                            'tenant_id' => $tenant->id,
+                                            'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
+                                        ]);
+                                        throw $createException; // Re-throw if we still can't find the order
+                                    }
                                 }
                             } else {
                                 throw $createException; // Re-throw if it's not a duplicate error
@@ -432,85 +471,15 @@ class WooCommerceOrderController extends Controller
                     'shipment_id' => Shipment::where('order_id', $order->id)->value('id'),
                 ], 200);
             }
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Handle duplicate entry constraint violation
-            if ($e->getCode() == 23000 && str_contains($e->getMessage(), 'Duplicate entry')) {
-                \Log::info('Order already exists (race condition), fetching existing order', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id
-                ]);
-                
-                // Try multiple times with increasing delays to find the existing order
-                $order = null;
-                $attempts = 0;
-                $maxAttempts = 5;
-                
-                while (!$order && $attempts < $maxAttempts) {
-                    $delay = ($attempts + 1) * 100000; // 100ms, 200ms, 300ms, 400ms, 500ms
-                    usleep($delay);
-                    
-                    \Log::info('Attempting to find existing order', [
-                        'attempt' => $attempts + 1,
-                        'delay_ms' => $delay / 1000
-                    ]);
-                    
-                    // Try to find the order with tenant filter first
-                    $order = Order::where('tenant_id', $tenant->id)
-                        ->where('external_order_id', $externalId)
-                        ->first();
-                    
-                    // If not found, try without tenant filter
-                    if (!$order) {
-                        $order = Order::where('external_order_id', $externalId)->first();
-                    }
-                    
-                    $attempts++;
-                }
-                
-                if (!$order) {
-                    \Log::error('Failed to find existing order after multiple attempts', [
-                        'external_order_id' => $externalId,
-                        'tenant_id' => $tenant->id,
-                        'attempts' => $attempts,
-                        'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'created_at'])
-                    ]);
-                    return response()->json(['success'=>false,'message'=>'Order processing failed - could not find existing order'], 500);
-                }
-                
-                \Log::info('Found existing order after race condition', [
-                    'order_id' => $order->id,
-                    'external_order_id' => $externalId,
-                    'attempts' => $attempts
-                ]);
-                
-                // Update customer information if needed
-                $customerData = data_get($request, 'customer', []);
-                $updateData = [];
-                
-                if (empty($order->customer_name) && !empty($customerData['first_name'])) {
-                    $updateData['customer_name'] = trim($customerData['first_name'] . ' ' . $customerData['last_name']);
-                }
-                if (empty($order->customer_email) && !empty($customerData['email'])) {
-                    $updateData['customer_email'] = $customerData['email'];
-                }
-                if (empty($order->customer_phone) && !empty($customerData['phone'])) {
-                    $updateData['customer_phone'] = $customerData['phone'];
-                }
-                
-                if (!empty($updateData)) {
-                    $order->update($updateData);
-                }
-                
-                // Return existing order (idempotency)
-                return response()->json([
-                    'success'     => true,
-                    'message'     => 'Order already exists',
-                    'order_id'    => $order->id,
-                    'shipment_id' => Shipment::where('order_id', $order->id)->value('id'),
-                ], 200);
-            }
-            
-            // Re-throw if it's not a duplicate entry error
+        } catch (\Exception $e) {
+            \Log::error('Transaction failed with unexpected error', [
+                'external_order_id' => $externalId,
+                'tenant_id' => $tenant->id,
+                'error' => $e->getMessage(),
+                'error_code' => $e->getCode(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine()
+            ]);
             throw $e;
         }
 
