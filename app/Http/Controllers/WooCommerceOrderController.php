@@ -247,8 +247,8 @@ class WooCommerceOrderController extends Controller
                     'tenant_id' => $tenant->id
                 ]);
                 
-                try {
-                    $order = Order::create([
+                // Use updateOrCreate to handle race conditions gracefully
+                $orderData = [
                     'tenant_id'        => $tenant->id,
                     'external_order_id'=> $externalId,
                     'order_number'     => data_get($request, 'order.order_number'),
@@ -273,14 +273,24 @@ class WooCommerceOrderController extends Controller
                     'shipping_city'        => data_get($request, 'shipping.address.city'),
                     'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
                     'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
-                    ]);
+                ];
+
+                try {
+                    $order = Order::updateOrCreate(
+                        [
+                            'tenant_id' => $tenant->id,
+                            'external_order_id' => $externalId
+                        ],
+                        $orderData
+                    );
                     
-                    \Log::info('Order created successfully', [
+                    \Log::info('Order created or updated successfully', [
                         'order_id' => $order->id,
-                        'external_order_id' => $externalId
+                        'external_order_id' => $externalId,
+                        'was_recently_created' => $order->wasRecentlyCreated
                     ]);
                 } catch (\Exception $orderCreateException) {
-                    \Log::error('Failed to create order in transaction', [
+                    \Log::error('Failed to create/update order in transaction', [
                         'external_order_id' => $externalId,
                         'tenant_id' => $tenant->id,
                         'error' => $orderCreateException->getMessage(),
