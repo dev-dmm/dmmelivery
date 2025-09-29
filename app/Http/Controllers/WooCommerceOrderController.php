@@ -145,98 +145,103 @@ class WooCommerceOrderController extends Controller
         // If order already exists, update customer info and return it (idempotency)
         $externalId = data_get($request, 'order.external_order_id');
         
-        // Use a more robust check with database lock to prevent race conditions
-        $existing = \DB::transaction(function () use ($tenant, $externalId) {
-            return Order::where('tenant_id', $tenant->id)
-                ->where('external_order_id', $externalId)
-                ->lockForUpdate()
-                ->first();
-        });
+        // Use a single transaction for the entire process to prevent race conditions
+        try {
+            $result = \DB::transaction(function () use ($tenant, $externalId, $customer, $request) {
+                // Check if order already exists within the same transaction
+                $existing = Order::where('tenant_id', $tenant->id)
+                    ->where('external_order_id', $externalId)
+                    ->lockForUpdate()
+                    ->first();
+                    
+                \Log::info('Checked for existing order in transaction', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id,
+                    'existing_order_id' => $existing?->id
+                ]);
 
-        if ($existing) {
-            // Update customer information if it's missing
-            if (empty($existing->customer_name) || empty($existing->customer_email)) {
-                // Get customer data from request for update
+                if ($existing) {
+                    // Update customer information if it's missing
+                    if (empty($existing->customer_name) || empty($existing->customer_email)) {
+                        // Get customer data from request for update
+                        $customerName = trim(implode(' ', array_filter([
+                            data_get($request, 'customer.first_name'),
+                            data_get($request, 'customer.last_name'),
+                        ])));
+                        $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
+                        $customerPhone = data_get($request, 'customer.phone');
+                        
+                        $existing->update([
+                            'customer_name'  => $customerName,
+                            'customer_email' => $customerEmail,
+                            'customer_phone' => $customerPhone,
+                        ]);
+                        \Log::info('Updated customer information for existing order', [
+                            'order_id' => $existing->id,
+                            'customer_name' => $customerName,
+                            'customer_email' => $customerEmail
+                        ]);
+                    }
+                    
+                    \Log::info('Order already exists, returning existing order', [
+                        'external_order_id' => $externalId,
+                        'order_id' => $existing->id,
+                        'tenant_id' => $tenant->id
+                    ]);
+                    
+                    return ['order' => $existing, 'shipment' => null, 'existing' => true];
+                }
+
+                \Log::info('Creating new order in transaction', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id
+                ]);
+
+                // Find or create customer by email OR phone
+                $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
+                $customerPhone = data_get($request, 'customer.phone');
                 $customerName = trim(implode(' ', array_filter([
                     data_get($request, 'customer.first_name'),
                     data_get($request, 'customer.last_name'),
                 ])));
-                $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
-                $customerPhone = data_get($request, 'customer.phone');
-                
-                $existing->update([
-                    'customer_name'  => $customerName,
-                    'customer_email' => $customerEmail,
-                    'customer_phone' => $customerPhone,
-                ]);
-                \Log::info('Updated customer information for existing order', [
-                    'order_id' => $existing->id,
-                    'customer_name' => $customerName,
-                    'customer_email' => $customerEmail
-                ]);
-            }
-            
-            return response()->json([
-                'success'     => true,
-                'message'     => 'Order already exists',
-                'order_id'    => $existing->id,
-                'shipment_id' => Shipment::where('order_id', $existing->id)->value('id'),
-            ], 200);
-        }
 
-        // Find or create customer by email OR phone
-        $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
-        $customerPhone = data_get($request, 'customer.phone');
-        $customerName = trim(implode(' ', array_filter([
-            data_get($request, 'customer.first_name'),
-            data_get($request, 'customer.last_name'),
-        ])));
+                // Check for existing customer by email OR phone
+                $customer = Customer::where('tenant_id', $tenant->id)
+                    ->where(function ($query) use ($customerEmail, $customerPhone) {
+                        $query->where('email', $customerEmail);
+                        if ($customerPhone) {
+                            $query->orWhere('phone', $customerPhone);
+                        }
+                    })
+                    ->first();
 
-        // Check for existing customer by email OR phone
-        $customer = Customer::where('tenant_id', $tenant->id)
-            ->where(function ($query) use ($customerEmail, $customerPhone) {
-                $query->where('email', $customerEmail);
-                if ($customerPhone) {
-                    $query->orWhere('phone', $customerPhone);
+                if (!$customer) {
+                    // Create new customer
+                    $customer = Customer::create([
+                        'tenant_id' => $tenant->id,
+                        'name' => $customerName,
+                        'email' => $customerEmail,
+                        'phone' => $customerPhone,
+                    ]);
+                } else {
+                    // Update existing customer with new information if provided
+                    $updateData = [];
+                    if ($customerName && $customerName !== $customer->name) {
+                        $updateData['name'] = $customerName;
+                    }
+                    if ($customerPhone && $customerPhone !== $customer->phone) {
+                        $updateData['phone'] = $customerPhone;
+                    }
+                    if ($customerEmail !== $customer->email) {
+                        $updateData['email'] = $customerEmail;
+                    }
+
+                    if (!empty($updateData)) {
+                        $customer->update($updateData);
+                    }
                 }
-            })
-            ->first();
 
-        if (!$customer) {
-            // Create new customer
-            $customer = Customer::create([
-                'tenant_id' => $tenant->id,
-                'name' => $customerName,
-                'email' => $customerEmail,
-                'phone' => $customerPhone,
-            ]);
-        } else {
-            // Update existing customer with new information if provided
-            $updateData = [];
-            if ($customerName && $customerName !== $customer->name) {
-                $updateData['name'] = $customerName;
-            }
-            if ($customerPhone && $customerPhone !== $customer->phone) {
-                $updateData['phone'] = $customerPhone;
-            }
-            if ($customerEmail !== $customer->email) {
-                $updateData['email'] = $customerEmail;
-            }
-
-            if (!empty($updateData)) {
-                $customer->update($updateData);
-            }
-        }
-
-        // Create order with duplicate handling in a transaction
-        try {
-            \Log::info('Starting order creation transaction', [
-                'external_order_id' => $externalId,
-                'tenant_id' => $tenant->id,
-                'customer_id' => $customer->id
-            ]);
-            
-            $result = \DB::transaction(function () use ($tenant, $externalId, $customer, $request) {
+                // Create the order
                 \Log::info('Creating order in transaction', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id
@@ -355,6 +360,16 @@ class WooCommerceOrderController extends Controller
             
             $order = $result['order'];
             $shipment = $result['shipment'];
+            
+            // Check if this was an existing order
+            if (isset($result['existing']) && $result['existing']) {
+                return response()->json([
+                    'success'     => true,
+                    'message'     => 'Order already exists',
+                    'order_id'    => $order->id,
+                    'shipment_id' => Shipment::where('order_id', $order->id)->value('id'),
+                ], 200);
+            }
         } catch (\Illuminate\Database\QueryException $e) {
             // Handle duplicate entry constraint violation
             if ($e->getCode() == 23000 && str_contains($e->getMessage(), 'Duplicate entry')) {
