@@ -148,30 +148,15 @@ class WooCommerceOrderController extends Controller
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
-                // Check if order already exists within the same transaction
+                // First, try to find existing order
                 $existing = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
-                    ->lockForUpdate()
                     ->first();
                     
-                \Log::info('Checked for existing order in transaction', [
+                \Log::info('Checked for existing order', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
-                    'existing_order_id' => $existing?->id,
-                    'query_sql' => Order::where('tenant_id', $tenant->id)->where('external_order_id', $externalId)->toSql(),
-                    'query_bindings' => [$tenant->id, $externalId]
-                ]);
-                
-                // Also check without lockForUpdate to see if there's a locking issue
-                $existingWithoutLock = Order::where('tenant_id', $tenant->id)
-                    ->where('external_order_id', $externalId)
-                    ->first();
-                    
-                \Log::info('Checked for existing order without lock', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id,
-                    'existing_order_id' => $existingWithoutLock?->id,
-                    'order_exists_without_lock' => $existingWithoutLock ? 'YES' : 'NO'
+                    'existing_order_id' => $existing?->id
                 ]);
 
                 if ($existing) {
@@ -206,7 +191,7 @@ class WooCommerceOrderController extends Controller
                     return ['order' => $existing, 'shipment' => null, 'existing' => true];
                 }
 
-                \Log::info('Creating new order in transaction', [
+                \Log::info('Creating new order', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id
                 ]);
@@ -237,6 +222,11 @@ class WooCommerceOrderController extends Controller
                         'email' => $customerEmail,
                         'phone' => $customerPhone,
                     ]);
+                    \Log::info('Created new customer', [
+                        'customer_id' => $customer->id,
+                        'customer_name' => $customerName,
+                        'customer_email' => $customerEmail
+                    ]);
                 } else {
                     // Update existing customer with new information if provided
                     $updateData = [];
@@ -253,15 +243,23 @@ class WooCommerceOrderController extends Controller
                     if (!empty($updateData)) {
                         $customer->update($updateData);
                     }
+                    \Log::info('Using existing customer', [
+                        'customer_id' => $customer->id,
+                        'customer_name' => $customer->name,
+                        'customer_email' => $customer->email
+                    ]);
                 }
 
-                // Create the order
-                \Log::info('Creating order in transaction', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id
-                ]);
-                
-                // Use updateOrCreate to handle race conditions gracefully
+                // Ensure customer_id is valid
+                if (!$customer || !$customer->id) {
+                    \Log::error('Customer creation failed or customer ID is null', [
+                        'customer' => $customer,
+                        'customer_id' => $customer?->id
+                    ]);
+                    throw new \Exception('Failed to create or find customer');
+                }
+
+                // Create the order data
                 $orderData = [
                     'tenant_id'        => $tenant->id,
                     'external_order_id'=> $externalId,
@@ -289,95 +287,63 @@ class WooCommerceOrderController extends Controller
                     'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
                 ];
 
+                \Log::info('Creating order with data', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id,
+                    'customer_id' => $customer->id,
+                    'order_data' => $orderData
+                ]);
+
                 try {
-                    // First try to find existing order
-                    $order = Order::where('tenant_id', $tenant->id)
-                        ->where('external_order_id', $externalId)
-                        ->first();
-                    
-                    if ($order) {
-                        // Update existing order
-                        $order->update($orderData);
-                        \Log::info('Order updated successfully', [
-                            'order_id' => $order->id,
-                            'external_order_id' => $externalId
+                    // Try to create the order
+                    $order = Order::create($orderData);
+                    \Log::info('Order created successfully', [
+                        'order_id' => $order->id,
+                        'external_order_id' => $externalId
+                    ]);
+                } catch (\Illuminate\Database\QueryException $createException) {
+                    // If creation fails due to duplicate, try to find the existing order
+                    if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
+                        \Log::info('Order creation failed due to duplicate, fetching existing order', [
+                            'external_order_id' => $externalId,
+                            'tenant_id' => $tenant->id,
+                            'error' => $createException->getMessage()
                         ]);
-                    } else {
-                        // Try to create new order
-                        try {
-                            $order = Order::create($orderData);
-                            \Log::info('Order created successfully', [
+                        
+                        // Try to find the order that was created by another request
+                        $order = Order::where('tenant_id', $tenant->id)
+                            ->where('external_order_id', $externalId)
+                            ->first();
+                        
+                        if (!$order) {
+                            // Try without tenant filter as fallback
+                            $order = Order::where('external_order_id', $externalId)->first();
+                        }
+                        
+                        if ($order) {
+                            // Update the existing order with new data
+                            $order->update($orderData);
+                            \Log::info('Found and updated existing order after race condition', [
                                 'order_id' => $order->id,
                                 'external_order_id' => $externalId
                             ]);
-                        } catch (\Illuminate\Database\QueryException $createException) {
-                            // If creation fails due to duplicate, try to find the existing order
-                            if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
-                                \Log::info('Order creation failed due to duplicate, fetching existing order', [
-                                    'external_order_id' => $externalId,
-                                    'tenant_id' => $tenant->id
-                                ]);
-                                
-                                // Try to find the order that was created by another request
-                                $order = Order::where('tenant_id', $tenant->id)
-                                    ->where('external_order_id', $externalId)
-                                    ->first();
-                                
-                                if (!$order) {
-                                    // Try without tenant filter as fallback
-                                    $order = Order::where('external_order_id', $externalId)->first();
-                                }
-                                
-                                if ($order) {
-                                    // Update the existing order with new data
-                                    $order->update($orderData);
-                                    \Log::info('Found and updated existing order after race condition', [
-                                        'order_id' => $order->id,
-                                        'external_order_id' => $externalId
-                                    ]);
-                                } else {
-                                    // If we still can't find the order, try a different approach
-                                    \Log::warning('Could not find existing order after duplicate constraint, trying alternative approach', [
-                                        'external_order_id' => $externalId,
-                                        'tenant_id' => $tenant->id
-                                    ]);
-                                    
-                                    // Try to find the order without tenant filter
-                                    $order = Order::where('external_order_id', $externalId)->first();
-                                    
-                                    if ($order) {
-                                        \Log::info('Found order without tenant filter, updating tenant', [
-                                            'order_id' => $order->id,
-                                            'old_tenant_id' => $order->tenant_id,
-                                            'new_tenant_id' => $tenant->id
-                                        ]);
-                                        
-                                        // Update the order with new tenant and data
-                                        $order->update(array_merge($orderData, ['tenant_id' => $tenant->id]));
-                                    } else {
-                                        \Log::error('Order not found even without tenant filter', [
-                                            'external_order_id' => $externalId,
-                                            'tenant_id' => $tenant->id,
-                                            'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
-                                        ]);
-                                        throw $createException; // Re-throw if we still can't find the order
-                                    }
-                                }
-                            } else {
-                                throw $createException; // Re-throw if it's not a duplicate error
-                            }
+                        } else {
+                            \Log::error('Could not find existing order after duplicate constraint', [
+                                'external_order_id' => $externalId,
+                                'tenant_id' => $tenant->id,
+                                'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
+                            ]);
+                            throw $createException; // Re-throw if we still can't find the order
                         }
+                    } else {
+                        \Log::error('Order creation failed with non-duplicate error', [
+                            'external_order_id' => $externalId,
+                            'tenant_id' => $tenant->id,
+                            'error' => $createException->getMessage(),
+                            'error_code' => $createException->getCode()
+                        ]);
+                        throw $createException; // Re-throw if it's not a duplicate error
                     }
-                } catch (\Exception $orderCreateException) {
-                    \Log::error('Failed to create/update order in transaction', [
-                        'external_order_id' => $externalId,
-                        'tenant_id' => $tenant->id,
-                        'error' => $orderCreateException->getMessage(),
-                        'error_code' => $orderCreateException->getCode(),
-                        'error_file' => $orderCreateException->getFile(),
-                        'error_line' => $orderCreateException->getLine()
-                    ]);
-                    throw $orderCreateException;
                 }
                 
                 // Create order items if provided
