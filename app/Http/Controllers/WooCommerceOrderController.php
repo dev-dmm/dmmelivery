@@ -259,17 +259,32 @@ class WooCommerceOrderController extends Controller
                     'tenant_id' => $tenant->id
                 ]);
                 
+                // Small delay to allow the other transaction to complete
+                usleep(100000); // 100ms delay
+                
                 // Fetch the existing order that was created by another request
                 $order = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
                 
                 if (!$order) {
-                    \Log::error('Failed to find existing order after duplicate constraint violation', [
+                    // Try to find the order without tenant filter (in case of tenant mismatch)
+                    $order = Order::where('external_order_id', $externalId)->first();
+                    
+                    if (!$order) {
+                        \Log::error('Failed to find existing order after duplicate constraint violation', [
+                            'external_order_id' => $externalId,
+                            'tenant_id' => $tenant->id,
+                            'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
+                        ]);
+                        return response()->json(['success'=>false,'message'=>'Order processing failed'], 500);
+                    }
+                    
+                    \Log::warning('Found order with different tenant', [
                         'external_order_id' => $externalId,
-                        'tenant_id' => $tenant->id
+                        'requested_tenant_id' => $tenant->id,
+                        'found_tenant_id' => $order->tenant_id
                     ]);
-                    return response()->json(['success'=>false,'message'=>'Order processing failed'], 500);
                 }
                 
                 // Update customer information if needed
