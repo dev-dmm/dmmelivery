@@ -230,7 +230,18 @@ class WooCommerceOrderController extends Controller
 
         // Create order with duplicate handling in a transaction
         try {
+            \Log::info('Starting order creation transaction', [
+                'external_order_id' => $externalId,
+                'tenant_id' => $tenant->id,
+                'customer_id' => $customer->id
+            ]);
+            
             $result = \DB::transaction(function () use ($tenant, $externalId, $customer, $request) {
+                \Log::info('Creating order in transaction', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id
+                ]);
+                
                 $order = Order::create([
                     'tenant_id'        => $tenant->id,
                     'external_order_id'=> $externalId,
@@ -258,12 +269,22 @@ class WooCommerceOrderController extends Controller
                     'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
                 ]);
                 
+                \Log::info('Order created successfully', [
+                    'order_id' => $order->id,
+                    'external_order_id' => $externalId
+                ]);
+                
                 // Create order items if provided
                 $this->createOrderItems($order, $request);
                 
                 // Create shipment (default true)
                 $shipment = null;
                 if ($request->boolean('create_shipment', true)) {
+                    \Log::info('Looking for courier', [
+                        'tenant_id' => $tenant->id,
+                        'order_id' => $order->id
+                    ]);
+                    
                     $courier = Courier::where('tenant_id', $tenant->id)
                         ->where('is_default', true)
                         ->first() ?? Courier::where('tenant_id', $tenant->id)->first();
@@ -271,10 +292,16 @@ class WooCommerceOrderController extends Controller
                     if (!$courier) {
                         \Log::error('WooCommerce order failed: No courier configured for tenant', [
                             'tenant_id' => $tenant->id,
-                            'order_id' => $order->id
+                            'order_id' => $order->id,
+                            'available_couriers' => Courier::where('tenant_id', $tenant->id)->get(['id', 'name', 'is_default'])
                         ]);
                         throw new \Exception('No courier configured for tenant');
                     }
+                    
+                    \Log::info('Found courier', [
+                        'courier_id' => $courier->id,
+                        'courier_name' => $courier->name
+                    ]);
 
                     $addr = $request->input('shipping.address');
 
@@ -311,7 +338,17 @@ class WooCommerceOrderController extends Controller
                         'created_at'      => now(),
                         'updated_at'      => now(),
                     ]);
+                    
+                    \Log::info('Shipment created successfully', [
+                        'shipment_id' => $shipment->id,
+                        'tracking_number' => $tracking
+                    ]);
                 }
+                
+                \Log::info('Transaction completed successfully', [
+                    'order_id' => $order->id,
+                    'shipment_id' => $shipment?->id
+                ]);
                 
                 return ['order' => $order, 'shipment' => $shipment];
             });
