@@ -148,12 +148,13 @@ class WooCommerceOrderController extends Controller
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
-                // First, try to find existing order
+                // Use SELECT FOR UPDATE to lock the row and prevent race conditions
                 $existing = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
+                    ->lockForUpdate()
                     ->first();
                     
-                \Log::info('Checked for existing order', [
+                \Log::info('Checked for existing order with lock', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
                     'existing_order_id' => $existing?->id
@@ -310,14 +311,27 @@ class WooCommerceOrderController extends Controller
                             'error' => $createException->getMessage()
                         ]);
                         
-                        // Try to find the order that was created by another request
+                        // Wait a moment for the other transaction to complete
+                        usleep(100000); // 100ms
+                        
+                        // Try multiple strategies to find the existing order
+                        $order = null;
+                        
+                        // Strategy 1: Find by tenant and external_order_id
                         $order = Order::where('tenant_id', $tenant->id)
                             ->where('external_order_id', $externalId)
                             ->first();
                         
+                        // Strategy 2: If not found, try without tenant filter
                         if (!$order) {
-                            // Try without tenant filter as fallback
                             $order = Order::where('external_order_id', $externalId)->first();
+                        }
+                        
+                        // Strategy 3: If still not found, try with a broader search
+                        if (!$order) {
+                            $order = Order::where('external_order_id', $externalId)
+                                ->where('customer_email', $customer->email)
+                                ->first();
                         }
                         
                         if ($order) {
@@ -325,15 +339,34 @@ class WooCommerceOrderController extends Controller
                             $order->update($orderData);
                             \Log::info('Found and updated existing order after race condition', [
                                 'order_id' => $order->id,
-                                'external_order_id' => $externalId
+                                'external_order_id' => $externalId,
+                                'strategy_used' => 'found_existing'
                             ]);
                         } else {
                             \Log::error('Could not find existing order after duplicate constraint', [
                                 'external_order_id' => $externalId,
                                 'tenant_id' => $tenant->id,
-                                'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id'])
+                                'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'customer_email']),
+                                'customer_email' => $customer->email
                             ]);
-                            throw $createException; // Re-throw if we still can't find the order
+                            
+                            // As a last resort, try to create the order again with a different ID
+                            // This handles the case where the order exists but we can't find it
+                            try {
+                                $orderData['id'] = Str::uuid();
+                                $order = Order::create($orderData);
+                                \Log::info('Created order with new UUID after duplicate constraint', [
+                                    'order_id' => $order->id,
+                                    'external_order_id' => $externalId
+                                ]);
+                            } catch (\Exception $retryException) {
+                                \Log::error('Failed to create order even with new UUID', [
+                                    'external_order_id' => $externalId,
+                                    'tenant_id' => $tenant->id,
+                                    'retry_error' => $retryException->getMessage()
+                                ]);
+                                throw $createException; // Re-throw original exception
+                            }
                         }
                     } else {
                         \Log::error('Order creation failed with non-duplicate error', [
