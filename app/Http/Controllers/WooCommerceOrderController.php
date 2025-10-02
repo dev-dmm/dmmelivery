@@ -92,19 +92,34 @@ class WooCommerceOrderController extends Controller
             'payload' => $request->all()
         ]);
         
-        \Log::info('Starting order processing - METHOD BEGIN', [
-            'external_order_id' => data_get($request, 'order.external_order_id'),
+        // Normalize external order ID
+        $externalId = trim((string) data_get($request, 'order.external_order_id'));
+        $tenantId = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
+        
+        \Log::info('Starting order processing with Redis lock', [
+            'external_order_id' => $externalId,
+            'tenant_id' => $tenantId,
             'timestamp' => now()->toDateTimeString()
         ]);
         
-        \Log::info('DEBUG: About to start database transaction', [
-            'external_order_id' => data_get($request, 'order.external_order_id'),
+        // Use Redis lock to prevent race conditions
+        $lockKey = "orders:create:{$tenantId}:{$externalId}";
+        
+        return \Cache::lock($lockKey, 10)->block(5, function () use ($request, $externalId, $tenantId) {
+            return $this->doStore($request, $externalId, $tenantId);
+        });
+    }
+    
+    private function doStore(Request $request, string $externalId, string $tenantId): JsonResponse
+    {
+        \Log::info('Inside Redis lock - starting order creation', [
+            'external_order_id' => $externalId,
+            'tenant_id' => $tenantId,
             'timestamp' => now()->toDateTimeString()
         ]);
 
         // Read headers
         $headerKey = $request->header('X-Api-Key');
-        $tenantId  = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
 
         if (!$headerKey) {
             \Log::warning('WooCommerce order rejected: No API key provided');
@@ -174,6 +189,9 @@ class WooCommerceOrderController extends Controller
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
+                // Set READ COMMITTED isolation level to see committed changes
+                \DB::statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+                
                 // First, try to find existing order (without lock for better performance)
                 $existing = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
@@ -218,19 +236,6 @@ class WooCommerceOrderController extends Controller
                     return ['order' => $existing, 'shipment' => null, 'existing' => true];
                 }
 
-                \Log::info('Creating new order', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id,
-                    'order_data_keys' => array_keys($orderData),
-                    'order_data_sample' => [
-                        'external_order_id' => $orderData['external_order_id'] ?? 'MISSING',
-                        'order_number' => $orderData['order_number'] ?? 'MISSING',
-                        'status' => $orderData['status'] ?? 'MISSING',
-                        'total_amount' => $orderData['total_amount'] ?? 'MISSING',
-                        'customer_name' => $orderData['customer_name'] ?? 'MISSING',
-                        'customer_email' => $orderData['customer_email'] ?? 'MISSING'
-                    ]
-                ]);
 
                 // Find or create customer by email OR phone
                 $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
@@ -349,87 +354,16 @@ class WooCommerceOrderController extends Controller
                 \Log::info('Creating order with data', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
-                    'customer_id' => $customer->id,
                     'order_data' => $orderData
                 ]);
 
-                // Try to create the order with proper duplicate handling
-                $order = null;
-                $maxRetries = 3;
-                $retryCount = 0;
-                
-                while ($retryCount < $maxRetries && !$order) {
-                    try {
-                        $order = Order::create($orderData);
-                        \Log::info('Order created successfully', [
-                            'order_id' => $order->id,
-                            'external_order_id' => $externalId,
-                            'attempt' => $retryCount + 1
-                        ]);
-                        break; // Success, exit the retry loop
-                        
-                    } catch (\Illuminate\Database\QueryException $createException) {
-                        // If creation fails due to duplicate, try to find the existing order
-                        if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
-                            $retryCount++;
-                            
-                            \Log::info('Order creation failed due to duplicate, attempting to find existing order', [
-                                'external_order_id' => $externalId,
-                                'tenant_id' => $tenant->id,
-                                'attempt' => $retryCount,
-                                'max_retries' => $maxRetries,
-                                'error' => $createException->getMessage()
-                            ]);
-                            
-                            // Wait a moment for the other transaction to complete
-                            usleep(100000 * $retryCount); // Increasing delay: 100ms, 200ms, 300ms
-                            
-                            // Try to find the existing order
-                            $existing = Order::where('tenant_id', $tenant->id)
-                                ->where('external_order_id', $externalId)
-                                ->first();
-                            
-                            if ($existing) {
-                                \Log::info('Found existing order after duplicate constraint', [
-                                    'order_id' => $existing->id,
-                                    'external_order_id' => $externalId,
-                                    'attempt' => $retryCount
-                                ]);
-                                $order = $existing; // Use the existing order
-                                break; // Success, exit the retry loop
-                            } else {
-                                \Log::warning('Could not find existing order after duplicate constraint', [
-                                    'external_order_id' => $externalId,
-                                    'tenant_id' => $tenant->id,
-                                    'attempt' => $retryCount,
-                                    'max_retries' => $maxRetries
-                                ]);
-                                
-                                if ($retryCount >= $maxRetries) {
-                                    \Log::error('Max retries reached, could not find existing order', [
-                                        'external_order_id' => $externalId,
-                                        'tenant_id' => $tenant->id,
-                                        'retry_count' => $retryCount,
-                                        'available_orders' => Order::where('tenant_id', $tenant->id)->where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'created_at'])
-                                    ]);
-                                    throw $createException; // Re-throw if we can't find it after all retries
-                                }
-                            }
-                        } else {
-                            \Log::error('Order creation failed with non-duplicate error', [
-                                'external_order_id' => $externalId,
-                                'tenant_id' => $tenant->id,
-                                'error' => $createException->getMessage(),
-                                'error_code' => $createException->getCode()
-                            ]);
-                            throw $createException; // Re-throw other query exceptions
-                        }
-                    }
-                }
-                
-                if (!$order) {
-                    throw new \Exception('Failed to create or find order after maximum retries');
-                }
+                // Create the order (Redis lock prevents race conditions)
+                $order = Order::create($orderData);
+                \Log::info('Order created successfully', [
+                    'order_id' => $order->id,
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id
+                ]);
                 
                 // Create order items if provided
                 $this->createOrderItems($order, $request);
