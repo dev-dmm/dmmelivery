@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use App\Models\Tenant;
 use App\Models\Customer;
 use App\Models\Order;
@@ -105,9 +106,14 @@ class WooCommerceOrderController extends Controller
         // Use Redis lock to prevent race conditions
         $lockKey = "orders:create:{$tenantId}:{$externalId}";
         
-        return \Cache::lock($lockKey, 10)->block(5, function () use ($request, $externalId, $tenantId) {
-            return $this->doStore($request, $externalId, $tenantId);
-        });
+        try {
+            return \Cache::lock($lockKey, 10)->block(5, function () use ($request, $externalId, $tenantId) {
+                return $this->doStore($request, $externalId, $tenantId);
+            });
+        } catch (LockTimeoutException $e) {
+            \Log::warning('Order lock timeout', compact('lockKey','tenantId','externalId'));
+            return response()->json(['success'=>false,'message'=>'Busy, try again'], 423);
+        }
     }
     
     private function doStore(Request $request, string $externalId, string $tenantId): JsonResponse
@@ -167,8 +173,7 @@ class WooCommerceOrderController extends Controller
             return response()->json(['success'=>false, 'message'=>'Validation failed', 'errors'=>$v->errors()], 422);
         }
 
-        // If order already exists, update customer info and return it (idempotency)
-        $externalId = data_get($request, 'order.external_order_id');
+        // $externalId is already normalized & locked, don't overwrite it
         
         \Log::info('Starting order processing', [
             'external_order_id' => $externalId,
@@ -186,11 +191,12 @@ class WooCommerceOrderController extends Controller
             'preferred_courier' => data_get($request, 'preferred_courier')
         ]);
         
+        // Set READ COMMITTED isolation level before transaction starts
+        \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
-                // Set READ COMMITTED isolation level to see committed changes
-                \DB::statement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
                 
                 // First, try to find existing order (without lock for better performance)
                 $existing = Order::where('tenant_id', $tenant->id)
