@@ -164,49 +164,17 @@ class WooCommerceOrderController extends Controller
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
-                // Use SELECT FOR UPDATE to lock the row and prevent race conditions
+                // First, try to find existing order (without lock for better performance)
                 $existing = Order::where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
-                    ->lockForUpdate()
                     ->first();
                     
-                \Log::info('Checked for existing order with lock', [
+                \Log::info('Checked for existing order', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
                     'existing_order_id' => $existing?->id,
                     'found_existing' => $existing ? 'YES' : 'NO'
                 ]);
-                
-                // Additional check without lock to see if order exists
-                $orderExists = Order::where('tenant_id', $tenant->id)
-                    ->where('external_order_id', $externalId)
-                    ->exists();
-                    
-                \Log::info('Additional order existence check', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id,
-                    'order_exists' => $orderExists
-                ]);
-                
-                // If order exists but wasn't found with lock, try to find it
-                if ($orderExists && !$existing) {
-                    \Log::warning('Order exists but not found with lock - potential data inconsistency', [
-                        'external_order_id' => $externalId,
-                        'tenant_id' => $tenant->id
-                    ]);
-                    
-                    // Try to find the order without lock
-                    $existing = Order::where('tenant_id', $tenant->id)
-                        ->where('external_order_id', $externalId)
-                        ->first();
-                        
-                    if ($existing) {
-                        \Log::info('Found existing order without lock', [
-                            'order_id' => $existing->id,
-                            'external_order_id' => $externalId
-                        ]);
-                    }
-                }
 
                 if ($existing) {
                     // Update customer information if it's missing
@@ -375,14 +343,22 @@ class WooCommerceOrderController extends Controller
                     'order_data' => $orderData
                 ]);
 
-                try {
-                    // Try to create the order
-                    $order = Order::create($orderData);
-                    \Log::info('Order created successfully', [
-                        'order_id' => $order->id,
-                        'external_order_id' => $externalId
-                    ]);
-                } catch (\Illuminate\Database\QueryException $createException) {
+                // Try to create the order with race condition handling
+                $maxRetries = 3;
+                $retryCount = 0;
+                $order = null;
+                
+                while ($retryCount < $maxRetries && !$order) {
+                    try {
+                        $order = Order::create($orderData);
+                        \Log::info('Order created successfully', [
+                            'order_id' => $order->id,
+                            'external_order_id' => $externalId,
+                            'attempt' => $retryCount + 1
+                        ]);
+                        break; // Success, exit the retry loop
+                        
+                    } catch (\Illuminate\Database\QueryException $createException) {
                     // If creation fails due to duplicate, try to find the existing order
                     if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
                         \Log::info('Order creation failed due to duplicate, fetching existing order', [
