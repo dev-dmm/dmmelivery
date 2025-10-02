@@ -145,6 +145,22 @@ class WooCommerceOrderController extends Controller
         // If order already exists, update customer info and return it (idempotency)
         $externalId = data_get($request, 'order.external_order_id');
         
+        \Log::info('Starting order processing', [
+            'external_order_id' => $externalId,
+            'tenant_id' => $tenant->id,
+            'tenant_name' => $tenant->name ?? 'Unknown',
+            'request_source' => data_get($request, 'source'),
+            'order_number' => data_get($request, 'order.order_number'),
+            'total_amount' => data_get($request, 'order.total_amount'),
+            'customer_email' => data_get($request, 'customer.email'),
+            'customer_name' => trim(implode(' ', array_filter([
+                data_get($request, 'customer.first_name'),
+                data_get($request, 'customer.last_name'),
+            ]))),
+            'create_shipment' => data_get($request, 'create_shipment', false),
+            'preferred_courier' => data_get($request, 'preferred_courier')
+        ]);
+        
         // Use a single transaction for the entire process to prevent race conditions
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
@@ -171,6 +187,26 @@ class WooCommerceOrderController extends Controller
                     'tenant_id' => $tenant->id,
                     'order_exists' => $orderExists
                 ]);
+                
+                // If order exists but wasn't found with lock, try to find it
+                if ($orderExists && !$existing) {
+                    \Log::warning('Order exists but not found with lock - potential data inconsistency', [
+                        'external_order_id' => $externalId,
+                        'tenant_id' => $tenant->id
+                    ]);
+                    
+                    // Try to find the order without lock
+                    $existing = Order::where('tenant_id', $tenant->id)
+                        ->where('external_order_id', $externalId)
+                        ->first();
+                        
+                    if ($existing) {
+                        \Log::info('Found existing order without lock', [
+                            'order_id' => $existing->id,
+                            'external_order_id' => $externalId
+                        ]);
+                    }
+                }
 
                 if ($existing) {
                     // Update customer information if it's missing
@@ -206,7 +242,16 @@ class WooCommerceOrderController extends Controller
 
                 \Log::info('Creating new order', [
                     'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id
+                    'tenant_id' => $tenant->id,
+                    'order_data_keys' => array_keys($orderData),
+                    'order_data_sample' => [
+                        'external_order_id' => $orderData['external_order_id'] ?? 'MISSING',
+                        'order_number' => $orderData['order_number'] ?? 'MISSING',
+                        'status' => $orderData['status'] ?? 'MISSING',
+                        'total_amount' => $orderData['total_amount'] ?? 'MISSING',
+                        'customer_name' => $orderData['customer_name'] ?? 'MISSING',
+                        'customer_email' => $orderData['customer_email'] ?? 'MISSING'
+                    ]
                 ]);
 
                 // Find or create customer by email OR phone
@@ -218,6 +263,13 @@ class WooCommerceOrderController extends Controller
                 ])));
 
                 // Check for existing customer by email OR phone
+                \Log::info('Looking for existing customer', [
+                    'tenant_id' => $tenant->id,
+                    'customer_email' => $customerEmail,
+                    'customer_phone' => $customerPhone,
+                    'customer_name' => $customerName
+                ]);
+                
                 $customer = Customer::where('tenant_id', $tenant->id)
                     ->where(function ($query) use ($customerEmail, $customerPhone) {
                         $query->where('email', $customerEmail);
@@ -226,19 +278,35 @@ class WooCommerceOrderController extends Controller
                         }
                     })
                     ->first();
+                    
+                \Log::info('Customer lookup result', [
+                    'customer_found' => $customer ? 'YES' : 'NO',
+                    'customer_id' => $customer?->id,
+                    'customer_email' => $customer?->email,
+                    'customer_phone' => $customer?->phone
+                ]);
 
                 if (!$customer) {
                     // Create new customer
+                    \Log::info('Creating new customer', [
+                        'tenant_id' => $tenant->id,
+                        'customer_name' => $customerName,
+                        'customer_email' => $customerEmail,
+                        'customer_phone' => $customerPhone
+                    ]);
+                    
                     $customer = Customer::create([
                         'tenant_id' => $tenant->id,
                         'name' => $customerName,
                         'email' => $customerEmail,
                         'phone' => $customerPhone,
                     ]);
-                    \Log::info('Created new customer', [
+                    
+                    \Log::info('Created new customer successfully', [
                         'customer_id' => $customer->id,
                         'customer_name' => $customerName,
-                        'customer_email' => $customerEmail
+                        'customer_email' => $customerEmail,
+                        'customer_phone' => $customerPhone
                     ]);
                 } else {
                     // Update existing customer with new information if provided
@@ -399,12 +467,34 @@ class WooCommerceOrderController extends Controller
                 if ($request->boolean('create_shipment', true)) {
                     \Log::info('Looking for courier', [
                         'tenant_id' => $tenant->id,
-                        'order_id' => $order->id
+                        'order_id' => $order->id,
+                        'order_external_id' => $externalId
                     ]);
                     
-                    $courier = Courier::where('tenant_id', $tenant->id)
+                    // First try to find default courier
+                    $defaultCourier = Courier::where('tenant_id', $tenant->id)
                         ->where('is_default', true)
-                        ->first() ?? Courier::where('tenant_id', $tenant->id)->first();
+                        ->first();
+                        
+                    \Log::info('Default courier lookup', [
+                        'tenant_id' => $tenant->id,
+                        'default_courier_found' => $defaultCourier ? 'YES' : 'NO',
+                        'default_courier_id' => $defaultCourier?->id,
+                        'default_courier_name' => $defaultCourier?->name
+                    ]);
+                    
+                    // If no default, try any courier for this tenant
+                    if (!$defaultCourier) {
+                        $anyCourier = Courier::where('tenant_id', $tenant->id)->first();
+                        \Log::info('Any courier lookup', [
+                            'tenant_id' => $tenant->id,
+                            'any_courier_found' => $anyCourier ? 'YES' : 'NO',
+                            'any_courier_id' => $anyCourier?->id,
+                            'any_courier_name' => $anyCourier?->name
+                        ]);
+                    }
+                    
+                    $courier = $defaultCourier ?? Courier::where('tenant_id', $tenant->id)->first();
 
                     if (!$courier) {
                         \Log::error('WooCommerce order failed: No courier configured for tenant', [
@@ -421,16 +511,41 @@ class WooCommerceOrderController extends Controller
                     ]);
 
                     $addr = $request->input('shipping.address');
+                    
+                    \Log::info('Preparing shipment creation', [
+                        'tenant_id' => $tenant->id,
+                        'order_id' => $order->id,
+                        'customer_id' => $customer->id,
+                        'courier_id' => $courier->id,
+                        'shipping_address' => $this->formatAddress($addr),
+                        'shipping_city' => $addr['city'] ?? '',
+                        'weight' => (float) data_get($request, 'shipping.weight', 0.5),
+                        'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0)
+                    ]);
 
                     // collision-safe tracking number generation
                     $tracking = null;
+                    $attempts = 0;
                     do {
                         $tracking = strtoupper(Str::random(12));
+                        $attempts++;
+                        \Log::info('Generating tracking number', [
+                            'attempt' => $attempts,
+                            'tracking_number' => $tracking,
+                            'exists' => Shipment::where('tenant_id', $tenant->id)
+                                ->where('tracking_number', $tracking)
+                                ->exists()
+                        ]);
                     } while (
                         Shipment::where('tenant_id', $tenant->id)
                             ->where('tracking_number', $tracking)
                             ->exists()
                     );
+                    
+                    \Log::info('Generated unique tracking number', [
+                        'tracking_number' => $tracking,
+                        'attempts' => $attempts
+                    ]);
 
                     $shipment = Shipment::create([
                         'tenant_id'         => $tenant->id,
@@ -467,8 +582,22 @@ class WooCommerceOrderController extends Controller
             $order = $result['order'];
             $shipment = $result['shipment'];
             
+            \Log::info('Transaction completed successfully', [
+                'external_order_id' => $externalId,
+                'tenant_id' => $tenant->id,
+                'order_id' => $order->id,
+                'shipment_id' => $shipment?->id,
+                'tracking_number' => $shipment?->tracking_number,
+                'is_existing_order' => isset($result['existing']) && $result['existing']
+            ]);
+            
             // Check if this was an existing order
             if (isset($result['existing']) && $result['existing']) {
+                \Log::info('Returning existing order response', [
+                    'order_id' => $order->id,
+                    'shipment_id' => Shipment::where('order_id', $order->id)->value('id')
+                ]);
+                
                 return response()->json([
                     'success'     => true,
                     'message'     => 'Order already exists',
