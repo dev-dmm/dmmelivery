@@ -203,7 +203,8 @@ class WooCommerceOrderController extends Controller
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
                 
                 // First, try to find existing order (including trashed orders)
-                $existing = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                // Use withoutGlobalScopes() to remove ALL global scopes, then manually filter
+                $existing = Order::withoutGlobalScopes()
                     ->withTrashed()
                     ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
@@ -213,7 +214,9 @@ class WooCommerceOrderController extends Controller
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
                     'existing_order_id' => $existing?->id,
-                    'found_existing' => $existing ? 'YES' : 'NO'
+                    'found_existing' => $existing ? 'YES' : 'NO',
+                    'is_trashed' => $existing?->trashed() ? 'YES' : 'NO',
+                    'deleted_at' => $existing?->deleted_at
                 ]);
 
                 if ($existing) {
@@ -564,7 +567,7 @@ class WooCommerceOrderController extends Controller
                 ]);
 
                 // Try to find the existing order
-                $existing = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                $existing = Order::withoutGlobalScopes()
                     ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
