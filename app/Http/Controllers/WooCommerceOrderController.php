@@ -343,14 +343,22 @@ class WooCommerceOrderController extends Controller
                     'order_data' => $orderData
                 ]);
 
-                try {
-                    // Try to create the order
-                    $order = Order::create($orderData);
-                    \Log::info('Order created successfully', [
-                        'order_id' => $order->id,
-                        'external_order_id' => $externalId
-                    ]);
-                } catch (\Illuminate\Database\QueryException $createException) {
+                // Try to create the order with proper duplicate handling
+                $order = null;
+                $maxRetries = 3;
+                $retryCount = 0;
+                
+                while ($retryCount < $maxRetries && !$order) {
+                    try {
+                        $order = Order::create($orderData);
+                        \Log::info('Order created successfully', [
+                            'order_id' => $order->id,
+                            'external_order_id' => $externalId,
+                            'attempt' => $retryCount + 1
+                        ]);
+                        break; // Success, exit the retry loop
+                        
+                    } catch (\Illuminate\Database\QueryException $createException) {
                     // If creation fails due to duplicate, try to find the existing order
                     if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
                         \Log::info('Order creation failed due to duplicate, fetching existing order', [
