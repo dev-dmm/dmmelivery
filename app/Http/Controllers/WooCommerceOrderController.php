@@ -343,88 +343,82 @@ class WooCommerceOrderController extends Controller
                     'order_data' => $orderData
                 ]);
 
-                try {
-                    // Try to create the order
-                    $order = Order::create($orderData);
-                    \Log::info('Order created successfully', [
-                        'order_id' => $order->id,
-                        'external_order_id' => $externalId
-                    ]);
-                } catch (\Illuminate\Database\QueryException $createException) {
-                    // If creation fails due to duplicate, try to find the existing order
-                    if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
-                        \Log::info('Order creation failed due to duplicate, fetching existing order', [
+                // Try to create the order with proper duplicate handling
+                $order = null;
+                $maxRetries = 3;
+                $retryCount = 0;
+                
+                while ($retryCount < $maxRetries && !$order) {
+                    try {
+                        $order = Order::create($orderData);
+                        \Log::info('Order created successfully', [
+                            'order_id' => $order->id,
                             'external_order_id' => $externalId,
-                            'tenant_id' => $tenant->id,
-                            'error' => $createException->getMessage()
+                            'attempt' => $retryCount + 1
                         ]);
+                        break; // Success, exit the retry loop
                         
-                        // Wait a moment for the other transaction to complete
-                        usleep(100000); // 100ms
-                        
-                        // Try multiple strategies to find the existing order
-                        $order = null;
-                        
-                        // Strategy 1: Find by tenant and external_order_id
-                        $order = Order::where('tenant_id', $tenant->id)
-                            ->where('external_order_id', $externalId)
-                            ->first();
-                        
-                        // Strategy 2: If not found, try without tenant filter
-                        if (!$order) {
-                            $order = Order::where('external_order_id', $externalId)->first();
-                        }
-                        
-                        // Strategy 3: If still not found, try with a broader search
-                        if (!$order) {
-                            $order = Order::where('external_order_id', $externalId)
-                                ->where('customer_email', $customer->email)
-                                ->first();
-                        }
-                        
-                        if ($order) {
-                            // Update the existing order with new data
-                            $order->update($orderData);
-                            \Log::info('Found and updated existing order after race condition', [
-                                'order_id' => $order->id,
-                                'external_order_id' => $externalId,
-                                'strategy_used' => 'found_existing'
-                            ]);
-                        } else {
-                            \Log::error('Could not find existing order after duplicate constraint', [
+                    } catch (\Illuminate\Database\QueryException $createException) {
+                        // If creation fails due to duplicate, try to find the existing order
+                        if ($createException->getCode() == 23000 && str_contains($createException->getMessage(), 'Duplicate entry')) {
+                            $retryCount++;
+                            
+                            \Log::info('Order creation failed due to duplicate, attempting to find existing order', [
                                 'external_order_id' => $externalId,
                                 'tenant_id' => $tenant->id,
-                                'available_orders' => Order::where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'customer_email']),
-                                'customer_email' => $customer->email
+                                'attempt' => $retryCount,
+                                'max_retries' => $maxRetries,
+                                'error' => $createException->getMessage()
                             ]);
                             
-                            // As a last resort, try to create the order again with a different ID
-                            // This handles the case where the order exists but we can't find it
-                            try {
-                                $orderData['id'] = Str::uuid();
-                                $order = Order::create($orderData);
-                                \Log::info('Created order with new UUID after duplicate constraint', [
-                                    'order_id' => $order->id,
-                                    'external_order_id' => $externalId
+                            // Wait a moment for the other transaction to complete
+                            usleep(100000 * $retryCount); // Increasing delay: 100ms, 200ms, 300ms
+                            
+                            // Try to find the existing order
+                            $existing = Order::where('tenant_id', $tenant->id)
+                                ->where('external_order_id', $externalId)
+                                ->first();
+                            
+                            if ($existing) {
+                                \Log::info('Found existing order after duplicate constraint', [
+                                    'order_id' => $existing->id,
+                                    'external_order_id' => $externalId,
+                                    'attempt' => $retryCount
                                 ]);
-                            } catch (\Exception $retryException) {
-                                \Log::error('Failed to create order even with new UUID', [
+                                $order = $existing; // Use the existing order
+                                break; // Success, exit the retry loop
+                            } else {
+                                \Log::warning('Could not find existing order after duplicate constraint', [
                                     'external_order_id' => $externalId,
                                     'tenant_id' => $tenant->id,
-                                    'retry_error' => $retryException->getMessage()
+                                    'attempt' => $retryCount,
+                                    'max_retries' => $maxRetries
                                 ]);
-                                throw $createException; // Re-throw original exception
+                                
+                                if ($retryCount >= $maxRetries) {
+                                    \Log::error('Max retries reached, could not find existing order', [
+                                        'external_order_id' => $externalId,
+                                        'tenant_id' => $tenant->id,
+                                        'retry_count' => $retryCount,
+                                        'available_orders' => Order::where('tenant_id', $tenant->id)->where('external_order_id', $externalId)->get(['id', 'tenant_id', 'external_order_id', 'created_at'])
+                                    ]);
+                                    throw $createException; // Re-throw if we can't find it after all retries
+                                }
                             }
+                        } else {
+                            \Log::error('Order creation failed with non-duplicate error', [
+                                'external_order_id' => $externalId,
+                                'tenant_id' => $tenant->id,
+                                'error' => $createException->getMessage(),
+                                'error_code' => $createException->getCode()
+                            ]);
+                            throw $createException; // Re-throw other query exceptions
                         }
-                    } else {
-                        \Log::error('Order creation failed with non-duplicate error', [
-                            'external_order_id' => $externalId,
-                            'tenant_id' => $tenant->id,
-                            'error' => $createException->getMessage(),
-                            'error_code' => $createException->getCode()
-                        ]);
-                        throw $createException; // Re-throw if it's not a duplicate error
                     }
+                }
+                
+                if (!$order) {
+                    throw new \Exception('Failed to create or find order after maximum retries');
                 }
                 
                 // Create order items if provided
