@@ -157,7 +157,19 @@ class WooCommerceOrderController extends Controller
                 \Log::info('Checked for existing order with lock', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
-                    'existing_order_id' => $existing?->id
+                    'existing_order_id' => $existing?->id,
+                    'found_existing' => $existing ? 'YES' : 'NO'
+                ]);
+                
+                // Additional check without lock to see if order exists
+                $orderExists = Order::where('tenant_id', $tenant->id)
+                    ->where('external_order_id', $externalId)
+                    ->exists();
+                    
+                \Log::info('Additional order existence check', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id,
+                    'order_exists' => $orderExists
                 ]);
 
                 if ($existing) {
