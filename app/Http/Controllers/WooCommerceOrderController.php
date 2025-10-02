@@ -423,6 +423,7 @@ class WooCommerceOrderController extends Controller
                     $shipment = Shipment::create([
                         'tenant_id'       => $tenant->id,
                         'order_id'        => $order->id,
+                        'customer_id'     => $customer->id,
                         'courier_id'      => $courier->id,
                         'tracking_number' => $tracking,
                         'status'          => 'pending',
