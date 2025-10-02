@@ -14,4 +14,16 @@ class TenantScope implements Scope
             $builder->where('tenant_id', app('tenant')->id);
         }
     }
+
+    public function extend(Builder $builder)
+    {
+        $this->addWithoutTenantScope($builder);
+    }
+
+    protected function addWithoutTenantScope(Builder $builder)
+    {
+        $builder->macro('withoutTenantScope', function (Builder $builder) {
+            return $builder->withoutGlobalScope($this);
+        });
+    }
 }

@@ -203,7 +203,8 @@ class WooCommerceOrderController extends Controller
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
                 
                 // First, try to find existing order (including trashed orders)
-                $existing = Order::withTrashed()
+                $existing = Order::withoutTenantScope()
+                    ->withTrashed()
                     ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
@@ -579,7 +580,8 @@ class WooCommerceOrderController extends Controller
                 ]);
                 
                 // Try to find the existing order
-                $existing = Order::where('tenant_id', $tenant->id)
+                $existing = Order::withoutTenantScope()
+                    ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
                 
