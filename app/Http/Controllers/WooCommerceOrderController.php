@@ -203,7 +203,7 @@ class WooCommerceOrderController extends Controller
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
                 
                 // First, try to find existing order (including trashed orders)
-                $existing = Order::withoutTenantScope()
+                $existing = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
                     ->withTrashed()
                     ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
@@ -225,9 +225,9 @@ class WooCommerceOrderController extends Controller
                             'tenant_id' => $tenant->id,
                             'deleted_at' => $existing->deleted_at
                         ]);
-                        
+
                         $existing->restore();
-                        
+
                         // Update order with new data from request
                         $existing->update([
                             'status' => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
@@ -250,44 +250,23 @@ class WooCommerceOrderController extends Controller
                             'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
                             'shipping_country' => data_get($request, 'shipping.address.country', 'GR'),
                         ]);
-                        
+
                         \Log::info('Trashed order restored and updated', [
                             'order_id' => $existing->id,
                             'external_order_id' => $externalId,
                             'tenant_id' => $tenant->id
                         ]);
-                        
+
                         return ['order' => $existing, 'shipment' => null, 'existing' => true];
                     }
-                    
-                    // Update customer information if it's missing
-                    if (empty($existing->customer_name) || empty($existing->customer_email)) {
-                        // Get customer data from request for update
-                        $customerName = trim(implode(' ', array_filter([
-                            data_get($request, 'customer.first_name'),
-                            data_get($request, 'customer.last_name'),
-                        ])));
-                        $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
-                        $customerPhone = data_get($request, 'customer.phone');
-                        
-                        $existing->update([
-                            'customer_name'  => $customerName,
-                            'customer_email' => $customerEmail,
-                            'customer_phone' => $customerPhone,
-                        ]);
-                        \Log::info('Updated customer information for existing order', [
-                            'order_id' => $existing->id,
-                            'customer_name' => $customerName,
-                            'customer_email' => $customerEmail
-                        ]);
-                    }
-                    
-                    \Log::info('Order already exists, returning existing order', [
-                        'external_order_id' => $externalId,
+
+                    // Active order - return idempotently
+                    \Log::info('Found active order; returning existing', [
                         'order_id' => $existing->id,
+                        'external_order_id' => $externalId,
                         'tenant_id' => $tenant->id
                     ]);
-                    
+
                     return ['order' => $existing, 'shipment' => null, 'existing' => true];
                 }
 
@@ -566,25 +545,30 @@ class WooCommerceOrderController extends Controller
                     'shipment_id' => Shipment::where('order_id', $order->id)->value('id'),
                 ], 200);
             }
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Log::error('DB error on order create', [
+                'class'       => get_class($e),
+                'sql_state'   => $e->errorInfo[0] ?? null,
+                'driver_code' => $e->errorInfo[1] ?? null,
+                'driver_msg'  => $e->errorInfo[2] ?? $e->getMessage(),
+                'external_id' => $externalId,
+                'tenant_id'   => $tenant->id,
+            ]);
+
             // Check if this is a duplicate key error
-            if (
-                $e instanceof \Illuminate\Database\QueryException &&
-                $e->getCode() == '23000' &&
-                str_contains($e->getMessage(), 'Duplicate entry')
-            ) {
+            if ($e->getCode() == '23000' && str_contains($e->getMessage(), 'Duplicate entry')) {
                 \Log::info('Order already exists (duplicate key constraint)', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
                     'error' => $e->getMessage()
                 ]);
-                
+
                 // Try to find the existing order
-                $existing = Order::withoutTenantScope()
+                $existing = Order::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
                     ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
-                
+
                 if ($existing) {
                     return response()->json([
                         'success' => true,
@@ -594,14 +578,16 @@ class WooCommerceOrderController extends Controller
                     ], 200);
                 }
             }
-            
-            \Log::error('Transaction failed with unexpected error', [
-                'external_order_id' => $externalId,
-                'tenant_id' => $tenant->id,
-                'error' => $e->getMessage(),
-                'error_code' => $e->getCode(),
-                'error_file' => $e->getFile(),
-                'error_line' => $e->getLine()
+
+            throw $e;
+        } catch (\Throwable $e) {
+            \Log::error('Unexpected error', [
+                'class'       => get_class($e),
+                'message'     => $e->getMessage(),
+                'file'        => $e->getFile(),
+                'line'        => $e->getLine(),
+                'external_id' => $externalId ?? null,
+                'tenant_id'   => $tenant->id ?? null,
             ]);
             throw $e;
         }finally {
