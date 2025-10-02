@@ -95,6 +95,10 @@ class WooCommerceOrderController extends Controller
         
         // Normalize external order ID
         $externalId = trim((string) data_get($request, 'order.external_order_id'));
+        if ($externalId === '') {
+            \Log::warning('Rejected: empty external_order_id after normalization', ['payload' => $request->all()]);
+            return response()->json(['success'=>false, 'message'=>'Invalid external_order_id'], 422);
+        }
         $tenantId = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
         
         \Log::info('Starting order processing with Redis lock', [
@@ -519,7 +523,11 @@ class WooCommerceOrderController extends Controller
             }
         } catch (\Exception $e) {
             // Check if this is a duplicate key error
-            if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'external_order_id_tenant_id_unique') !== false) {
+            if (
+                $e instanceof \Illuminate\Database\QueryException &&
+                $e->getCode() == '23000' &&
+                str_contains($e->getMessage(), 'Duplicate entry')
+            ) {
                 \Log::info('Order already exists (duplicate key constraint)', [
                     'external_order_id' => $externalId,
                     'tenant_id' => $tenant->id,
@@ -550,6 +558,9 @@ class WooCommerceOrderController extends Controller
                 'error_line' => $e->getLine()
             ]);
             throw $e;
+        }finally {
+            // Reset to default isolation level (MySQL default: REPEATABLE READ)
+            \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
         }
 
         \Log::info('WooCommerce order processed successfully', [
