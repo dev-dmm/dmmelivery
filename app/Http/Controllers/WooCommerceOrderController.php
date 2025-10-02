@@ -202,8 +202,9 @@ class WooCommerceOrderController extends Controller
         try {
             $result = \DB::transaction(function () use ($tenant, $externalId, $request) {
                 
-                // First, try to find existing order (without lock for better performance)
-                $existing = Order::where('tenant_id', $tenant->id)
+                // First, try to find existing order (including trashed orders)
+                $existing = Order::withTrashed()
+                    ->where('tenant_id', $tenant->id)
                     ->where('external_order_id', $externalId)
                     ->first();
                     
@@ -215,6 +216,49 @@ class WooCommerceOrderController extends Controller
                 ]);
 
                 if ($existing) {
+                    // If order is trashed, restore it
+                    if ($existing->trashed()) {
+                        \Log::info('Found trashed order; restoring', [
+                            'order_id' => $existing->id,
+                            'external_order_id' => $externalId,
+                            'tenant_id' => $tenant->id,
+                            'deleted_at' => $existing->deleted_at
+                        ]);
+                        
+                        $existing->restore();
+                        
+                        // Update order with new data from request
+                        $existing->update([
+                            'status' => $this->mapOrderStatus(data_get($request, 'order.status', 'pending')),
+                            'total_amount' => (float) data_get($request, 'order.total_amount', 0),
+                            'subtotal' => (float) data_get($request, 'order.subtotal', 0),
+                            'tax_amount' => (float) data_get($request, 'order.tax_amount', 0),
+                            'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0),
+                            'discount_amount' => (float) data_get($request, 'order.discount_amount', 0),
+                            'currency' => data_get($request, 'order.currency', 'EUR'),
+                            'payment_status' => data_get($request, 'order.payment_status', 'pending'),
+                            'payment_method' => data_get($request, 'order.payment_method'),
+                            'customer_name' => trim(implode(' ', array_filter([
+                                data_get($request, 'customer.first_name'),
+                                data_get($request, 'customer.last_name'),
+                            ]))),
+                            'customer_email' => data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local',
+                            'customer_phone' => data_get($request, 'customer.phone'),
+                            'shipping_address' => data_get($request, 'shipping.address.address_1'),
+                            'shipping_city' => data_get($request, 'shipping.address.city'),
+                            'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
+                            'shipping_country' => data_get($request, 'shipping.address.country', 'GR'),
+                        ]);
+                        
+                        \Log::info('Trashed order restored and updated', [
+                            'order_id' => $existing->id,
+                            'external_order_id' => $externalId,
+                            'tenant_id' => $tenant->id
+                        ]);
+                        
+                        return ['order' => $existing, 'shipment' => null, 'existing' => true];
+                    }
+                    
                     // Update customer information if it's missing
                     if (empty($existing->customer_name) || empty($existing->customer_email)) {
                         // Get customer data from request for update
