@@ -465,6 +465,29 @@ class WooCommerceOrderController extends Controller
                 ], 200);
             }
         } catch (\Exception $e) {
+            // Check if this is a duplicate key error
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false && strpos($e->getMessage(), 'external_order_id_tenant_id_unique') !== false) {
+                \Log::info('Order already exists (duplicate key constraint)', [
+                    'external_order_id' => $externalId,
+                    'tenant_id' => $tenant->id,
+                    'error' => $e->getMessage()
+                ]);
+                
+                // Try to find the existing order
+                $existing = Order::where('tenant_id', $tenant->id)
+                    ->where('external_order_id', $externalId)
+                    ->first();
+                
+                if ($existing) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Order already exists',
+                        'order_id' => $existing->id,
+                        'shipment_id' => Shipment::where('order_id', $existing->id)->value('id'),
+                    ], 200);
+                }
+            }
+            
             \Log::error('Transaction failed with unexpected error', [
                 'external_order_id' => $externalId,
                 'tenant_id' => $tenant->id,
