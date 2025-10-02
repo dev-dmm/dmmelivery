@@ -421,28 +421,21 @@ class WooCommerceOrderController extends Controller
                     );
 
                     $shipment = Shipment::create([
-                        'tenant_id'       => $tenant->id,
-                        'order_id'        => $order->id,
-                        'customer_id'     => $customer->id,
-                        'courier_id'      => $courier->id,
-                        'tracking_number' => $tracking,
-                        'status'          => 'pending',
-                        'recipient_name'  => trim(implode(' ', array_filter([
-                            $addr['first_name'] ?? '',
-                            $addr['last_name'] ?? ''
-                        ]))),
-                        'recipient_phone' => $addr['phone'] ?? '',
-                        'recipient_email' => $addr['email'] ?? '',
-                        'address_line_1'  => $addr['address_1'] ?? '',
-                        'address_line_2'  => $addr['address_2'] ?? '',
-                        'city'            => $addr['city'] ?? '',
-                        'postal_code'     => $addr['postcode'] ?? '',
-                        'country'         => $addr['country'] ?? 'GR',
-                        'weight'          => (float) data_get($request, 'shipping.weight', 0),
-                        'dimensions'      => null,
-                        'special_instructions' => null,
-                        'created_at'      => now(),
-                        'updated_at'      => now(),
+                        'tenant_id'         => $tenant->id,
+                        'order_id'          => $order->id,
+                        'customer_id'       => $customer->id,
+                        'courier_id'        => $courier->id,
+                        'tracking_number'   => $tracking,
+                        'courier_tracking_id' => $tracking, // Set same as tracking_number
+                        'status'            => 'pending',
+                        'shipping_address'  => $this->formatAddress($addr),
+                        'shipping_city'     => $addr['city'] ?? '',
+                        'billing_address'   => $this->formatAddress($addr),
+                        'weight'            => (float) data_get($request, 'shipping.weight', 0.5),
+                        'shipping_cost'     => (float) data_get($request, 'order.shipping_cost', 0),
+                        'dimensions'        => null,
+                        'created_at'        => now(),
+                        'updated_at'        => now(),
                     ]);
                     
                     \Log::info('Shipment created successfully', [
