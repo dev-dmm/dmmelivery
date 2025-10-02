@@ -130,7 +130,7 @@ class WooCommerceOrderController extends Controller
             'shipping.address.address_1'          => 'required|string',
             'shipping.address.city'               => 'required|string',
             'shipping.address.postcode'           => 'required|string',
-            'customer.email'                      => 'nullable|email',
+            'customer.email'                      => 'nullable|string|max:255',
         ]);
 
         if ($v->fails()) {
