@@ -23,8 +23,8 @@ foreach ($tenantOrders as $order) {
     echo "ID: {$order->id}, Tenant: {$order->tenant_id}, External ID: {$order->external_order_id}, Order Number: {$order->order_number}, Created: {$order->created_at}\n";
 }
 
-echo "\nChecking for any orders created in the last 10 minutes:\n";
-$recentOrders = \App\Models\Order::where('created_at', '>=', now()->subMinutes(10))
+echo "\nChecking for any orders created in the last 5 minutes:\n";
+$recentOrders = \App\Models\Order::where('created_at', '>=', now()->subMinutes(5))
     ->orderBy('created_at', 'desc')
     ->limit(10)
     ->get(['id', 'tenant_id', 'external_order_id', 'order_number', 'created_at']);

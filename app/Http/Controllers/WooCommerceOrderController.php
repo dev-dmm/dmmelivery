@@ -96,6 +96,11 @@ class WooCommerceOrderController extends Controller
             'external_order_id' => data_get($request, 'order.external_order_id'),
             'timestamp' => now()->toDateTimeString()
         ]);
+        
+        \Log::info('DEBUG: About to start database transaction', [
+            'external_order_id' => data_get($request, 'order.external_order_id'),
+            'timestamp' => now()->toDateTimeString()
+        ]);
 
         // Read headers
         $headerKey = $request->header('X-Api-Key');
