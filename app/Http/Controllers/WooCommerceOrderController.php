@@ -91,6 +91,11 @@ class WooCommerceOrderController extends Controller
             'headers' => $request->headers->all(),
             'payload' => $request->all()
         ]);
+        
+        \Log::info('Starting order processing - METHOD BEGIN', [
+            'external_order_id' => data_get($request, 'order.external_order_id'),
+            'timestamp' => now()->toDateTimeString()
+        ]);
 
         // Read headers
         $headerKey = $request->header('X-Api-Key');
