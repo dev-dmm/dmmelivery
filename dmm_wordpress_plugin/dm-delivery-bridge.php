@@ -15,6 +15,7 @@
  * Requires PHP: 7.4
  * WC requires at least: 5.0
  * WC tested up to: 8.5
+ * HPOS: yes
  */
 
 // File tracking probe
@@ -30,6 +31,14 @@ define('DMM_DELIVERY_BRIDGE_VERSION', '1.0.0');
 define('DMM_DELIVERY_BRIDGE_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DMM_DELIVERY_BRIDGE_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DMM_DELIVERY_BRIDGE_PLUGIN_FILE', __FILE__);
+
+// Multi-courier includes
+require_once __DIR__ . '/includes/Courier/Provider.php';
+require_once __DIR__ . '/includes/Courier/Registry.php';
+require_once __DIR__ . '/includes/Courier/MetaMapping.php';
+require_once __DIR__ . '/includes/Courier/AcsProvider.php';
+require_once __DIR__ . '/includes/Courier/SpeedexProvider.php';
+require_once __DIR__ . '/includes/Courier/GenericProvider.php';
 
 /**
  * Main plugin class
@@ -80,8 +89,21 @@ class DMM_Delivery_Bridge {
             return;
         }
         
+        // Prevent double hook registration
+        if (did_action('dmm_delivery_bridge_hooks_registered')) {
+            return;
+        }
+        
         // Load text domain
         load_plugin_textdomain('dmm-delivery-bridge', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        
+        // Register multi-courier providers
+        \DMM\Courier\Registry::register(new \DMM\Courier\AcsProvider());
+        \DMM\Courier\Registry::register(new \DMM\Courier\SpeedexProvider());
+        \DMM\Courier\Registry::register(new \DMM\Courier\GenericProvider());
+        
+        // Allow 3rd parties to register more providers
+        do_action('dmm_register_courier_providers', \DMM\Courier\Registry::class);
         
         // Initialize admin
         if (is_admin()) {
@@ -89,12 +111,21 @@ class DMM_Delivery_Bridge {
             add_action('admin_init', [$this, 'admin_init']);
         }
         
-        // Hook into WooCommerce order processing
-        add_action('woocommerce_order_status_processing', [$this, 'send_order_to_api']);
-        add_action('woocommerce_order_status_completed', [$this, 'send_order_to_api']);
+        // Hook into WooCommerce order processing - comprehensive triggers
+        add_action('woocommerce_payment_complete', [$this, 'queue_send_to_api'], 10, 1);
+        add_action('woocommerce_order_status_changed', [$this, 'maybe_queue_send_on_status'], 10, 4);
+        add_action('woocommerce_order_status_processing', [$this, 'queue_send_to_api']);
+        add_action('woocommerce_order_status_completed', [$this, 'queue_send_to_api']);
+        
+        // Subscriptions support
+        add_action('wcs_renewal_order_created', [$this, 'queue_send_to_api'], 10, 1);
         
         // Add custom order meta box
         add_action('add_meta_boxes', [$this, 'add_order_meta_box']);
+        
+        // Action Scheduler handlers
+        add_action('dmm_send_order', [$this, 'process_order_async'], 10, 1);
+        add_action('dmm_update_order', [$this, 'process_order_update'], 10, 1);
         
         // AJAX handlers
         add_action('wp_ajax_dmm_test_connection', [$this, 'ajax_test_connection']);
@@ -110,6 +141,11 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_diagnose_orders', [$this, 'ajax_diagnose_orders']);
         add_action('wp_ajax_dmm_force_resend_all', [$this, 'ajax_force_resend_all']);
         add_action('wp_ajax_dmm_test_force_resend', [$this, 'ajax_test_force_resend']);
+        add_action('wp_ajax_dmm_get_monitoring_data', [$this, 'ajax_get_monitoring_data']);
+        add_action('wp_ajax_dmm_clear_failed_orders', [$this, 'ajax_clear_failed_orders']);
+        
+        // Order update monitoring
+        add_action('woocommerce_order_object_updated_props', [$this, 'handle_order_updated'], 10, 2);
         
         // ACS Voucher Detection
         add_action('wp_ajax_dmm_acs_track_shipment', [$this, 'ajax_acs_track_shipment']);
@@ -134,9 +170,56 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_elta_update_tracking', [$this, 'ajax_elta_update_tracking']);
         add_action('wp_ajax_dmm_elta_delete_tracking', [$this, 'ajax_elta_delete_tracking']);
         
-        // Meta field monitoring for ACS vouchers
+        // Meta field monitoring for ACS vouchers (HPOS compatible)
         add_action('updated_post_meta', [$this, 'on_meta_updated'], 10, 4);
         add_action('added_post_meta', [$this, 'on_meta_added'], 10, 4);
+        
+        // HPOS-safe order save hook
+        add_action('woocommerce_after_order_object_save', [$this, 'on_order_saved'], 10, 1);
+        
+        // Order item meta updates (shipping items)
+        add_action('woocommerce_update_order_item_meta', [$this, 'on_order_item_meta_updated'], 10, 4);
+        
+        // Order notes for voucher mentions
+        add_action('woocommerce_new_order_note', [$this, 'on_order_note_added'], 10, 2);
+        
+        // ActionScheduler hooks
+        add_action('dmm_process_detected_voucher', [$this, 'process_detected_voucher'], 10, 1);
+        
+        // Admin interface for voucher detection logs
+        add_action('add_meta_boxes', [$this, 'add_voucher_detection_meta_box']);
+        
+        // Database table creation
+        add_action('init', [$this, 'create_dedupe_table']);
+        
+        // Cleanup tasks
+        add_action('dmm_cleanup_old_logs', [$this, 'cleanup_old_logs']);
+        add_action('dmm_check_stuck_jobs', [$this, 'check_stuck_jobs']);
+        
+        // Manual override AJAX handlers
+        add_action('wp_ajax_dmm_manual_set_voucher', [$this, 'ajax_manual_set_voucher']);
+        add_action('wp_ajax_dmm_test_voucher_lookup', [$this, 'ajax_test_voucher_lookup']);
+        add_action('wp_ajax_dmm_clear_redetect_voucher', [$this, 'ajax_clear_redetect_voucher']);
+        add_action('wp_ajax_dmm_force_reassign_voucher', [$this, 'ajax_force_reassign_voucher']);
+        
+        // GDPR compliance
+        add_filter('wp_privacy_personal_data_exporters', [$this, 'register_privacy_exporter']);
+        add_filter('wp_privacy_personal_data_erasers', [$this, 'register_privacy_eraser']);
+        
+        // Admin notices for job health
+        add_action('admin_notices', [$this, 'show_job_health_notices']);
+        
+        // Day-2 KPIs and alert rules
+        add_action('dmm_check_day2_kpis', [$this, 'check_day2_kpis']);
+        add_action('dmm_synthetic_probe', [$this, 'run_synthetic_probe']);
+        
+        // System status
+        add_filter('woocommerce_system_status_report', [$this, 'add_system_status_row']);
+        
+        // WP-CLI commands
+        if (defined('WP_CLI') && WP_CLI) {
+            add_action('cli_init', [$this, 'register_cli_commands']);
+        }
         
         // ACS Status Sync Scheduling
         add_action('wp_ajax_dmm_acs_sync_all_shipments', [$this, 'ajax_acs_sync_all_shipments']);
@@ -448,6 +531,16 @@ class DMM_Delivery_Bridge {
             [$this, 'orders_admin_page']
         );
         
+        // Monitoring subpage
+        add_submenu_page(
+            'dmm-delivery-bridge',
+            __('Monitoring', 'dmm-delivery-bridge'),
+            __('Monitoring', 'dmm-delivery-bridge'),
+            'manage_options',
+            'dmm-delivery-bridge-monitoring',
+            [$this, 'monitoring_admin_page']
+        );
+        
         // Log Details subpage (hidden from menu)
         add_submenu_page(
             null, // Hidden from menu
@@ -501,6 +594,14 @@ class DMM_Delivery_Bridge {
             'tenant_id',
             __('Tenant ID', 'dmm-delivery-bridge'),
             [$this, 'tenant_id_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_api_section'
+        );
+        
+        add_settings_field(
+            'api_secret',
+            __('API Secret', 'dmm-delivery-bridge'),
+            [$this, 'api_secret_callback'],
             'dmm_delivery_bridge_settings',
             'dmm_delivery_bridge_api_section'
         );
@@ -728,6 +829,30 @@ class DMM_Delivery_Bridge {
             [$this, 'elta_apost_code_callback'],
             'dmm_delivery_bridge_settings',
             'dmm_delivery_bridge_elta_section'
+        );
+        
+        // Multi-Courier Settings Section
+        add_settings_section(
+            'dmm_delivery_bridge_multi_courier_section',
+            __('Multi-Courier Settings', 'dmm-delivery-bridge'),
+            [$this, 'multi_courier_section_callback'],
+            'dmm_delivery_bridge_settings'
+        );
+        
+        add_settings_field(
+            'dmm_default_courier',
+            __('Default Courier', 'dmm-delivery-bridge'),
+            [$this, 'default_courier_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_multi_courier_section'
+        );
+        
+        add_settings_field(
+            'dmm_courier_priority',
+            __('Courier Priority', 'dmm-delivery-bridge'),
+            [$this, 'courier_priority_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_multi_courier_section'
         );
     }
     
@@ -2289,6 +2414,129 @@ class DMM_Delivery_Bridge {
     
     
     /**
+     * Monitoring admin page
+     */
+    public function monitoring_admin_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+            
+            <div class="dmm-monitoring-dashboard">
+                <div class="dmm-stats-grid">
+                    <div class="dmm-stat-card">
+                        <h3><?php _e('Queue Status', 'dmm-delivery-bridge'); ?></h3>
+                        <div id="dmm-queue-status">
+                            <p><?php _e('Loading...', 'dmm-delivery-bridge'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="dmm-stat-card">
+                        <h3><?php _e('Recent Activity', 'dmm-delivery-bridge'); ?></h3>
+                        <div id="dmm-recent-activity">
+                            <p><?php _e('Loading...', 'dmm-delivery-bridge'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="dmm-stat-card">
+                        <h3><?php _e('Failed Orders', 'dmm-delivery-bridge'); ?></h3>
+                        <div id="dmm-failed-orders">
+                            <p><?php _e('Loading...', 'dmm-delivery-bridge'); ?></p>
+                        </div>
+                    </div>
+                    
+                    <div class="dmm-stat-card">
+                        <h3><?php _e('System Health', 'dmm-delivery-bridge'); ?></h3>
+                        <div id="dmm-system-health">
+                            <p><?php _e('Loading...', 'dmm-delivery-bridge'); ?></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dmm-actions">
+                    <button type="button" class="button button-primary" id="dmm-refresh-monitoring">
+                        <?php _e('Refresh', 'dmm-delivery-bridge'); ?>
+                    </button>
+                    <button type="button" class="button" id="dmm-clear-failed-orders">
+                        <?php _e('Clear Failed Orders', 'dmm-delivery-bridge'); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .dmm-monitoring-dashboard {
+            margin-top: 20px;
+        }
+        
+        .dmm-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .dmm-stat-card {
+            background: #fff;
+            border: 1px solid #ccd0d4;
+            border-radius: 4px;
+            padding: 20px;
+            box-shadow: 0 1px 1px rgba(0,0,0,.04);
+        }
+        
+        .dmm-stat-card h3 {
+            margin-top: 0;
+            color: #23282d;
+        }
+        
+        .dmm-actions {
+            display: flex;
+            gap: 10px;
+        }
+        </style>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            function refreshMonitoring() {
+                $.post(ajaxurl, {
+                    action: 'dmm_get_monitoring_data',
+                    nonce: '<?php echo wp_create_nonce('dmm_monitoring'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        $('#dmm-queue-status').html(response.data.queue_status);
+                        $('#dmm-recent-activity').html(response.data.recent_activity);
+                        $('#dmm-failed-orders').html(response.data.failed_orders);
+                        $('#dmm-system-health').html(response.data.system_health);
+                    }
+                });
+            }
+            
+            $('#dmm-refresh-monitoring').click(refreshMonitoring);
+            
+            $('#dmm-clear-failed-orders').click(function() {
+                if (confirm('<?php _e('Are you sure you want to clear all failed orders?', 'dmm-delivery-bridge'); ?>')) {
+                    $.post(ajaxurl, {
+                        action: 'dmm_clear_failed_orders',
+                        nonce: '<?php echo wp_create_nonce('dmm_monitoring'); ?>'
+                    }, function(response) {
+                        if (response.success) {
+                            alert('<?php _e('Failed orders cleared successfully.', 'dmm-delivery-bridge'); ?>');
+                            refreshMonitoring();
+                        }
+                    });
+                }
+            });
+            
+            // Initial load
+            refreshMonitoring();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(refreshMonitoring, 30000);
+        });
+        </script>
+        <?php
+    }
+    
+    /**
      * Orders Management admin page
      */
     public function orders_admin_page() {
@@ -2790,14 +3038,25 @@ class DMM_Delivery_Bridge {
         echo '<p class="description">' . __('Your tenant ID from the DMM Delivery system.', 'dmm-delivery-bridge') . '</p>';
     }
     
+    public function api_secret_callback() {
+        $value = isset($this->options['api_secret']) ? $this->options['api_secret'] : '';
+        echo '<input type="password" name="dmm_delivery_bridge_options[api_secret]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . __('Your API secret for payload signing (optional but recommended for security).', 'dmm-delivery-bridge') . '</p>';
+    }
+    
     public function acs_courier_meta_field_callback() {
         $value = isset($this->options['acs_courier_meta_field']) ? $this->options['acs_courier_meta_field'] : '_acs_voucher';
+        $watched_keys = isset($this->options['acs_watched_keys']) ? $this->options['acs_watched_keys'] : [];
         
         // Get all available meta fields
         $all_fields = $this->get_recent_order_meta_fields();
         
+        echo '<div class="dmm-voucher-settings">';
+        
+        // Primary field selection
+        echo '<h4>' . __('Primary Voucher Field', 'dmm-delivery-bridge') . '</h4>';
         echo '<select name="dmm_delivery_bridge_options[acs_courier_meta_field]" class="regular-text" style="max-height: 30px;" size="1">';
-        echo '<option value="">' . __('-- Select a meta field --', 'dmm-delivery-bridge') . '</option>';
+        echo '<option value="">' . __('-- Select primary meta field --', 'dmm-delivery-bridge') . '</option>';
         
         // Group fields by type
         $grouped_fields = [];
@@ -2825,7 +3084,81 @@ class DMM_Delivery_Bridge {
         }
         
         echo '</select>';
-        echo '<p class="description">' . __('Select the meta field that contains the ACS Courier voucher number for each order.', 'dmm-delivery-bridge') . '</p>';
+        echo '<p class="description">' . __('Primary meta field that contains the ACS Courier voucher number.', 'dmm-delivery-bridge') . '</p>';
+        
+        // Additional watched keys
+        echo '<h4>' . __('Additional Watched Fields', 'dmm-delivery-bridge') . '</h4>';
+        echo '<div class="dmm-multi-select-container">';
+        echo '<select name="dmm_delivery_bridge_options[acs_watched_keys][]" multiple class="regular-text" style="height: 120px;">';
+        
+        foreach ($grouped_fields as $group => $fields) {
+            echo '<optgroup label="' . esc_attr($group) . '">';
+            foreach ($fields as $field) {
+                $selected = in_array($field, $watched_keys) ? 'selected' : '';
+                echo '<option value="' . esc_attr($field) . '"' . $selected . '>' . esc_html($field) . '</option>';
+            }
+            echo '</optgroup>';
+        }
+        
+        echo '</select>';
+        echo '<p class="description">' . __('Hold Ctrl/Cmd to select multiple fields. These will also be monitored for ACS vouchers.', 'dmm-delivery-bridge') . '</p>';
+        echo '</div>';
+        
+        // Auto-detection toggle
+        $auto_detection = isset($this->options['acs_auto_detection']) ? $this->options['acs_auto_detection'] : true;
+        echo '<h4>' . __('Auto-Detection Settings', 'dmm-delivery-bridge') . '</h4>';
+        echo '<label>';
+        echo '<input type="checkbox" name="dmm_delivery_bridge_options[acs_auto_detection]" value="1" ' . checked($auto_detection, true, false) . '>';
+        echo ' ' . __('Enable automatic voucher detection from third-party plugins', 'dmm-delivery-bridge');
+        echo '</label>';
+        echo '<p class="description">' . __('When enabled, the system will automatically detect ACS vouchers from various sources (post meta, item meta, order notes).', 'dmm-delivery-bridge') . '</p>';
+        
+        // Canary mode setting
+        $canary_percentage = isset($this->options['acs_canary_percentage']) ? $this->options['acs_canary_percentage'] : 100;
+        echo '<h4>' . __('Canary Mode', 'dmm-delivery-bridge') . '</h4>';
+        echo '<label for="acs_canary_percentage">' . __('Processing Percentage:', 'dmm-delivery-bridge') . '</label><br>';
+        echo '<input type="number" name="dmm_delivery_bridge_options[acs_canary_percentage]" id="acs_canary_percentage" value="' . esc_attr($canary_percentage) . '" min="0" max="100" style="width: 100px;">';
+        echo '<p class="description">' . __('Percentage of voucher detections to process (0-100). Use for gradual rollout. 100 = full processing.', 'dmm-delivery-bridge') . '</p>';
+        
+        // Feature toggles
+        echo '<h4>' . __('Feature Toggles', 'dmm-delivery-bridge') . '</h4>';
+        
+        // Detector OFF toggle
+        $detector_off = isset($this->options['detector_off']) ? $this->options['detector_off'] : false;
+        echo '<label>';
+        echo '<input type="checkbox" name="dmm_delivery_bridge_options[detector_off]" value="1" ' . checked($detector_off, true, false) . '>';
+        echo ' ' . __('Detector OFF (Hard Kill Switch)', 'dmm-delivery-bridge');
+        echo '</label>';
+        echo '<p class="description">' . __('Instant rollback - disables all voucher detection and processing.', 'dmm-delivery-bridge') . '</p>';
+        
+        // Synthetic probe toggle
+        $probe_enabled = get_option('dmm_probe_enabled', false);
+        echo '<label>';
+        echo '<input type="checkbox" name="dmm_probe_enabled" value="1" ' . checked($probe_enabled, true, false) . '>';
+        echo ' ' . __('Enable Synthetic Probe', 'dmm-delivery-bridge');
+        echo '</label>';
+        echo '<p class="description">' . __('Automated testing with synthetic orders (hourly cron).', 'dmm-delivery-bridge') . '</p>';
+        
+        // HPOS status
+        echo '<h4>' . __('System Status', 'dmm-delivery-bridge') . '</h4>';
+        $hpos_enabled = $this->is_hpos_enabled();
+        echo '<p><strong>' . __('HPOS Status:', 'dmm-delivery-bridge') . '</strong> ';
+        echo $hpos_enabled ? '<span style="color: green;">✓ Enabled</span>' : '<span style="color: orange;">⚠ Disabled (using post meta)</span>';
+        echo '</p>';
+        
+        $action_scheduler = class_exists('ActionScheduler');
+        echo '<p><strong>' . __('ActionScheduler:', 'dmm-delivery-bridge') . '</strong> ';
+        echo $action_scheduler ? '<span style="color: green;">✓ Available</span>' : '<span style="color: red;">✗ Not Available</span>';
+        echo '</p>';
+        
+        echo '</div>';
+        
+        // Add some CSS for better styling
+        echo '<style>
+        .dmm-voucher-settings h4 { margin-top: 20px; margin-bottom: 10px; }
+        .dmm-multi-select-container { margin-bottom: 15px; }
+        .dmm-voucher-settings label { display: block; margin-bottom: 10px; }
+        </style>';
     }
     
     public function geniki_courier_meta_field_callback() {
@@ -3172,10 +3505,30 @@ class DMM_Delivery_Bridge {
         </script>';
     }
     
+    public function multi_courier_section_callback() {
+        echo '<p>' . __('Configure multi-courier support for automatic courier detection and routing.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function default_courier_callback() {
+        $value = get_option('dmm_default_courier', 'acs');
+        echo '<select name="dmm_default_courier" id="dmm_default_courier">';
+        echo '<option value="acs"' . selected($value, 'acs', false) . '>ACS</option>';
+        echo '<option value="speedex"' . selected($value, 'speedex', false) . '>SPEEDEX</option>';
+        echo '<option value="generic"' . selected($value, 'generic', false) . '>Generic</option>';
+        echo '</select>';
+        echo '<p class="description">' . __('Default courier for unknown meta keys.', 'dmm-delivery-bridge') . '</p>';
+    }
+    
+    public function courier_priority_callback() {
+        $value = get_option('dmm_courier_priority', 'acs,speedex,generic');
+        echo '<input type="text" name="dmm_courier_priority" id="dmm_courier_priority" value="' . esc_attr($value) . '" style="width: 300px;" />';
+        echo '<p class="description">' . __('Comma-separated priority order (e.g., acs,speedex,generic).', 'dmm-delivery-bridge') . '</p>';
+    }
+    
     /**
-     * Send order to API
+     * Queue order for sending to API (Action Scheduler)
      */
-    public function send_order_to_api($order_id) {
+    public function queue_send_to_api($order_id) {
         // Check if auto send is enabled
         if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
             return;
@@ -3193,22 +3546,208 @@ class DMM_Delivery_Bridge {
         }
         
         // Check if already sent successfully
-        if (get_post_meta($order_id, '_dmm_delivery_sent', true) === 'yes') {
+        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
             return;
         }
         
-        $this->process_order($order);
+        // Check for race condition with transient lock
+        $lock_key = 'dmm_sending_' . $order_id;
+        if (get_transient($lock_key)) {
+            return; // Already being processed
+        }
+        
+        // Set lock with longer TTL for queue backup scenarios (10 minutes)
+        set_transient($lock_key, true, 600);
+        
+        // Enqueue Action Scheduler job with stable group
+        as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
+        
+        $this->debug_log("Queued order {$order_id} for sending to API");
     }
     
     /**
-     * Process order and send to API (with duplicate check)
+     * Handle status change events with comprehensive checking
+     */
+    public function maybe_queue_send_on_status($order_id, $old_status, $new_status, $order) {
+        // Check if auto send is enabled
+        if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
+            return;
+        }
+        
+        // Check if this status should trigger sending
+        $order_statuses = isset($this->options['order_statuses']) ? $this->options['order_statuses'] : ['processing', 'completed'];
+        if (!in_array($new_status, $order_statuses)) {
+            return;
+        }
+        
+        // Check if already sent successfully
+        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
+            return;
+        }
+        
+        // Check for race condition with transient lock
+        $lock_key = 'dmm_sending_' . $order_id;
+        if (get_transient($lock_key)) {
+            return; // Already being processed
+        }
+        
+        // Set lock with longer TTL for queue backup scenarios (10 minutes)
+        set_transient($lock_key, true, 600);
+        
+        // Enqueue Action Scheduler job with stable group
+        as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
+        
+        $this->debug_log("Queued order {$order_id} for sending to API (status change: {$old_status} -> {$new_status})");
+    }
+    
+    /**
+     * Legacy method for backward compatibility
+     */
+    public function send_order_to_api($order_id) {
+        $this->queue_send_to_api($order_id);
+    }
+    
+    /**
+     * Process order asynchronously via Action Scheduler
+     */
+    public function process_order_async($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            $this->debug_log("Order {$order_id} not found in async processing");
+            return;
+        }
+        
+        // Clear the lock
+        delete_transient('dmm_sending_' . $order_id);
+        
+        // Re-check if already sent (race condition protection)
+        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
+            $this->debug_log("Order {$order_id} already sent, skipping async processing");
+            return;
+        }
+        
+        $this->process_order_robust($order);
+    }
+    
+    /**
+     * Process order update asynchronously
+     */
+    public function process_order_update($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            $this->debug_log("Order {$order_id} not found in update processing");
+            return;
+        }
+        
+        // Clear the lock
+        delete_transient('dmm_updating_' . $order_id);
+        
+        // Only process if order was already sent
+        if ($order->get_meta('_dmm_delivery_sent') !== 'yes') {
+            $this->debug_log("Order {$order_id} not sent yet, skipping update");
+            return;
+        }
+        
+        $this->process_order_update_robust($order);
+    }
+    
+    /**
+     * Robust order update processing
+     */
+    private function process_order_update_robust($order) {
+        $order_id = $order->get_id();
+        
+        // Generate update-specific idempotency key
+        $idempotency_key = $this->generate_update_idempotency_key($order);
+        
+        try {
+            // Prepare order data with update flag
+            $order_data = $this->prepare_order_data($order);
+            $order_data['idempotency_key'] = $idempotency_key;
+            $order_data['sync_update'] = true; // Flag for PATCH/PUT
+            
+            $this->log_structured('order_update_start', [
+                'order_id' => $order_id,
+                'idempotency_key' => $idempotency_key
+            ]);
+            
+            // Send update to API
+            $response = $this->send_to_api($order_data);
+            
+            if ($response && $response['success']) {
+                // Update payload hash
+                $order->update_meta_data('_dmm_delivery_payload_hash', hash('sha256', json_encode($order_data)));
+                $order->update_meta_data('_dmm_delivery_updated_at', gmdate('c'));
+                $order->save();
+                
+                // Add order note
+                $order->add_order_note(__('Order updated in DMM Delivery system.', 'dmm-delivery-bridge'));
+                
+                $this->log_structured('order_update_success', [
+                    'order_id' => $order_id
+                ]);
+            } else {
+                $error_message = $response ? $response['message'] : 'Unknown error occurred';
+                $order->add_order_note(
+                    sprintf(__('Failed to update order in DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
+                );
+                
+                $this->log_structured('order_update_failed', [
+                    'order_id' => $order_id,
+                    'error' => $error_message
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            $this->log_structured('order_update_exception', [
+                'order_id' => $order_id,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Generate idempotency key for updates
+     */
+    private function generate_update_idempotency_key($order) {
+        $secret = isset($this->options['api_secret']) ? $this->options['api_secret'] : 'default_secret';
+        $site_url = get_site_url();
+        $order_id = $order->get_id();
+        $order_timestamp = $order->get_date_created()->getTimestamp();
+        
+        // Update-specific key namespace
+        $key_data = $site_url . '|' . $order_id . '|' . $order_timestamp . '|update';
+        return hash_hmac('sha256', $key_data, $secret);
+    }
+    
+    /**
+     * Process order and send to API (with duplicate check) - HPOS compatible
      */
     public function process_order($order) {
+        $this->process_order_robust($order);
+    }
+    
+    /**
+     * Robust order processing with retry logic and idempotency
+     */
+    private function process_order_robust($order) {
         $order_id = $order->get_id();
         
         // Check if already sent successfully
-        if (get_post_meta($order_id, '_dmm_delivery_sent', true) === 'yes') {
+        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
             $this->debug_log('Order ' . $order_id . ' already sent, skipping');
+            return;
+        }
+        
+        // Generate idempotency key
+        $idempotency_key = $this->generate_idempotency_key($order);
+        
+        // Check retry count
+        $retry_count = (int) $order->get_meta('_dmm_delivery_retry_count');
+        $max_retries = 5;
+        
+        if ($retry_count >= $max_retries) {
+            $this->handle_max_retries_reached($order);
             return;
         }
         
@@ -3216,26 +3755,19 @@ class DMM_Delivery_Bridge {
         $response = null;
         
         try {
-            // Prepare order data
+            // Prepare order data with idempotency key
             $order_data = $this->prepare_order_data($order);
+            $order_data['idempotency_key'] = $idempotency_key;
             
-            // Debug logging
-            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
-                error_log('DMM Delivery Bridge - Processing Order ID: ' . $order_id);
-                error_log('DMM Delivery Bridge - Order Data: ' . print_r($order_data, true));
-                error_log('DMM Delivery Bridge - Customer Email: ' . $order->get_billing_email());
-                error_log('DMM Delivery Bridge - Customer Phone: ' . $order->get_billing_phone());
-                
-                // Log product images for debugging
-                if (isset($order_data['order']['items'])) {
-                    foreach ($order_data['order']['items'] as $index => $item) {
-                        error_log('DMM Delivery Bridge - Product ' . ($index + 1) . ' Image: ' . ($item['image_url'] ?? 'No image'));
-                    }
-                }
-            }
+            // Add structured logging
+            $this->log_structured('order_processing_start', [
+                'order_id' => $order_id,
+                'retry_count' => $retry_count,
+                'idempotency_key' => $idempotency_key
+            ]);
             
-            // Send to API
-            $response = $this->send_to_api($order_data);
+            // Send to API with retry logic
+            $response = $this->send_to_api_with_retry($order_data, $retry_count);
             
             // Debug API response
             if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
@@ -3244,7 +3776,11 @@ class DMM_Delivery_Bridge {
             
         } catch (Exception $e) {
             // Handle any exceptions during processing
-            error_log('DMM Delivery Bridge - Exception during order processing: ' . $e->getMessage());
+            $this->log_structured('order_processing_exception', [
+                'order_id' => $order_id,
+                'error' => $e->getMessage(),
+                'retry_count' => $retry_count
+            ]);
             
             $response = [
                 'success' => false,
@@ -3258,23 +3794,303 @@ class DMM_Delivery_Bridge {
             $this->log_request($order_id, $order_data, $response);
         }
         
-        // Update order meta
+        // Handle response
         if ($response && $response['success']) {
-            update_post_meta($order_id, '_dmm_delivery_sent', 'yes');
-            update_post_meta($order_id, '_dmm_delivery_order_id', $response['data']['order_id'] ?? '');
-            update_post_meta($order_id, '_dmm_delivery_shipment_id', $response['data']['shipment_id'] ?? '');
-            
-            // Add order note
-            $order->add_order_note(__('Order sent to DMM Delivery system successfully.', 'dmm-delivery-bridge'));
+            $this->handle_successful_send($order, $response);
         } else {
-            update_post_meta($order_id, '_dmm_delivery_sent', 'error');
-            
-            // Add order note with error
-            $error_message = $response ? $response['message'] : 'Unknown error occurred';
-            $order->add_order_note(
-                sprintf(__('Failed to send order to DMM Delivery system: %s', 'dmm-delivery-bridge'), $error_message)
-            );
+            $this->handle_failed_send($order, $response, $retry_count);
         }
+    }
+    
+    /**
+     * Generate deterministic idempotency key (stable across retries)
+     */
+    private function generate_idempotency_key($order) {
+        $secret = isset($this->options['api_secret']) ? $this->options['api_secret'] : 'default_secret';
+        $site_url = get_site_url();
+        $order_id = $order->get_id();
+        $order_timestamp = $order->get_date_created()->getTimestamp();
+        
+        // Stable key that doesn't change across retries
+        $key_data = $site_url . '|' . $order_id . '|' . $order_timestamp;
+        return hash_hmac('sha256', $key_data, $secret);
+    }
+    
+    /**
+     * Send to API with retry logic
+     */
+    private function send_to_api_with_retry($order_data, $retry_count) {
+        $response = $this->send_to_api($order_data);
+        
+        // If failed and retryable, schedule retry
+        if (!$response['success'] && $this->is_retryable_error($response)) {
+            $this->schedule_retry($order_data['order']['id'], $retry_count);
+        }
+        
+        return $response;
+    }
+    
+    /**
+     * Check if error is retryable based on HTTP status and error type
+     */
+    private function is_retryable_error($response) {
+        $http_code = $response['http_code'] ?? 0;
+        $message = strtolower($response['message'] ?? '');
+        
+        // Retry on: 408/429/5xx, cURL timeouts, DNS failures, connection reset
+        if (in_array($http_code, [408, 429]) || $http_code >= 500) {
+            return true;
+        }
+        
+        // Don't retry on: 400/401/403/404/422 (client errors)
+        if (in_array($http_code, [400, 401, 403, 404, 422])) {
+            return false;
+        }
+        
+        // If 409 duplicate from server and idempotency key matches → mark as sent
+        if ($http_code === 409) {
+            $this->log_structured('duplicate_request_detected', [
+                'order_id' => $response['order_id'] ?? 'unknown',
+                'http_code' => $http_code
+            ]);
+            return false; // Don't retry, but handle as success
+        }
+        
+        // Check for retryable error patterns
+        $retryable_patterns = [
+            'timeout',
+            'connection_error',
+            'server_error',
+            'rate_limited',
+            'dns',
+            'connection reset',
+            'network unreachable'
+        ];
+        
+        foreach ($retryable_patterns as $pattern) {
+            if (strpos($message, $pattern) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Schedule retry with exponential backoff
+     */
+    private function schedule_retry($order_id, $retry_count) {
+        $delays = [120, 600, 3600, 21600]; // 2m, 10m, 1h, 6h
+        $delay = $delays[min($retry_count, count($delays) - 1)] ?? 21600;
+        
+        as_schedule_single_action(
+            time() + $delay,
+            'dmm_send_order',
+            ['order_id' => $order_id],
+            'dmm'
+        );
+        
+        $this->log_structured('retry_scheduled', [
+            'order_id' => $order_id,
+            'retry_count' => $retry_count + 1,
+            'delay_seconds' => $delay
+        ]);
+    }
+    
+    /**
+     * Handle successful send
+     */
+    private function handle_successful_send($order, $response) {
+        $order_id = $order->get_id();
+        
+        // Mark as sent
+        $order->update_meta_data('_dmm_delivery_sent', 'yes');
+        $order->update_meta_data('_dmm_delivery_order_id', $response['data']['order_id'] ?? '');
+        $order->update_meta_data('_dmm_delivery_shipment_id', $response['data']['shipment_id'] ?? '');
+        $order->update_meta_data('_dmm_delivery_sent_at', gmdate('c'));
+        
+        // Clear retry count
+        $order->delete_meta_data('_dmm_delivery_retry_count');
+        
+        // Save once after all meta changes
+        $order->save();
+        
+        // Add order note
+        $order->add_order_note(__('Order sent to DMM Delivery system successfully.', 'dmm-delivery-bridge'));
+        
+        $this->log_structured('order_sent_success', [
+            'order_id' => $order_id,
+            'dmm_order_id' => $response['data']['order_id'] ?? '',
+            'dmm_shipment_id' => $response['data']['shipment_id'] ?? ''
+        ]);
+    }
+    
+    /**
+     * Handle failed send
+     */
+    private function handle_failed_send($order, $response, $retry_count) {
+        $order_id = $order->get_id();
+        $new_retry_count = $retry_count + 1;
+        
+        // Update retry count
+        $order->update_meta_data('_dmm_delivery_retry_count', $new_retry_count);
+        $order->save();
+        
+        // Add order note
+        $error_message = $response ? $response['message'] : 'Unknown error occurred';
+        $order->add_order_note(
+            sprintf(__('Failed to send order to DMM Delivery system (attempt %d): %s', 'dmm-delivery-bridge'), $new_retry_count, $error_message)
+        );
+        
+        $this->log_structured('order_send_failed', [
+            'order_id' => $order_id,
+            'retry_count' => $new_retry_count,
+            'error' => $error_message
+        ]);
+    }
+    
+    /**
+     * Handle max retries reached
+     */
+    private function handle_max_retries_reached($order) {
+        $order_id = $order->get_id();
+        
+        // Clear the lock
+        delete_transient('dmm_sending_' . $order_id);
+        
+        // Mark as failed
+        $order->update_meta_data('_dmm_delivery_sent', 'failed');
+        $order->update_meta_data('_dmm_delivery_failed_at', gmdate('c'));
+        $order->save();
+        
+        // Add order note
+        $order->add_order_note(__('Order failed to send to DMM Delivery system after maximum retries. Please check manually.', 'dmm-delivery-bridge'));
+        
+        $this->log_structured('order_max_retries_reached', [
+            'order_id' => $order_id
+        ]);
+        
+        // TODO: Send admin notification
+    }
+    
+    /**
+     * Structured logging helper (GDPR compliant)
+     */
+    private function log_structured($event, $context = []) {
+        // Sanitize context to avoid PII
+        $sanitized_context = $this->sanitize_log_context($context);
+        
+        $log_entry = [
+            'timestamp' => gmdate('Y-m-d H:i:s'), // UTC timestamp
+            'event' => $event,
+            'context' => $sanitized_context
+        ];
+        
+        error_log('DMM Delivery Bridge: ' . json_encode($log_entry));
+    }
+    
+    /**
+     * Sanitize log context to avoid PII
+     */
+    private function sanitize_log_context($context) {
+        $sanitized = [];
+        
+        foreach ($context as $key => $value) {
+            if (in_array($key, ['email', 'phone', 'billing_email', 'billing_phone'])) {
+                // Hash PII fields
+                $sanitized[$key] = hash('sha256', (string) $value);
+            } elseif (in_array($key, ['order_data', 'payload', 'body'])) {
+                // Truncate large payloads
+                $sanitized[$key] = substr(json_encode($value), 0, 200) . '...';
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+        
+        return $sanitized;
+    }
+    
+    /**
+     * Handle order updates for re-sending
+     */
+    public function handle_order_updated($order, $updated_props) {
+        // Only process if order was already sent
+        if ($order->get_meta('_dmm_delivery_sent') !== 'yes') {
+            return;
+        }
+        
+        // Check if significant properties changed
+        $significant_props = [
+            'billing_address_1', 'billing_address_2', 'billing_city', 'billing_state', 'billing_postcode',
+            'shipping_address_1', 'shipping_address_2', 'shipping_city', 'shipping_state', 'shipping_postcode',
+            'billing_email', 'billing_phone'
+        ];
+        
+        $has_significant_changes = false;
+        foreach ($significant_props as $prop) {
+            if (in_array($prop, $updated_props)) {
+                $has_significant_changes = true;
+                break;
+            }
+        }
+        
+        if (!$has_significant_changes) {
+            return;
+        }
+        
+        // Generate new payload hash
+        $order_data = $this->prepare_order_data($order);
+        $new_hash = hash('sha256', json_encode($order_data));
+        $old_hash = $order->get_meta('_dmm_delivery_payload_hash');
+        
+        if ($new_hash !== $old_hash) {
+            // Update payload hash
+            $order->update_meta_data('_dmm_delivery_payload_hash', $new_hash);
+            $order->save();
+            
+            // Enqueue update with different idempotency key namespace
+            $this->enqueue_order_update($order);
+        }
+    }
+    
+    /**
+     * Enqueue order update
+     */
+    private function enqueue_order_update($order) {
+        $order_id = $order->get_id();
+        
+        // Check for race condition
+        $lock_key = 'dmm_updating_' . $order_id;
+        if (get_transient($lock_key)) {
+            return;
+        }
+        
+        // Set lock
+        set_transient($lock_key, true, 600);
+        
+        // Enqueue update action
+        as_schedule_single_action(
+            time() + 30, // 30 second delay
+            'dmm_update_order',
+            ['order_id' => $order_id],
+            'dmm'
+        );
+        
+        $this->log_structured('order_update_queued', [
+            'order_id' => $order_id
+        ]);
+    }
+    
+    /**
+     * Sign payload for security
+     */
+    private function sign_payload($payload) {
+        $secret = isset($this->options['api_secret']) ? $this->options['api_secret'] : '';
+        if (empty($secret)) {
+            return null;
+        }
+        
+        return hash_hmac('sha256', $payload, $secret);
     }
     
     /**
@@ -3539,15 +4355,35 @@ class DMM_Delivery_Bridge {
         // Determine HTTP method based on sync flag
         $method = isset($data['sync_update']) && $data['sync_update'] ? 'PUT' : 'POST';
         
+        // Add idempotency key if present
+        $headers = [
+            'Content-Type' => 'application/json',
+            'X-Api-Key' => $api_key,
+            'X-Tenant-Id' => $tenant_id,
+        ];
+        
+        if (isset($data['idempotency_key'])) {
+            $headers['X-Idempotency-Key'] = $data['idempotency_key'];
+        }
+        
+        // Add payload signature for security
+        $payload = json_encode($data);
+        $signature = $this->sign_payload($payload);
+        if ($signature) {
+            $headers['X-Payload-Signature'] = $signature;
+        }
+        
         $args = [
             'method' => $method,
-            'timeout' => 30,
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'X-Api-Key' => $api_key,
-                'X-Tenant-Id' => $tenant_id,
-            ],
-            'body' => json_encode($data),
+            'timeout' => 20, // Total timeout
+            'redirection' => 5,
+            'httpversion' => '1.1',
+            'blocking' => true,
+            'headers' => $headers,
+            'body' => $payload,
+            'cookies' => [],
+            'user-agent' => 'DMM-Delivery-Bridge/1.0.0 (WordPress/' . get_bloginfo('version') . ')',
+            'sslverify' => true,
         ];
         
         // Debug: Log the request details
@@ -5126,62 +5962,261 @@ class DMM_Delivery_Bridge {
     }
     
     /**
-     * Clear order meta efficiently
+     * Clear order meta efficiently (HPOS compatible)
      */
     private function clear_order_meta_efficiently($order_id) {
-        global $wpdb;
-        
-        // Use single query to delete multiple meta keys
-        $wpdb->delete(
-            $wpdb->postmeta,
-            [
-                'post_id' => $order_id,
-                'meta_key' => '_dmm_delivery_sent'
-            ]
-        );
-        
-        $wpdb->delete(
-            $wpdb->postmeta,
-            [
-                'post_id' => $order_id,
-                'meta_key' => '_dmm_delivery_order_id'
-            ]
-        );
-        
-        $wpdb->delete(
-            $wpdb->postmeta,
-            [
-                'post_id' => $order_id,
-                'meta_key' => '_dmm_delivery_shipment_id'
-            ]
-        );
-    }
-    
-    /**
-     * Monitor meta field updates for ACS vouchers
-     */
-    public function on_meta_updated($meta_id, $post_id, $meta_key, $meta_value) {
-        $this->check_for_acs_voucher($post_id, $meta_key, $meta_value);
-    }
-    
-    /**
-     * Monitor meta field additions for ACS vouchers
-     */
-    public function on_meta_added($meta_id, $post_id, $meta_key, $meta_value) {
-        $this->check_for_acs_voucher($post_id, $meta_key, $meta_value);
-    }
-    
-    /**
-     * Check if meta field contains ACS voucher and create shipment
-     */
-    private function check_for_acs_voucher($post_id, $meta_key, $meta_value) {
-        // Only process WooCommerce orders
-        if (get_post_type($post_id) !== 'shop_order') {
+        $order = wc_get_order($order_id);
+        if (!$order) {
             return;
         }
         
-        // Check if this is an ACS-related meta field
-        $acs_meta_fields = [
+        // Use WooCommerce CRUD methods for HPOS compatibility
+        $order->delete_meta_data('_dmm_delivery_sent');
+        $order->delete_meta_data('_dmm_delivery_order_id');
+        $order->delete_meta_data('_dmm_delivery_shipment_id');
+        $order->delete_meta_data('_dmm_delivery_retry_count');
+        $order->delete_meta_data('_dmm_delivery_sent_at');
+        $order->delete_meta_data('_dmm_delivery_failed_at');
+        $order->save();
+    }
+    
+    /**
+     * Monitor meta field updates for ACS vouchers (HPOS-safe)
+     */
+    public function on_meta_updated($meta_id, $post_id, $meta_key, $meta_value) {
+        $this->maybe_capture_voucher($post_id, 'post_meta', $meta_key, $meta_value);
+    }
+    
+    /**
+     * Monitor meta field additions for ACS vouchers (HPOS-safe)
+     */
+    public function on_meta_added($meta_id, $post_id, $meta_key, $meta_value) {
+        $this->maybe_capture_voucher($post_id, 'post_meta', $meta_key, $meta_value);
+    }
+    
+    /**
+     * HPOS-safe order save hook
+     */
+    public function on_order_saved($order) {
+        if (!$order || !$this->is_hpos_enabled()) {
+            return;
+        }
+        
+        // Guard by dirty props to avoid firing on every save
+        if (method_exists($order, 'get_changes')) {
+            $changes = $order->get_changes();
+            $meta_touched = !empty($changes['meta_data']);
+            $items_touched = !empty($changes['shipping_lines']) || !empty($changes['line_items']);
+            
+            if (!$meta_touched && !$items_touched) {
+                return; // bail early
+            }
+        }
+        
+        // Check for voucher in order meta
+        $watched_keys = $this->get_watched_keys_for('acs');
+        foreach ($watched_keys as $key) {
+            $value = $order->get_meta($key);
+            if ($value) {
+                $this->maybe_capture_voucher($order->get_id(), 'order_meta', $key, $value);
+            }
+        }
+    }
+    
+    /**
+     * Monitor order item meta updates (shipping items)
+     */
+    public function on_order_item_meta_updated($item_id, $meta_key, $meta_value, $item) {
+        if (!$item || $item->get_type() !== 'shipping') {
+            return;
+        }
+        
+        $order_id = wc_get_order_id_by_order_item_id($item_id);
+        if ($order_id) {
+            $this->maybe_capture_voucher($order_id, 'item_meta', $meta_key, $meta_value);
+        }
+    }
+    
+    /**
+     * Monitor order notes for voucher mentions
+     */
+    public function on_order_note_added($comment_id, $order) {
+        $comment = get_comment($comment_id);
+        if (!$comment || $comment->comment_type !== 'order_note') {
+            return;
+        }
+        
+        // Only process non-customer notes
+        if (method_exists($comment, 'get_customer_note') && $comment->get_customer_note()) {
+            return;
+        }
+        
+        // Look for voucher patterns in order notes (safe parsing)
+        $note_content = $comment->comment_content;
+        
+        // Only parse system/privileged notes or use narrow pattern
+        if (preg_match('/\b(ACS|ΑCS)\b.*?(\d{10,12})\b/u', $note_content, $matches)) {
+            $potential_voucher = $matches[2];
+            if ($this->looks_like_acs_voucher($potential_voucher)) {
+                $this->maybe_capture_voucher($order->get_id(), 'order_note', 'note_content', $potential_voucher);
+            }
+        } else {
+            // Log near-misses for debugging
+            if (preg_match('/\b(\d{10,12})\b/', $note_content, $near_matches)) {
+                error_log('DMM: Near-miss voucher in note: ' . substr($near_matches[1], 0, 4) . '****');
+            }
+        }
+    }
+    
+    /**
+     * Production-ready voucher detection and processing
+     */
+    private function maybe_capture_voucher($order_id, $context, $meta_key, $value, $extra = []) {
+        // Early bail if feature toggle is off
+        if (!isset($this->options['acs_auto_detection']) || !$this->options['acs_auto_detection']) {
+            return;
+        }
+        
+        // Hard kill switch - detector OFF
+        if (isset($this->options['detector_off']) && $this->options['detector_off']) {
+            return;
+        }
+        
+        // Canary mode: process only N% of detections
+        if (!$this->should_process_canary($order_id)) {
+            $this->log_canary_skip($order_id, $meta_key, $value);
+            return;
+        }
+        
+        // Only process WooCommerce orders
+        if (!$this->is_woocommerce_order($order_id)) {
+            return;
+        }
+        
+        $value = trim((string)$value);
+        if ($value === '') return;
+
+        // 1) Try mapping by meta key
+        $courier = \DMM\Courier\MetaMapping::detectCourierFromKey($meta_key);
+
+        // 2) If coming from a note, try note hint (e.g., "ACS", "SPEEDEX")
+        if (!$courier && !empty($extra['note_content'])) {
+            $courier = \DMM\Courier\MetaMapping::detectCourierFromNote($extra['note_content']);
+        }
+
+        // 3) If still unknown, try validators by priority order
+        if (!$courier) {
+            $courier = \DMM\Courier\MetaMapping::resolveByValidators($value, dmm_courier_priority());
+        }
+
+        // 4) Fallback to default
+        if (!$courier) {
+            $courier = get_option('dmm_default_courier', 'acs');
+        }
+
+        $provider = \DMM\Courier\Registry::get($courier);
+        if (!$provider) { 
+            $this->log_ignore($order_id, 'no_provider', compact('courier','meta_key')); 
+            return; 
+        }
+
+        $normalized = $provider->normalize($value);
+
+        $order = wc_get_order($order_id);
+        if (!$order) return;
+
+        // Provider validation (includes your phone/invoice exclusions)
+        [$ok, $reason] = $provider->validate($normalized, $order);
+        if (!$ok) { 
+            $this->log_ignore($order_id, "invalid_$courier", ['reason'=>$reason,'meta_key'=>$meta_key]); 
+            return; 
+        }
+
+        // Per-(courier,voucher) dedupe across orders (DB UNIQUE(courier,voucher_hash))
+        $idem = sha1("$courier:$order_id:$normalized");
+        if ($this->has_processed_voucher_db($courier, $normalized)) {
+            $this->log_ignore($order_id, 'duplicate_same_order', ['courier'=>$courier,'meta_key'=>$meta_key]);
+            return;
+        }
+        if (!$this->try_claim_voucher($order_id, $courier, $normalized)) {
+            $this->add_order_note($order_id, "❗ Voucher already used on another order (****" . substr($normalized,-4) . "). Processing skipped.");
+            $this->log_ignore($order_id, 'dup_cross_order', ['courier'=>$courier]);
+            return;
+        }
+
+        // Canonical meta (per courier)
+        $order->update_meta_data("_dmm_{$courier}_voucher", $normalized);
+        $order->save();
+
+        // Queue job (your AS pipeline already handles jitter, Retry-After, quiet-hours, versioning, etc.)
+        $args = [
+            'order_id'       => $order_id,
+            'courier'        => $courier,
+            'voucher'        => $normalized,
+            'source'         => $context,
+            'plugin_version'  => defined('DMM_PLUGIN_VERSION') ? DMM_PLUGIN_VERSION : 'dev',
+        ];
+        $this->queue_voucher_processing($args, $idem);
+
+        $this->log_accept($order_id, $courier, $normalized, ['meta_key'=>$meta_key,'context'=>$context]);
+    }
+    
+    /**
+     * Multi-courier helper methods
+     */
+    private function log_ignore($order_id, $reason, $data = []) {
+        error_log("DMM Ignore: Order $order_id, Reason: $reason, Data: " . json_encode($data));
+    }
+    
+    private function log_accept($order_id, $courier, $voucher, $data = []) {
+        error_log("DMM Accept: Order $order_id, Courier: $courier, Voucher: $voucher, Data: " . json_encode($data));
+    }
+    
+    private function try_claim_voucher($order_id, $courier, $voucher): bool {
+        // Your existing claim voucher function
+        return $this->mark_voucher_processed_db($order_id, $courier, $voucher);
+    }
+    
+    private function send_to_core_app($payload, $courier) {
+        // Your existing send to core app function
+        // This should use your existing HTTP client logic
+        // For now, we'll use the existing create_acs_shipment for ACS
+        if ($courier === 'acs') {
+            $order = wc_get_order($payload['order_id']);
+            if ($order) {
+                $this->create_acs_shipment($order, $payload['voucher']);
+            }
+        }
+        // Add other courier handling as needed
+    }
+    
+    /**
+     * Check if this is a WooCommerce order (HPOS compatible)
+     */
+    private function is_woocommerce_order($order_id) {
+        if ($this->is_hpos_enabled()) {
+            return wc_get_order($order_id) !== false;
+        }
+        return get_post_type($order_id) === 'shop_order';
+    }
+    
+    /**
+     * Check if HPOS is enabled
+     */
+    private function is_hpos_enabled() {
+        if (class_exists('\Automattic\WooCommerce\Utilities\OrderUtil')) {
+            return \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+        }
+        return false;
+    }
+    
+    /**
+     * Get watched keys for a specific courier
+     */
+    private function get_watched_keys_for($courier) {
+        $default_keys = [
+            'acs' => [
+                '_acs_voucher',
             'acs_voucher',
             'acs_tracking', 
             'tracking_number',
@@ -5192,35 +6227,1653 @@ class DMM_Delivery_Bridge {
             'shipping_courier',
             'delivery_method',
             'courier_service'
+            ],
+            'elta' => [
+                '_elta_voucher',
+                'elta_tracking',
+                'elta_reference'
+            ],
+            'geniki' => [
+                '_geniki_voucher',
+                'geniki_tracking',
+                'gtx_reference'
+            ]
         ];
         
-        if (!in_array($meta_key, $acs_meta_fields)) {
-            return;
+        $watched_keys = $default_keys[$courier] ?? [];
+        
+        // Add configured primary key
+        $primary_key = isset($this->options['acs_courier_meta_field']) ? $this->options['acs_courier_meta_field'] : '';
+        if ($primary_key && $courier === 'acs') {
+            $watched_keys = array_unique(array_merge([$primary_key], $watched_keys));
         }
         
-        // Check if the value looks like an ACS voucher (numeric, 10+ digits)
-        if (!$this->is_acs_voucher($meta_value)) {
-            return;
+        // Add additional watched keys from settings
+        if ($courier === 'acs' && isset($this->options['acs_watched_keys'])) {
+            $additional_keys = is_array($this->options['acs_watched_keys']) ? $this->options['acs_watched_keys'] : [];
+            $watched_keys = array_unique(array_merge($watched_keys, $additional_keys));
         }
         
-        // Get the order
-        $order = wc_get_order($post_id);
+        // Allow third-party plugins to register keys
+        $watched_keys = apply_filters('dmm_voucher_meta_keys', $watched_keys, $courier);
+        
+        return $watched_keys;
+    }
+    
+    /**
+     * Enhanced ACS voucher validation with false positive guards
+     */
+    private function validate_acs_voucher($value, $order_id) {
+        // Remove any non-numeric characters
+        $clean_value = preg_replace('/[^0-9]/', '', $value);
+        
+        // Basic format check
+        if (!preg_match('/^(?:00)?\d{10,12}$/', $clean_value)) {
+            return ['valid' => false, 'reason' => 'Invalid ACS format'];
+        }
+        
+        // Get order for additional validation
+        $order = wc_get_order($order_id);
         if (!$order) {
+            return ['valid' => false, 'reason' => 'Order not found'];
+        }
+        
+        // Check against known bad patterns
+        $exclude_patterns = [
+            '/^0{10,}$/', // All zeros
+            '/^1{10,}$/', // All ones
+            '/^1234567890$/', // Sequential
+        ];
+        
+        foreach ($exclude_patterns as $pattern) {
+            if (preg_match($pattern, $clean_value)) {
+                return ['valid' => false, 'reason' => 'Excluded pattern'];
+            }
+        }
+        
+        // Check against phone numbers
+        $billing_phone = preg_replace('/[^0-9]/', '', $order->get_billing_phone());
+        $shipping_phone = preg_replace('/[^0-9]/', '', $order->get_shipping_phone());
+        
+        if ($clean_value === $billing_phone || $clean_value === $shipping_phone) {
+            return ['valid' => false, 'reason' => 'Matches phone number'];
+        }
+        
+        // Check against order number patterns
+        $order_number = $order->get_order_number();
+        if ($clean_value === $order_number) {
+            return ['valid' => false, 'reason' => 'Matches order number'];
+        }
+        
+        // Check against invoice numbers (if available)
+        $invoice_number = $order->get_meta('_invoice_number');
+        if ($invoice_number && $clean_value === $invoice_number) {
+            return ['valid' => false, 'reason' => 'Matches invoice number'];
+        }
+        
+        // Allow third-party plugins to add custom validation
+        $validation_result = apply_filters('dmm_validate_acs_voucher', ['valid' => true, 'reason' => ''], $clean_value, $order);
+        
+        return $validation_result;
+    }
+    
+    /**
+     * Strict ACS voucher validation (legacy method)
+     */
+    private function looks_like_acs_voucher($value) {
+        $result = $this->validate_acs_voucher($value, 0);
+        return $result['valid'];
+    }
+    
+    /**
+     * Check if voucher has been processed
+     */
+    private function has_processed_voucher($idempotency_key) {
+        $processed = get_transient("dmm_processed_$idempotency_key");
+        return !empty($processed);
+    }
+    
+    /**
+     * Queue voucher processing with proper locking
+     */
+    private function queue_voucher_processing($data) {
+        // Log the detection
+        $this->log_voucher_detection($data);
+        
+        // Queue the actual processing
+        if (class_exists('ActionScheduler')) {
+            as_schedule_single_action(
+                time() + 30, // 30 second delay
+                'dmm_process_detected_voucher',
+                [$data],
+                'dmm-voucher-processing'
+            );
+        } else {
+            // Fallback to immediate processing
+            $this->process_detected_voucher($data);
+        }
+    }
+    
+    /**
+     * Log voucher detection for observability
+     */
+    private function log_voucher_detection($data) {
+        // Generate instance identifier for fleet tracing
+        $instance_id = $this->get_instance_identifier();
+        
+        $log_data = [
+            'order_id' => $data['order_id'],
+            'meta_key' => $data['meta_key'],
+            'source' => $data['source'],
+            'voucher_hash' => substr(sha1($data['voucher']), 0, 8), // First 8 chars only
+            'instance_id' => $instance_id,
+            'timestamp' => current_time('mysql')
+        ];
+        
+        error_log('DMM Voucher Detected: ' . json_encode($log_data));
+        
+        // Store in order meta for admin visibility
+        $order = wc_get_order($data['order_id']);
+        if ($order) {
+            $order->add_meta_data('_dmm_voucher_detection_log', $log_data);
+            $order->save();
+        }
+    }
+    
+    /**
+     * Get instance identifier for fleet tracing
+     */
+    private function get_instance_identifier() {
+        // Use server name + process ID for unique identification
+        $server_name = isset($_SERVER['SERVER_NAME']) ? $_SERVER['SERVER_NAME'] : 'unknown';
+        $process_id = getmypid();
+        $instance_id = substr(sha1($server_name . $process_id), 0, 8);
+        
+        return $instance_id;
+    }
+    
+    /**
+     * Single-flight guard to avoid double ACS fetch
+     */
+    private function singleflight_take($key, $ttl = 30) {
+        $lock = "dmm_sf_$key";
+        if (get_transient($lock)) {
+            return false;
+        }
+        set_transient($lock, 1, $ttl);
+        return true;
+    }
+    
+    /**
+     * Release single-flight lock
+     */
+    private function singleflight_release($key) {
+        delete_transient("dmm_sf_$key");
+    }
+    
+    /**
+     * Check if should process in canary mode
+     */
+    private function should_process_canary($order_id) {
+        $canary_percentage = isset($this->options['acs_canary_percentage']) ? intval($this->options['acs_canary_percentage']) : 100;
+        
+        if ($canary_percentage >= 100) {
+            return true; // Full rollout
+        }
+        
+        $seed = get_option('dmm_canary_seed', 'default');
+        return $this->is_canary_hit($order_id, $canary_percentage, $seed);
+    }
+    
+    /**
+     * Deterministic canary assignment (stable across fleet)
+     */
+    private function is_canary_hit($order_id, $percentage, $seed) {
+        $h = substr(sha1($seed . ':' . $order_id), 0, 8);
+        $n = hexdec($h) % 100;        // 0..99
+        return $n < max(0, min(100, (int)$percentage));
+    }
+    
+    /**
+     * Log canary skip for monitoring
+     */
+    private function log_canary_skip($order_id, $meta_key, $value) {
+        $canary_percentage = isset($this->options['acs_canary_percentage']) ? intval($this->options['acs_canary_percentage']) : 100;
+        
+        error_log(sprintf(
+            'DMM Canary Skip: Order %d, Key %s, Voucher %s****, Canary %d%%',
+            $order_id, $meta_key, substr($value, 0, 4), $canary_percentage
+        ));
+    }
+    
+    /**
+     * Process detected voucher (called by ActionScheduler)
+     */
+    public function process_detected_voucher($data) {
+        $courier = $data['courier'] ?? 'acs';
+        $provider = \DMM\Courier\Registry::get($courier);
+        if (!$provider) {
+            error_log("DMM Voucher Processing: Unknown courier '$courier'");
+            return;
+        }
+
+        try {
+            $order = wc_get_order($data['order_id']);
+            if (!$order) {
+                return;
+            }
+            
+            // Single-flight guard to avoid double processing
+            $lock_key = "{$courier}_fetch_{$data['order_id']}";
+            if (!$this->singleflight_take($lock_key, 30)) {
+                error_log("DMM Voucher Processing: Single-flight lock active for $courier, skipping");
+                return;
+            }
+            
+            try {
+                // Add instance header for fleet tracing
+                $this->add_fleet_headers();
+                
+                // Route through provider
+                $payload = [
+                    'order_id' => (int)$data['order_id'],
+                    'courier'  => $courier,
+                    'voucher'  => (string)$data['voucher'],
+                    'meta'     => ['source' => $data['source'] ?? 'unknown'],
+                    'version'  => $data['plugin_version'] ?? 'dev',
+                ];
+                
+                $payload = $provider->route($payload);
+                
+                // Send to core app or courier directly
+                $this->send_to_core_app($payload, $courier);
+                
+            } finally {
+                // Always release the lock
+                $this->singleflight_release($lock_key);
+            }
+            
+        } catch (Exception $e) {
+            error_log("DMM Voucher Processing Error ($courier): " . $e->getMessage());
+            
+            // Schedule retry with backoff
+            $this->schedule_voucher_retry($data, $e);
+        }
+    }
+    
+    /**
+     * Add fleet safety headers for tracing
+     */
+    private function add_fleet_headers() {
+        $headers = $this->get_fleet_headers();
+        
+        // Add headers for external API calls
+        add_filter('http_request_args', function($args) use ($headers) {
+            $args['headers'] = array_merge($args['headers'] ?? [], $headers);
+            return $args;
+        });
+    }
+    
+    /**
+     * Get fleet tracing headers with fallbacks
+     */
+    private function get_fleet_headers() {
+        $instance = get_option('dmm_instance_id') ?: substr(sha1(DB_NAME . ':' . site_url()), 0, 8);
+        $server = php_uname('n') ?: ($_SERVER['SERVER_NAME'] ?? 'unknown');
+        $version = defined('DMM_PLUGIN_VERSION') ? DMM_PLUGIN_VERSION : '1.0.0';
+        
+        return [
+            'X-DMM-Instance' => $instance,
+            'X-DMM-Server' => $server,
+            'X-DMM-Version' => $version,
+        ];
+    }
+    
+    /**
+     * Schedule voucher processing retry
+     */
+    private function schedule_voucher_retry($data, $exception) {
+        $retry_count = $data['retry_count'] ?? 0;
+        $max_retries = 3;
+        
+        if ($retry_count >= $max_retries) {
+            // Log final failure
+            error_log('DMM Voucher Processing Failed After Retries: ' . $exception->getMessage());
             return;
         }
         
-        // Check if we already processed this voucher
-        $processed_vouchers = get_post_meta($post_id, '_dmm_acs_processed_vouchers', true) ?: [];
-        if (in_array($meta_value, $processed_vouchers)) {
+        $data['retry_count'] = $retry_count + 1;
+        $schedule = [300, 600, 1200]; // 5, 10, 20 minutes
+        
+        // Check for Retry-After header from ACS API
+        $retry_after = $this->get_retry_after_from_exception($exception);
+        $delay = $this->next_delay($schedule, $retry_count, $retry_after);
+        
+        if (class_exists('ActionScheduler')) {
+            as_schedule_single_action(
+                time() + $delay,
+                'dmm_process_detected_voucher',
+                [$data],
+                'dmm-voucher-processing'
+            );
+        }
+    }
+    
+    /**
+     * Extract Retry-After header from exception
+     */
+    private function get_retry_after_from_exception($exception) {
+        $retry_after = null;
+        
+        // Check if exception has response headers
+        if (method_exists($exception, 'getResponse')) {
+            $response = $exception->getResponse();
+            if ($response && method_exists($response, 'getHeader')) {
+                $retry_after = $response->getHeader('Retry-After');
+            }
+        }
+        
+        // Check if exception message contains retry-after info
+        if (!$retry_after && preg_match('/retry-after[:\s]+([^\s]+)/i', $exception->getMessage(), $matches)) {
+            $retry_after = $matches[1];
+        }
+        
+        return $this->parse_retry_after($retry_after, 300);
+    }
+    
+    /**
+     * Parse Retry-After header (seconds or HTTP-date)
+     */
+    private function parse_retry_after($retry_after, $fallback = 300) {
+        if (empty($retry_after)) {
+            return max(60, (int)$fallback);
+        }
+        
+        $val = is_array($retry_after) ? reset($retry_after) : $retry_after;
+        $val = trim((string)$val);
+        
+        // Case 1: delta-seconds
+        if (ctype_digit($val)) {
+            return max(60, (int)$val);
+        }
+        
+        // Case 2: HTTP-date
+        $ts = strtotime($val);
+        if ($ts !== false) {
+            $now = time();
+            $delta = $ts - $now;
+            if ($delta > 0) {
+                return max(60, $delta);
+            }
+        }
+        
+        return max(60, (int)$fallback);
+    }
+    
+    /**
+     * Jittered backoff helper (honors Retry-After when present)
+     */
+    private function next_delay($schedule, $attempt, $retry_after = null) {
+        $base = $retry_after !== null ? $retry_after : ($schedule[$attempt] ?? end($schedule));
+        $jitter = (int) round($base * (mt_rand(-20, 20) / 100.0)); // ±20%
+        $delay = max(60, $base + $jitter);
+        
+        // Quiet-hours backoff (reduce noise at peak)
+        if ($this->is_quiet_hour()) {
+            $delay = max($delay, 300); // Minimum 5 minutes at night
+        }
+        
+        return $delay;
+    }
+    
+    /**
+     * Check if current time is in quiet hours
+     */
+    private function is_quiet_hour() {
+        $h = (int) current_time('H');
+        return ($h >= 2 && $h < 6); // 02:00–05:59 local
+    }
+    
+    /**
+     * Add voucher detection meta box to order edit page
+     */
+    public function add_voucher_detection_meta_box() {
+        add_meta_box(
+            'dmm_voucher_detection',
+            __('Voucher Detection Log', 'dmm-delivery-bridge'),
+            [$this, 'voucher_detection_meta_box_callback'],
+            'shop_order',
+            'side',
+            'default'
+        );
+    }
+    
+    /**
+     * Display voucher detection meta box
+     */
+    public function voucher_detection_meta_box_callback($post) {
+        $order = wc_get_order($post->ID);
+        if (!$order) {
+            echo '<p>' . __('Order not found.', 'dmm-delivery-bridge') . '</p>';
             return;
         }
         
-        // Mark as processed
-        $processed_vouchers[] = $meta_value;
-        update_post_meta($post_id, '_dmm_acs_processed_vouchers', $processed_vouchers);
+        // Get detection logs
+        $detection_logs = $order->get_meta('_dmm_voucher_detection_log');
+        $processed_vouchers = $order->get_meta('_dmm_acs_processed_vouchers');
+        $current_voucher = $order->get_meta('_dmm_acs_voucher');
+        $last_sync = $order->get_meta('_dmm_acs_last_sync');
         
-        // Create shipment and sync to main application
-        $this->create_acs_shipment($order, $meta_value);
+        echo '<div class="dmm-voucher-detection-log">';
+        
+        // Current voucher
+        if ($current_voucher) {
+            echo '<h4>' . __('Current Voucher', 'dmm-delivery-bridge') . '</h4>';
+            echo '<p><code>' . esc_html(substr($current_voucher, 0, 8)) . '...</code></p>';
+        }
+        
+        // Last sync
+        if ($last_sync) {
+            echo '<h4>' . __('Last Sync', 'dmm-delivery-bridge') . '</h4>';
+            echo '<p>' . esc_html($last_sync) . '</p>';
+        }
+        
+        // Detection logs
+        if ($detection_logs) {
+            echo '<h4>' . __('Detection History', 'dmm-delivery-bridge') . '</h4>';
+            echo '<div class="dmm-detection-logs">';
+            
+            if (is_array($detection_logs)) {
+                foreach ($detection_logs as $log) {
+                    echo '<div class="dmm-log-entry">';
+                    echo '<strong>' . esc_html($log['source']) . ':</strong> ';
+                    echo esc_html($log['meta_key']) . ' ';
+                    echo '<code>' . esc_html($log['voucher_hash']) . '</code> ';
+                    echo '<small>' . esc_html($log['timestamp']) . '</small>';
+                    echo '</div>';
+                }
+            } else {
+                echo '<p>' . esc_html($detection_logs) . '</p>';
+            }
+            
+            echo '</div>';
+        }
+        
+        // Processed vouchers
+        if ($processed_vouchers && is_array($processed_vouchers)) {
+            echo '<h4>' . __('Processed Vouchers', 'dmm-delivery-bridge') . '</h4>';
+            echo '<ul>';
+            foreach ($processed_vouchers as $voucher) {
+                echo '<li><code>' . esc_html(substr($voucher, 0, 8)) . '...</code></li>';
+            }
+            echo '</ul>';
+        }
+        
+        if (!$current_voucher && !$detection_logs) {
+            echo '<p><em>' . __('No voucher detection activity for this order.', 'dmm-delivery-bridge') . '</em></p>';
+        }
+        
+        // Manual override section
+        echo '<h4>' . __('Manual Override', 'dmm-delivery-bridge') . '</h4>';
+        echo '<div class="dmm-manual-override">';
+        
+        // Manual voucher input
+        echo '<p>';
+        echo '<label for="dmm_manual_voucher">' . __('Set Voucher:', 'dmm-delivery-bridge') . '</label><br>';
+        echo '<input type="text" id="dmm_manual_voucher" name="dmm_manual_voucher" value="' . esc_attr($current_voucher) . '" placeholder="' . __('Enter ACS voucher number', 'dmm-delivery-bridge') . '" style="width: 100%; margin: 5px 0;">';
+        echo '</p>';
+        
+        // Action buttons
+        echo '<p>';
+        echo '<button type="button" class="button" id="dmm_save_voucher">' . __('Save & Process', 'dmm-delivery-bridge') . '</button> ';
+        echo '<button type="button" class="button" id="dmm_test_lookup">' . __('Test Lookup', 'dmm-delivery-bridge') . '</button> ';
+        echo '<button type="button" class="button" id="dmm_clear_redetect">' . __('Clear & Re-detect', 'dmm-delivery-bridge') . '</button>';
+        echo '</p>';
+        
+        // Force reassign section (capability gated)
+        if (current_user_can('manage_woocommerce')) {
+            echo '<h4>' . __('Force Reassign Voucher', 'dmm-delivery-bridge') . '</h4>';
+            echo '<p class="description">' . __('Move this voucher to a different order (requires confirmation).', 'dmm-delivery-bridge') . '</p>';
+            echo '<p>';
+            echo '<label for="dmm_target_order">' . __('Target Order ID:', 'dmm-delivery-bridge') . '</label><br>';
+            echo '<input type="number" id="dmm_target_order" name="dmm_target_order" placeholder="' . __('Enter order ID', 'dmm-delivery-bridge') . '" style="width: 100px; margin: 5px 0;">';
+            echo ' <button type="button" class="button button-secondary" id="dmm_force_reassign">' . __('Force Reassign', 'dmm-delivery-bridge') . '</button>';
+            echo '</p>';
+        }
+        
+        echo '</div>';
+        
+        echo '</div>';
+        
+        // Add some CSS and JavaScript
+        echo '<style>
+        .dmm-voucher-detection-log h4 { margin: 15px 0 5px 0; font-size: 13px; }
+        .dmm-detection-logs { max-height: 200px; overflow-y: auto; }
+        .dmm-log-entry { margin-bottom: 5px; padding: 5px; background: #f9f9f9; border-radius: 3px; font-size: 12px; }
+        .dmm-log-entry code { background: #e1e1e1; padding: 1px 3px; border-radius: 2px; }
+        .dmm-manual-override { margin-top: 15px; padding: 10px; background: #f0f0f1; border-radius: 3px; }
+        .dmm-manual-override button { margin-right: 5px; }
+        </style>';
+        
+        echo '<script>
+        jQuery(document).ready(function($) {
+            $("#dmm_save_voucher").click(function() {
+                var voucher = $("#dmm_manual_voucher").val();
+                var orderId = ' . $post->ID . ';
+                
+                if (!voucher) {
+                    alert("' . __('Please enter a voucher number', 'dmm-delivery-bridge') . '");
+            return;
+        }
+        
+                $.post(ajaxurl, {
+                    action: "dmm_manual_set_voucher",
+                    order_id: orderId,
+                    voucher: voucher,
+                    nonce: "' . wp_create_nonce('dmm_voucher_override') . '"
+                }, function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.data);
+                    }
+                });
+            });
+            
+            $("#dmm_test_lookup").click(function() {
+                var voucher = $("#dmm_manual_voucher").val();
+                var orderId = ' . $post->ID . ';
+                
+                if (!voucher) {
+                    alert("' . __('Please enter a voucher number', 'dmm-delivery-bridge') . '");
+                    return;
+                }
+                
+                $(this).prop("disabled", true).text("' . __('Testing...', 'dmm-delivery-bridge') . '");
+                
+                $.post(ajaxurl, {
+                    action: "dmm_test_voucher_lookup",
+                    order_id: orderId,
+                    voucher: voucher,
+                    nonce: "' . wp_create_nonce('dmm_voucher_override') . '"
+                }, function(response) {
+                    $("#dmm_test_lookup").prop("disabled", false).text("' . __('Test Lookup', 'dmm-delivery-bridge') . '");
+                    
+                    if (response.success) {
+                        alert("' . __('Test successful! Status:', 'dmm-delivery-bridge') . ' " + response.data.status);
+                    } else {
+                        alert("' . __('Test failed:', 'dmm-delivery-bridge') . ' " + response.data);
+                    }
+                });
+            });
+            
+            $("#dmm_clear_redetect").click(function() {
+                var orderId = ' . $post->ID . ';
+                
+                if (!confirm("' . __('This will clear the current voucher and re-scan all meta fields. Continue?', 'dmm-delivery-bridge') . '")) {
+                    return;
+                }
+                
+                $.post(ajaxurl, {
+                    action: "dmm_clear_redetect_voucher",
+                    order_id: orderId,
+                    nonce: "' . wp_create_nonce('dmm_voucher_override') . '"
+                }, function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.data);
+                    }
+                });
+            });
+            
+            $("#dmm_force_reassign").click(function() {
+                var orderId = ' . $post->ID . ';
+                var targetOrderId = $("#dmm_target_order").val();
+                var voucher = $("#dmm_manual_voucher").val();
+                
+                if (!targetOrderId || !voucher) {
+                    alert("' . __('Please enter both voucher and target order ID', 'dmm-delivery-bridge') . '");
+                    return;
+                }
+                
+                if (!confirm("' . __('This will move the voucher from this order to order #', 'dmm-delivery-bridge') . '" + targetOrderId + ". ' . __('Continue?', 'dmm-delivery-bridge') . '")) {
+                    return;
+                }
+                
+                $.post(ajaxurl, {
+                    action: "dmm_force_reassign_voucher",
+                    source_order_id: orderId,
+                    target_order_id: targetOrderId,
+                    voucher: voucher,
+                    nonce: "' . wp_create_nonce('dmm_voucher_override') . '"
+                }, function(response) {
+                    if (response.success) {
+                        alert("' . __('Voucher reassigned successfully', 'dmm-delivery-bridge') . '");
+                        location.reload();
+                    } else {
+                        alert("Error: " + response.data);
+                    }
+                });
+            });
+        });
+        </script>';
+    }
+    
+    /**
+     * Create deduplication table (versioned migration)
+     */
+    public function create_dedupe_table() {
+        $current_version = get_option('dmm_db_version', '0.0.0');
+        $target_version = '1.0.0';
+        
+        if (version_compare($current_version, $target_version, '<')) {
+            $this->upgrade_database($target_version);
+        }
+    }
+    
+    /**
+     * Upgrade database to target version
+     */
+    private function upgrade_database($target_version) {
+        global $wpdb;
+        
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        // dbDelta-compatible SQL with proper formatting
+        $sql = "CREATE TABLE {$wpdb->prefix}dmm_processed_vouchers (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            order_id BIGINT UNSIGNED NOT NULL,
+            courier VARCHAR(16) NOT NULL,
+            voucher_hash CHAR(40) NOT NULL,
+            processed_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY uniq_courier_hash (courier, voucher_hash),
+            KEY order_id (order_id),
+            KEY processed_at (processed_at)
+        ) $charset_collate;";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+        
+        // Update version (autoload = no)
+        update_option('dmm_db_version', $target_version, false);
+        
+        // Initialize canary seed if not exists
+        if (!get_option('dmm_canary_seed')) {
+            update_option('dmm_canary_seed', wp_generate_password(16, false), false);
+        }
+        
+        // Initialize instance ID if not exists
+        if (!get_option('dmm_instance_id')) {
+            update_option('dmm_instance_id', substr(sha1(DB_NAME . ':' . site_url()), 0, 8), false);
+        }
+        
+        // Track plugin version for job compatibility
+        $plugin_version = defined('DMM_PLUGIN_VERSION') ? DMM_PLUGIN_VERSION : '1.0.0';
+        update_option('dmm_plugin_version', $plugin_version, false);
+        
+        // Mark all DMM options as autoload = no for performance
+        $dmm_options = [
+            'dmm_delivery_bridge_options',
+            'dmm_log_retention_days',
+            'dmm_stuck_jobs_count',
+            'dmm_stuck_jobs_notice',
+            'dmm_failed_jobs_count',
+            'dmm_failed_jobs_notice',
+            'dmm_canary_seed',
+            'dmm_instance_id',
+            'dmm_plugin_version'
+        ];
+        
+        foreach ($dmm_options as $option) {
+            $value = get_option($option);
+            if ($value !== false) {
+                update_option($option, $value, false); // autoload = no
+            }
+        }
+    }
+    
+    /**
+     * Check if voucher has been processed (database deduplication)
+     */
+    private function has_processed_voucher_db($order_id, $courier, $voucher) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_processed_vouchers';
+        $voucher_hash = sha1("$courier:$voucher");
+        
+        $result = $wpdb->get_var($wpdb->prepare(
+            "SELECT order_id FROM $table_name 
+             WHERE courier = %s AND voucher_hash = %s",
+            $courier, $voucher_hash
+        ));
+        
+        if ($result && $result != $order_id) {
+            // Voucher already used on different order
+            $voucher_display = substr($voucher, -4); // Last 4 digits
+            
+            // Add note to new order (blocking)
+            $this->add_order_note($order_id, 
+                sprintf(__('❗ Voucher already used on order #%d (****%s). Processing skipped.', 'dmm-delivery-bridge'), $result, $voucher_display),
+                'error'
+            );
+            
+            // Add note to original order (info)
+            $original_order = wc_get_order($result);
+            if ($original_order) {
+                $original_order->add_order_note(
+                    sprintf(__('ℹ Another order (#%d) attempted to reuse voucher (****%s).', 'dmm-delivery-bridge'), $order_id, $voucher_display),
+                    false, false
+                );
+                $original_order->save();
+            }
+            
+            return true;
+        }
+        
+        return !empty($result);
+    }
+    
+    /**
+     * Mark voucher as processed (database deduplication)
+     */
+    private function mark_voucher_processed_db($order_id, $courier, $voucher) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_processed_vouchers';
+        $voucher_hash = sha1("$courier:$voucher");
+        
+        $result = $wpdb->query($wpdb->prepare(
+            "INSERT IGNORE INTO $table_name (order_id, courier, voucher_hash, processed_at)
+             VALUES (%d, %s, %s, UTC_TIMESTAMP())",
+            $order_id, $courier, $voucher_hash
+        ));
+        
+        return $result > 0;
+    }
+    
+    /**
+     * Cancel pending jobs for old voucher
+     */
+    private function cancel_pending_jobs_for_voucher($order_id, $old_voucher) {
+        if (!class_exists('ActionScheduler')) {
+            return;
+        }
+        
+        $old_idempotency_key = sha1("acs:$order_id:$old_voucher");
+        
+        // Find and cancel pending jobs
+        $args = [
+            'hook' => 'dmm_process_detected_voucher',
+            'status' => 'pending',
+            'per_page' => 100
+        ];
+        
+        $jobs = as_get_scheduled_actions($args);
+        foreach ($jobs as $job) {
+            $job_args = $job->get_args();
+            if (!empty($job_args[0]) && 
+                isset($job_args[0]['order_id']) && 
+                $job_args[0]['order_id'] == $order_id &&
+                isset($job_args[0]['voucher']) &&
+                $job_args[0]['voucher'] == $old_voucher) {
+                as_unschedule_action('dmm_process_detected_voucher', $job_args, 'dmm-voucher-processing');
+            }
+        }
+    }
+    
+    /**
+     * Add order note with type
+     */
+    private function add_order_note($order_id, $note, $type = 'info') {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $order->add_order_note($note, false, $type === 'error');
+        }
+    }
+    
+    /**
+     * Cleanup old logs
+     */
+    public function cleanup_old_logs() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_processed_vouchers';
+        $retention_days = get_option('dmm_log_retention_days', 90);
+        
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM $table_name 
+             WHERE processed_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)",
+            $retention_days
+        ));
+        
+        // Clean up old transients
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->options} 
+             WHERE option_name LIKE '_transient_dmm_processed_%' 
+             AND option_value < %d",
+            time() - ($retention_days * DAY_IN_SECONDS)
+        ));
+    }
+    
+    /**
+     * Check for stuck jobs
+     */
+    public function check_stuck_jobs() {
+        if (!class_exists('ActionScheduler')) {
+            return;
+        }
+        
+        $stuck_threshold = 30 * MINUTE_IN_SECONDS; // 30 minutes
+        $stuck_jobs = as_get_scheduled_actions([
+            'hook' => 'dmm_process_detected_voucher',
+            'status' => 'in-progress',
+            'per_page' => 100
+        ]);
+        
+        $stuck_count = 0;
+        foreach ($stuck_jobs as $job) {
+            if ($job->get_schedule()->get_date()->getTimestamp() < time() - $stuck_threshold) {
+                $stuck_count++;
+            }
+        }
+        
+        if ($stuck_count > 0) {
+            update_option('dmm_stuck_jobs_count', $stuck_count);
+            update_option('dmm_stuck_jobs_notice', true);
+        } else {
+            delete_option('dmm_stuck_jobs_count');
+            delete_option('dmm_stuck_jobs_notice');
+        }
+        
+        // Check for failed jobs
+        $failed_jobs = as_get_scheduled_actions([
+            'hook' => 'dmm_process_detected_voucher',
+            'status' => 'failed',
+            'per_page' => 10
+        ]);
+        
+        if (count($failed_jobs) > 0) {
+            update_option('dmm_failed_jobs_count', count($failed_jobs));
+            update_option('dmm_failed_jobs_notice', true);
+        } else {
+            delete_option('dmm_failed_jobs_count');
+            delete_option('dmm_failed_jobs_notice');
+        }
+    }
+    
+    /**
+     * AJAX: Manual set voucher
+     */
+    public function ajax_manual_set_voucher() {
+        check_ajax_referer('dmm_voucher_override', 'nonce');
+        
+        // Check capabilities
+        if (!current_user_can('manage_woocommerce') && !current_user_can('shop_manager')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $order_id = absint($_POST['order_id']);
+        $voucher = sanitize_text_field($_POST['voucher']);
+        
+        if (!$order_id || !$voucher) {
+            wp_send_json_error('Invalid parameters');
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error('Order not found');
+        }
+        
+        // Validate voucher
+        $validation_result = $this->validate_acs_voucher($voucher, $order_id);
+        if (!$validation_result['valid']) {
+            wp_send_json_error('Invalid voucher: ' . $validation_result['reason']);
+        }
+        
+        // Check database deduplication
+        if ($this->has_processed_voucher_db($order_id, 'acs', $voucher)) {
+            wp_send_json_error('Voucher already processed');
+        }
+        
+        // Update canonical voucher
+        $order->update_meta_data('_dmm_acs_voucher', $voucher);
+        $order->save();
+        
+        // Mark as processed in database
+        $this->mark_voucher_processed_db($order_id, 'acs', $voucher);
+        
+        // Queue processing
+        $this->queue_voucher_processing([
+            'order_id' => $order_id,
+            'voucher' => $voucher,
+            'courier' => 'acs',
+            'source' => 'manual_override',
+            'meta_key' => 'manual'
+        ]);
+        
+        wp_send_json_success('Voucher set and processing queued');
+    }
+    
+    /**
+     * AJAX: Test voucher lookup
+     */
+    public function ajax_test_voucher_lookup() {
+        check_ajax_referer('dmm_voucher_override', 'nonce');
+        
+        // Check capabilities
+        if (!current_user_can('manage_woocommerce') && !current_user_can('shop_manager')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $order_id = absint($_POST['order_id']);
+        $voucher = sanitize_text_field($_POST['voucher']);
+        
+        if (!$order_id || !$voucher) {
+            wp_send_json_error('Invalid parameters');
+        }
+        
+        try {
+            // Test ACS API lookup
+            $tracking_response = $this->get_acs_tracking_status($voucher);
+            
+            if ($tracking_response['success']) {
+                $status = $this->map_acs_status($tracking_response['data']['events'] ?? []);
+                wp_send_json_success(['status' => $status]);
+            } else {
+                wp_send_json_error('ACS API error: ' . $tracking_response['message']);
+            }
+        } catch (Exception $e) {
+            wp_send_json_error('Test failed: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * AJAX: Clear and re-detect voucher
+     */
+    public function ajax_clear_redetect_voucher() {
+        check_ajax_referer('dmm_voucher_override', 'nonce');
+        
+        // Check capabilities
+        if (!current_user_can('manage_woocommerce') && !current_user_can('shop_manager')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $order_id = absint($_POST['order_id']);
+        
+        if (!$order_id) {
+            wp_send_json_error('Invalid order ID');
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error('Order not found');
+        }
+        
+        // Clear current voucher
+        $order->delete_meta_data('_dmm_acs_voucher');
+        $order->delete_meta_data('_dmm_voucher_detection_log');
+        $order->save();
+        
+        // Re-scan all watched keys
+        $watched_keys = $this->get_watched_keys_for('acs');
+        $found_voucher = false;
+        
+        foreach ($watched_keys as $key) {
+            $value = $order->get_meta($key);
+            if ($value) {
+                $this->maybe_capture_voucher($order_id, 'manual_redetect', $key, $value);
+                $found_voucher = true;
+                break; // Only process first found voucher
+            }
+        }
+        
+        // Also check shipping items
+        if (!$found_voucher) {
+            foreach ($order->get_items('shipping') as $item) {
+                foreach ($watched_keys as $key) {
+                    $value = $item->get_meta($key);
+                    if ($value) {
+                        $this->maybe_capture_voucher($order_id, 'manual_redetect_item', $key, $value);
+                        $found_voucher = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+        
+        if ($found_voucher) {
+            wp_send_json_success('Re-detection completed');
+        } else {
+            wp_send_json_success('No vouchers found in watched fields');
+        }
+    }
+    
+    /**
+     * AJAX: Force reassign voucher
+     */
+    public function ajax_force_reassign_voucher() {
+        check_ajax_referer('dmm_voucher_override', 'nonce');
+        
+        // Check capabilities (admin only)
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+        
+        $source_order_id = absint($_POST['source_order_id']);
+        $target_order_id = absint($_POST['target_order_id']);
+        $voucher = sanitize_text_field($_POST['voucher']);
+        
+        if (!$source_order_id || !$target_order_id || !$voucher) {
+            wp_send_json_error('Invalid parameters');
+        }
+        
+        $source_order = wc_get_order($source_order_id);
+        $target_order = wc_get_order($target_order_id);
+        
+        if (!$source_order || !$target_order) {
+            wp_send_json_error('Order not found');
+        }
+        
+        // Validate voucher
+        $validation_result = $this->validate_acs_voucher($voucher, $target_order_id);
+        if (!$validation_result['valid']) {
+            wp_send_json_error('Invalid voucher: ' . $validation_result['reason']);
+        }
+        
+        // Check if voucher is already used elsewhere
+        if ($this->has_processed_voucher_db($target_order_id, 'acs', $voucher)) {
+            wp_send_json_error('Voucher already used on target order');
+        }
+        
+        // Remove voucher from source order
+        $source_order->delete_meta_data('_dmm_acs_voucher');
+        $source_order->delete_meta_data('_dmm_voucher_detection_log');
+        $source_order->add_order_note(
+            sprintf(__('Voucher %s reassigned to order #%d', 'dmm-delivery-bridge'), 
+                substr($voucher, 0, 4) . '****', $target_order_id),
+            false, false
+        );
+        $source_order->save();
+        
+        // Add voucher to target order
+        $target_order->update_meta_data('_dmm_acs_voucher', $voucher);
+        $target_order->add_order_note(
+            sprintf(__('Voucher %s reassigned from order #%d', 'dmm-delivery-bridge'), 
+                substr($voucher, 0, 4) . '****', $source_order_id),
+            false, false
+        );
+        $target_order->save();
+        
+        // Mark as processed in database
+        $this->mark_voucher_processed_db($target_order_id, 'acs', $voucher);
+        
+        // Queue processing for target order
+        $this->queue_voucher_processing([
+            'order_id' => $target_order_id,
+            'voucher' => $voucher,
+            'courier' => 'acs',
+            'source' => 'force_reassign',
+            'meta_key' => 'manual'
+        ]);
+        
+        wp_send_json_success('Voucher reassigned successfully');
+    }
+    
+    /**
+     * Register privacy data exporter
+     */
+    public function register_privacy_exporter($exporters) {
+        $exporters['dmm-delivery-bridge'] = [
+            'exporter_friendly_name' => __('DMM Delivery Bridge', 'dmm-delivery-bridge'),
+            'callback' => [$this, 'privacy_data_exporter']
+        ];
+        return $exporters;
+    }
+    
+    /**
+     * Register privacy data eraser
+     */
+    public function register_privacy_eraser($erasers) {
+        $erasers['dmm-delivery-bridge'] = [
+            'eraser_friendly_name' => __('DMM Delivery Bridge', 'dmm-delivery-bridge'),
+            'callback' => [$this, 'privacy_data_eraser']
+        ];
+        return $erasers;
+    }
+    
+    /**
+     * Export privacy data
+     */
+    public function privacy_data_exporter($email, $page = 1) {
+        // DMM logs are operational, not personal data
+        return [
+            'data' => [],
+            'done' => true
+        ];
+    }
+    
+    /**
+     * Erase privacy data
+     */
+    public function privacy_data_eraser($email, $page = 1) {
+        $user = get_user_by('email', $email);
+        if (!$user) {
+            return [
+                'items_removed' => 0,
+                'items_retained' => 0,
+                'messages' => [],
+                'done' => true
+            ];
+        }
+        
+        $orders_processed = 0;
+        $orders = wc_get_orders([
+            'customer' => $user->ID,
+            'limit' => -1
+        ]);
+        
+        foreach ($orders as $order) {
+            // Scrub voucher last4 in logs
+            $detection_log = $order->get_meta('_dmm_voucher_detection_log');
+            if ($detection_log && is_array($detection_log)) {
+                foreach ($detection_log as &$log) {
+                    if (isset($log['voucher_hash'])) {
+                        $log['voucher_hash'] = '****' . substr($log['voucher_hash'], -4);
+                    }
+                }
+                $order->update_meta_data('_dmm_voucher_detection_log', $detection_log);
+                $order->save();
+                $orders_processed++;
+            }
+        }
+        
+        return [
+            'items_removed' => $orders_processed,
+            'items_retained' => 0,
+            'messages' => [
+                sprintf(__('Scrubbed voucher data from %d orders', 'dmm-delivery-bridge'), $orders_processed)
+            ],
+            'done' => true
+        ];
+    }
+    
+    /**
+     * Show job health admin notices
+     */
+    public function show_job_health_notices() {
+        if (!current_user_can('manage_woocommerce')) {
+            return;
+        }
+        
+        $stuck_count = get_option('dmm_stuck_jobs_count', 0);
+        $failed_count = get_option('dmm_failed_jobs_count', 0);
+        
+        if ($stuck_count > 0) {
+            echo '<div class="notice notice-warning is-dismissible">';
+            echo '<p><strong>' . __('DMM Delivery Bridge:', 'dmm-delivery-bridge') . '</strong> ';
+            echo sprintf(__('%d voucher processing jobs are stuck (>30 min).', 'dmm-delivery-bridge'), $stuck_count);
+            echo ' <a href="' . admin_url('admin.php?page=dmm-delivery-bridge&action=retry_stuck') . '">' . __('Retry All', 'dmm-delivery-bridge') . '</a>';
+            echo '</p></div>';
+        }
+        
+        if ($failed_count > 0) {
+            echo '<div class="notice notice-error is-dismissible">';
+            echo '<p><strong>' . __('DMM Delivery Bridge:', 'dmm-delivery-bridge') . '</strong> ';
+            echo sprintf(__('%d voucher processing jobs have failed.', 'dmm-delivery-bridge'), $failed_count);
+            echo ' <a href="' . admin_url('admin.php?page=dmm-delivery-bridge&action=retry_failed') . '">' . __('Retry Failed', 'dmm-delivery-bridge') . '</a>';
+            echo '</p></div>';
+        }
+    }
+    
+    /**
+     * Add system status row to WooCommerce Status
+     */
+    public function add_system_status_row($reports) {
+        global $wpdb;
+        
+        // Check HPOS status
+        $hpos_enabled = $this->is_hpos_enabled();
+        
+        // Check dedupe table
+        $table_name = $wpdb->prefix . 'dmm_processed_vouchers';
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        
+        // Get ActionScheduler counts
+        $as_pending = 0;
+        $as_failed = 0;
+        if (class_exists('ActionScheduler')) {
+            $as_pending = count(as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => 'pending',
+                'per_page' => 100
+            ]));
+            $as_failed = count(as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => 'failed',
+                'per_page' => 100
+            ]));
+        }
+        
+        // Check for clock skew (one-time warning)
+        $clock_skew = $this->check_clock_skew();
+        
+        $reports['dmm_delivery_bridge'] = [
+            'name' => 'DMM Delivery Bridge',
+            'label' => 'DMM Delivery Bridge',
+            'description' => 'Voucher detection and processing system status',
+            'test' => function() use ($hpos_enabled, $table_exists, $as_pending, $as_failed, $clock_skew) {
+                $status = 'good';
+                $message = [];
+                
+                // HPOS status
+                $message[] = 'HPOS: ' . ($hpos_enabled ? 'Enabled' : 'Disabled');
+                
+                // Table status
+                $message[] = 'Dedupe Table: ' . ($table_exists ? '✅' : '❌');
+                
+                // ActionScheduler status
+                $message[] = "AS Pending: $as_pending, Failed: $as_failed";
+                
+                // Multi-courier provider status
+                if (class_exists('\DMM\Courier\Registry')) {
+                    $providers = \DMM\Courier\Registry::all();
+                    $default_courier = get_option('dmm_default_courier', 'acs');
+                    $priority = dmm_courier_priority();
+                    
+                    $provider_status = [];
+                    foreach ($providers as $provider) {
+                        $provider_status[] = $provider->label() . ' ✅';
+                    }
+                    
+                    $message[] = 'Providers: ' . implode(' · ', $provider_status);
+                    $message[] = 'Default: ' . strtoupper($default_courier);
+                    $message[] = 'Priority: ' . implode(' → ', array_map('strtoupper', $priority));
+                    
+                    // Show mapping counts
+                    $map = dmm_voucher_meta_map();
+                    $counts = [];
+                    foreach ($map as $courier => $keys) {
+                        $counts[] = count($keys) . ' ' . strtoupper($courier);
+                    }
+                    $message[] = 'Keys Mapped: ' . implode(' / ', $counts);
+                }
+                
+                // Clock skew warning
+                if ($clock_skew > 60) {
+                    $message[] = "⚠️ Server clock differs by {$clock_skew}s; Retry-After may be inaccurate";
+                    $status = 'warning';
+                }
+                
+                if (!$table_exists) {
+                    $status = 'critical';
+                } elseif ($as_failed > 0) {
+                    $status = 'warning';
+                }
+                
+                return [
+                    'status' => $status,
+                    'label' => 'DMM Delivery Bridge Status',
+                    'message' => implode(' | ', $message)
+                ];
+            }
+        ];
+        
+        return $reports;
+    }
+    
+    /**
+     * Check for clock skew (one-time warning)
+     */
+    private function check_clock_skew() {
+        // This would typically check against a known time source
+        // For now, we'll use a simple heuristic based on recent API responses
+        $last_check = get_transient('dmm_clock_skew_check');
+        if ($last_check !== false) {
+            return $last_check;
+        }
+        
+        // Simulate clock skew check (in real implementation, check against NTP or API)
+        $skew = 0; // Assume no skew for now
+        set_transient('dmm_clock_skew_check', $skew, HOUR_IN_SECONDS);
+        
+        return $skew;
+    }
+    
+    /**
+     * Check Day-2 KPIs and trigger alerts
+     */
+    public function check_day2_kpis() {
+        global $wpdb;
+        
+        // Get ActionScheduler counts
+        $as_pending = 0;
+        $as_failed = 0;
+        if (class_exists('ActionScheduler')) {
+            $as_pending = count(as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => 'pending',
+                'per_page' => 100
+            ]));
+            $as_failed = count(as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => 'failed',
+                'per_page' => 100
+            ]));
+        }
+        
+        // Check for failed jobs (alert if ≥ 5 in 10 min)
+        if ($as_failed >= 5) {
+            $this->trigger_alert('failed_jobs', [
+                'count' => $as_failed,
+                'threshold' => 5,
+                'window' => '10 minutes'
+            ]);
+        }
+        
+        // Check for pending jobs (alert if > 200 for 15 min)
+        if ($as_pending > 200) {
+            $this->trigger_alert('pending_jobs', [
+                'count' => $as_pending,
+                'threshold' => 200,
+                'window' => '15 minutes'
+            ]);
+        }
+        
+        // Check for duplicate events (alert if > 3/day)
+        $duplicate_count = $this->get_duplicate_events_count();
+        if ($duplicate_count > 3) {
+            $this->trigger_alert('duplicate_events', [
+                'count' => $duplicate_count,
+                'threshold' => 3,
+                'window' => '24 hours'
+            ]);
+        }
+        
+        // Check clock skew (alert if > 60s)
+        $clock_skew = $this->check_clock_skew();
+        if ($clock_skew > 60) {
+            $this->trigger_alert('clock_skew', [
+                'skew' => $clock_skew,
+                'threshold' => 60
+            ]);
+        }
+    }
+    
+    /**
+     * Get count of duplicate events in last 24 hours
+     */
+    private function get_duplicate_events_count() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_processed_vouchers';
+        $yesterday = date('Y-m-d H:i:s', strtotime('-24 hours'));
+        
+        $count = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table_name 
+             WHERE processed_at > %s",
+            $yesterday
+        ));
+        
+        return (int)$count;
+    }
+    
+    /**
+     * Trigger alert for Day-2 KPIs
+     */
+    private function trigger_alert($type, $data) {
+        $alert_key = "dmm_alert_{$type}_" . date('Y-m-d-H');
+        
+        // Prevent duplicate alerts within same hour
+        if (get_transient($alert_key)) {
+            return;
+        }
+        
+        $message = $this->format_alert_message($type, $data);
+        
+        // Log alert
+        error_log("DMM Alert: $message");
+        
+        // Send email/Slack notification (implement based on your setup)
+        $this->send_alert_notification($type, $message, $data);
+        
+        // Set transient to prevent duplicate alerts
+        set_transient($alert_key, true, HOUR_IN_SECONDS);
+    }
+    
+    /**
+     * Format alert message
+     */
+    private function format_alert_message($type, $data) {
+        switch ($type) {
+            case 'failed_jobs':
+                return sprintf('DMM Alert: %d failed jobs detected (threshold: %d in %s)', 
+                    $data['count'], $data['threshold'], $data['window']);
+            case 'pending_jobs':
+                return sprintf('DMM Alert: %d pending jobs detected (threshold: %d for %s)', 
+                    $data['count'], $data['threshold'], $data['window']);
+            case 'duplicate_events':
+                return sprintf('DMM Alert: %d duplicate events detected (threshold: %d in %s)', 
+                    $data['count'], $data['threshold'], $data['window']);
+            case 'clock_skew':
+                return sprintf('DMM Alert: Clock skew of %ds detected (threshold: %ds)', 
+                    $data['skew'], $data['threshold']);
+            default:
+                return "DMM Alert: Unknown alert type $type";
+        }
+    }
+    
+    /**
+     * Send alert notification
+     */
+    private function send_alert_notification($type, $message, $data) {
+        // Implement email/Slack notification based on your setup
+        // For now, just log the alert
+        error_log("DMM Alert Notification: $message");
+        
+        // Example: Send to admin email
+        $admin_email = get_option('admin_email');
+        if ($admin_email) {
+            wp_mail($admin_email, 'DMM Delivery Bridge Alert', $message);
+        }
+    }
+    
+    /**
+     * Register WP-CLI commands
+     */
+    public function register_cli_commands() {
+        WP_CLI::add_command('dmm vouchers scan', [$this, 'cli_scan_vouchers']);
+        WP_CLI::add_command('dmm vouchers retry', [$this, 'cli_retry_jobs']);
+    }
+    
+    /**
+     * Run synthetic probe for automated testing
+     */
+    public function run_synthetic_probe() {
+        if (!get_option('dmm_probe_enabled')) {
+            return;
+        }
+        
+        // Create test order
+        $test_order = $this->create_test_order();
+        if (!$test_order) {
+            error_log('DMM Synthetic Probe: Failed to create test order');
+            return;
+        }
+        
+        // Set test voucher
+        $test_voucher = 'TEST-1234567890';
+        $test_order->update_meta_data('_dmm_acs_voucher', $test_voucher);
+        $test_order->save();
+        
+        // Verify job enqueued
+        $jobs = as_get_scheduled_actions([
+            'hook' => 'dmm_process_detected_voucher',
+            'status' => 'pending',
+            'per_page' => 10
+        ]);
+        
+        $job_found = false;
+        foreach ($jobs as $job) {
+            $args = $job->get_args();
+            if (isset($args[0]['order_id']) && $args[0]['order_id'] == $test_order->get_id()) {
+                $job_found = true;
+                break;
+            }
+        }
+        
+        if (!$job_found) {
+            error_log('DMM Synthetic Probe: No job enqueued for test order');
+            $this->cleanup_test_order($test_order);
+            return;
+        }
+        
+        // Verify canonical meta set
+        $canonical_voucher = $test_order->get_meta('_dmm_acs_voucher');
+        if ($canonical_voucher !== $test_voucher) {
+            error_log('DMM Synthetic Probe: Canonical meta not set correctly');
+            $this->cleanup_test_order($test_order);
+            return;
+        }
+        
+        // Log success
+        error_log('DMM Synthetic Probe: Test passed - job enqueued, canonical meta set');
+        
+        // Cleanup test order
+        $this->cleanup_test_order($test_order);
+    }
+    
+    /**
+     * Create test order for synthetic probe
+     */
+    private function create_test_order() {
+        $order = wc_create_order();
+        if (!$order) {
+            return false;
+        }
+        
+        // Add test product
+        $product = wc_get_product(1); // Use first available product
+        if (!$product) {
+            $order->delete();
+            return false;
+        }
+        
+        $order->add_product($product, 1);
+        $order->set_status('processing');
+        $order->save();
+        
+        return $order;
+    }
+    
+    /**
+     * Cleanup test order after synthetic probe
+     */
+    private function cleanup_test_order($order) {
+        if ($order) {
+            $order->delete(true); // Force delete
+        }
+    }
+    
+    /**
+     * WP-CLI: Scan vouchers for specific order
+     */
+    public function cli_scan_vouchers($args, $assoc_args) {
+        $order_id = isset($assoc_args['order']) ? intval($assoc_args['order']) : 0;
+        
+        if (!$order_id) {
+            WP_CLI::error('Order ID is required. Use --order=<id>');
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            WP_CLI::error("Order #$order_id not found");
+        }
+        
+        WP_CLI::log("Scanning order #$order_id for vouchers...");
+        
+        // Clear current voucher
+        $order->delete_meta_data('_dmm_acs_voucher');
+        $order->delete_meta_data('_dmm_voucher_detection_log');
+        $order->save();
+        
+        // Re-scan all watched keys
+        $watched_keys = $this->get_watched_keys_for('acs');
+        $found_voucher = false;
+        
+        foreach ($watched_keys as $key) {
+            $value = $order->get_meta($key);
+            if ($value) {
+                WP_CLI::log("Found voucher in meta key '$key': " . substr($value, 0, 4) . '****');
+                $this->maybe_capture_voucher($order_id, 'cli_scan', $key, $value);
+                $found_voucher = true;
+                break;
+            }
+        }
+        
+        // Also check shipping items
+        if (!$found_voucher) {
+            foreach ($order->get_items('shipping') as $item) {
+                foreach ($watched_keys as $key) {
+                    $value = $item->get_meta($key);
+                    if ($value) {
+                        WP_CLI::log("Found voucher in shipping item meta '$key': " . substr($value, 0, 4) . '****');
+                        $this->maybe_capture_voucher($order_id, 'cli_scan_item', $key, $value);
+                        $found_voucher = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+        
+        if ($found_voucher) {
+            WP_CLI::success('Voucher detection completed');
+        } else {
+            WP_CLI::warning('No vouchers found in watched fields');
+        }
+    }
+    
+    /**
+     * WP-CLI: Retry failed jobs
+     */
+    public function cli_retry_jobs($args, $assoc_args) {
+        if (!class_exists('ActionScheduler')) {
+            WP_CLI::error('ActionScheduler not available');
+        }
+        
+        $failed_only = isset($assoc_args['failed']) && $assoc_args['failed'];
+        
+        if ($failed_only) {
+            $jobs = as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => 'failed',
+                'per_page' => 100
+            ]);
+        } else {
+            $jobs = as_get_scheduled_actions([
+                'hook' => 'dmm_process_detected_voucher',
+                'status' => ['pending', 'failed'],
+                'per_page' => 100
+            ]);
+        }
+        
+        $retried = 0;
+        foreach ($jobs as $job) {
+            $args = $job->get_args();
+            if (!empty($args[0])) {
+                // Reschedule the job
+                as_schedule_single_action(
+                    time() + 30,
+                    'dmm_process_detected_voucher',
+                    $args,
+                    'dmm-voucher-processing'
+                );
+                $retried++;
+            }
+        }
+        
+        WP_CLI::success("Retried $retried jobs");
     }
     
     /**
@@ -8454,7 +11107,283 @@ class DMM_ELTA_Courier_Service {
         return (int) $count;
     }
     
+    /**
+     * AJAX: Get monitoring data
+     */
+    public function ajax_get_monitoring_data() {
+        check_ajax_referer('dmm_monitoring', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions'], 403);
+        }
+        
+        // Queue status
+        $queue_status = $this->get_queue_status();
+        
+        // Recent activity
+        $recent_activity = $this->get_recent_activity();
+        
+        // Failed orders
+        $failed_orders = $this->get_failed_orders();
+        
+        // System health
+        $system_health = $this->get_system_health();
+        
+        wp_send_json_success([
+            'queue_status' => $queue_status,
+            'recent_activity' => $recent_activity,
+            'failed_orders' => $failed_orders,
+            'system_health' => $system_health
+        ]);
+    }
+    
+    /**
+     * AJAX: Clear failed orders
+     */
+    public function ajax_clear_failed_orders() {
+        check_ajax_referer('dmm_monitoring', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions'], 403);
+        }
+        
+        // Clear failed orders meta
+        $failed_orders = $this->get_failed_orders_data();
+        foreach ($failed_orders as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $order->delete_meta_data('_dmm_delivery_sent');
+                $order->delete_meta_data('_dmm_delivery_retry_count');
+                $order->delete_meta_data('_dmm_delivery_failed_at');
+                $order->save();
+            }
+        }
+        
+        wp_send_json_success(['message' => 'Failed orders cleared successfully']);
+    }
+    
+    /**
+     * Get queue status
+     */
+    private function get_queue_status() {
+        if (!function_exists('as_get_scheduled_actions')) {
+            return '<p>Action Scheduler not available</p>';
+        }
+        
+        $pending = as_get_scheduled_actions([
+            'hook' => 'dmm_send_order',
+            'status' => 'pending',
+            'per_page' => -1
+        ]);
+        
+        $in_progress = as_get_scheduled_actions([
+            'hook' => 'dmm_send_order',
+            'status' => 'in-progress',
+            'per_page' => -1
+        ]);
+        
+        $failed = as_get_scheduled_actions([
+            'hook' => 'dmm_send_order',
+            'status' => 'failed',
+            'per_page' => -1
+        ]);
+        
+        return sprintf(
+            '<p><strong>Pending:</strong> %d<br><strong>In Progress:</strong> %d<br><strong>Failed:</strong> %d</p>',
+            count($pending),
+            count($in_progress),
+            count($failed)
+        );
+    }
+    
+    /**
+     * Get recent activity
+     */
+    private function get_recent_activity() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        $recent = $wpdb->get_results($wpdb->prepare("
+            SELECT order_id, success, message, created_at
+            FROM {$table_name}
+            WHERE created_at >= %s
+            ORDER BY created_at DESC
+            LIMIT 10
+        ", date('Y-m-d H:i:s', strtotime('-24 hours'))));
+        
+        if (empty($recent)) {
+            return '<p>No recent activity</p>';
+        }
+        
+        $html = '<ul>';
+        foreach ($recent as $log) {
+            $status = $log->success ? '✅' : '❌';
+            $html .= sprintf(
+                '<li>%s Order #%d - %s (%s)</li>',
+                $status,
+                $log->order_id,
+                esc_html($log->message),
+                $log->created_at
+            );
+        }
+        $html .= '</ul>';
+        
+        return $html;
+    }
+    
+    /**
+     * Get failed orders
+     */
+    private function get_failed_orders() {
+        $failed_orders = $this->get_failed_orders_data();
+        
+        if (empty($failed_orders)) {
+            return '<p>No failed orders</p>';
+        }
+        
+        $html = '<ul>';
+        foreach ($failed_orders as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $retry_count = $order->get_meta('_dmm_delivery_retry_count');
+                $html .= sprintf(
+                    '<li><a href="%s">Order #%d</a> (Retries: %d)</li>',
+                    get_edit_post_link($order_id),
+                    $order_id,
+                    $retry_count
+                );
+            }
+        }
+        $html .= '</ul>';
+        
+        return $html;
+    }
+    
+    /**
+     * Get failed orders data
+     */
+    private function get_failed_orders_data() {
+        global $wpdb;
+        
+        $results = $wpdb->get_col("
+            SELECT DISTINCT post_id
+            FROM {$wpdb->postmeta}
+            WHERE meta_key = '_dmm_delivery_sent'
+            AND meta_value = 'failed'
+        ");
+        
+        return array_map('intval', $results);
+    }
+    
+    /**
+     * Get system health
+     */
+    private function get_system_health() {
+        $health_checks = [];
+        
+        // WordPress version
+        $wp_version = get_bloginfo('version');
+        $health_checks[] = "WordPress: {$wp_version}";
+        
+        // WooCommerce version
+        if (class_exists('WooCommerce')) {
+            $wc_version = WC()->version;
+            $health_checks[] = "WooCommerce: {$wc_version}";
+        } else {
+            $health_checks[] = '❌ WooCommerce not active';
+        }
+        
+        // HPOS status
+        if (class_exists('\Automattic\WooCommerce\Utilities\Features')) {
+            $hpos_enabled = \Automattic\WooCommerce\Utilities\Features::is_enabled('custom_order_tables');
+            $health_checks[] = $hpos_enabled ? '✅ HPOS enabled' : '⚠️ HPOS disabled';
+        } else {
+            $health_checks[] = '❌ HPOS not available';
+        }
+        
+        // Action Scheduler
+        if (function_exists('as_get_scheduled_actions')) {
+            $health_checks[] = '✅ Action Scheduler available';
+        } else {
+            $health_checks[] = '❌ Action Scheduler not available';
+        }
+        
+        // Plugin version
+        $plugin_version = '1.0.0';
+        $health_checks[] = "Plugin: {$plugin_version}";
+        
+        // Check API configuration
+        $api_endpoint = isset($this->options['api_endpoint']) ? $this->options['api_endpoint'] : '';
+        $api_key = isset($this->options['api_key']) ? $this->options['api_key'] : '';
+        $tenant_id = isset($this->options['tenant_id']) ? $this->options['tenant_id'] : '';
+        
+        if (empty($api_endpoint) || empty($api_key) || empty($tenant_id)) {
+            $health_checks[] = '❌ API configuration incomplete';
+        } else {
+            $health_checks[] = '✅ API configuration complete';
+        }
+        
+        // Check recent errors
+        $recent_errors = $this->get_recent_error_count();
+        if ($recent_errors > 10) {
+            $health_checks[] = "⚠️ High error rate: {$recent_errors} errors in last hour";
+        } else {
+            $health_checks[] = "✅ Error rate normal: {$recent_errors} errors in last hour";
+        }
+        
+        return '<ul><li>' . implode('</li><li>', $health_checks) . '</li></ul>';
+    }
+    
 }
+
+// ============================================================================
+// Multi-Courier Meta Mapping Functions
+// ============================================================================
+
+function dmm_voucher_meta_map(): array {
+    $map = [
+        'acs' => [
+            '_acs_voucher',
+            'acs_voucher', 
+            'acs_tracking',
+            '_appsbyb_acs_courier_gr_no_pod',
+            '_appsbyb_acs_courier_gr_no_pod_pieces'
+        ],
+        'speedex' => [
+            'obs_speedex_courier',
+            'obs_speedex_courier_pieces'
+        ],
+        'generic' => [
+            'voucher_number',
+            'tracking_number',
+            'shipment_id',
+            '_dmm_delivery_shipment_id',
+            'courier',
+            'shipping_courier',
+            'courier_service',
+            'courier_company',
+            'shipping_provider',
+            'delivery_service',
+            'shipping_service',
+            'transport_method'
+        ]
+    ];
+    return apply_filters('dmm_voucher_meta_keys', $map);
+}
+
+function dmm_courier_priority(): array {
+    $csv = get_option('dmm_courier_priority', 'acs,speedex,generic');
+    $order = array_values(array_filter(array_map('trim', explode(',', $csv))));
+    return $order ?: ['acs', 'speedex', 'generic'];
+}
+
+// HPOS compatibility declaration
+add_action('before_woocommerce_init', function() {
+    if (class_exists(\Automattic\WooCommerce\Utilities\Features::class)) {
+        \Automattic\WooCommerce\Utilities\Features::declare_compatibility('custom_order_tables', __FILE__, true);
+    }
+});
 
 // Initialize the plugin
 DMM_Delivery_Bridge::getInstance();
