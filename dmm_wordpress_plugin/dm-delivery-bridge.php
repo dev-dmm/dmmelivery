@@ -99,6 +99,8 @@ class DMM_Delivery_Bridge {
         
         // Register multi-courier providers
         \DMM\Courier\Registry::register(new \DMM\Courier\AcsProvider());
+        \DMM\Courier\Registry::register(new \DMM\Courier\GenikiProvider());
+        \DMM\Courier\Registry::register(new \DMM\Courier\EltaProvider());
         \DMM\Courier\Registry::register(new \DMM\Courier\SpeedexProvider());
         \DMM\Courier\Registry::register(new \DMM\Courier\GenericProvider());
         
@@ -317,8 +319,6 @@ class DMM_Delivery_Bridge {
             'api_key' => '',
             'tenant_id' => '',
             'acs_courier_meta_field' => '_acs_voucher',
-            'geniki_courier_meta_field' => '_geniki_voucher',
-            'elta_courier_meta_field' => '_elta_voucher',
             'auto_send' => 'yes',
             'order_statuses' => ['processing', 'completed'],
             'create_shipment' => 'yes',
@@ -614,21 +614,6 @@ class DMM_Delivery_Bridge {
             'dmm_delivery_bridge_api_section'
         );
         
-        add_settings_field(
-            'geniki_courier_meta_field',
-            __('Geniki Taxidromiki Meta Field', 'dmm-delivery-bridge'),
-            [$this, 'geniki_courier_meta_field_callback'],
-            'dmm_delivery_bridge_settings',
-            'dmm_delivery_bridge_api_section'
-        );
-        
-        add_settings_field(
-            'elta_courier_meta_field',
-            __('ELTA Hellenic Post Meta Field', 'dmm-delivery-bridge'),
-            [$this, 'elta_courier_meta_field_callback'],
-            'dmm_delivery_bridge_settings',
-            'dmm_delivery_bridge_api_section'
-        );
         
             // Behavior Settings Fields
         add_settings_field(
@@ -3161,81 +3146,6 @@ class DMM_Delivery_Bridge {
         </style>';
     }
     
-    public function geniki_courier_meta_field_callback() {
-        $value = isset($this->options['geniki_courier_meta_field']) ? $this->options['geniki_courier_meta_field'] : '_geniki_voucher';
-        
-        // Get all available meta fields
-        $all_fields = $this->get_recent_order_meta_fields();
-        
-        echo '<select name="dmm_delivery_bridge_options[geniki_courier_meta_field]" class="regular-text" style="max-height: 30px;" size="1">';
-        echo '<option value="">' . __('-- Select a meta field --', 'dmm-delivery-bridge') . '</option>';
-        
-        // Group fields by type
-        $grouped_fields = [];
-        foreach ($all_fields as $field) {
-            $group = 'Other';
-            if (strpos($field, '_geniki') !== false || strpos($field, 'geniki') !== false) {
-                $group = 'Geniki Related';
-            } elseif (strpos($field, '_courier') !== false || strpos($field, 'courier') !== false) {
-                $group = 'Courier Related';
-            } elseif (strpos($field, '_voucher') !== false || strpos($field, 'voucher') !== false) {
-                $group = 'Voucher Related';
-            } elseif (strpos($field, '_tracking') !== false || strpos($field, 'tracking') !== false) {
-                $group = 'Tracking Related';
-            }
-            $grouped_fields[$group][] = $field;
-        }
-        
-        foreach ($grouped_fields as $group => $fields) {
-            echo '<optgroup label="' . esc_attr($group) . '">';
-            foreach ($fields as $field) {
-                $selected = selected($value, $field, false);
-                echo '<option value="' . esc_attr($field) . '"' . $selected . '>' . esc_html($field) . '</option>';
-            }
-            echo '</optgroup>';
-        }
-        
-        echo '</select>';
-        echo '<p class="description">' . __('Select the meta field that contains the Geniki Taxidromiki voucher number for each order.', 'dmm-delivery-bridge') . '</p>';
-    }
-    
-    public function elta_courier_meta_field_callback() {
-        $value = isset($this->options['elta_courier_meta_field']) ? $this->options['elta_courier_meta_field'] : '_elta_voucher';
-        
-        // Get all available meta fields
-        $all_fields = $this->get_recent_order_meta_fields();
-        
-        echo '<select name="dmm_delivery_bridge_options[elta_courier_meta_field]" class="regular-text" style="max-height: 30px;" size="1">';
-        echo '<option value="">' . __('-- Select a meta field --', 'dmm-delivery-bridge') . '</option>';
-        
-        // Group fields by type
-        $grouped_fields = [];
-        foreach ($all_fields as $field) {
-            $group = 'Other';
-            if (strpos($field, '_elta') !== false || strpos($field, 'elta') !== false) {
-                $group = 'ELTA Related';
-            } elseif (strpos($field, '_courier') !== false || strpos($field, 'courier') !== false) {
-                $group = 'Courier Related';
-            } elseif (strpos($field, '_voucher') !== false || strpos($field, 'voucher') !== false) {
-                $group = 'Voucher Related';
-            } elseif (strpos($field, '_tracking') !== false || strpos($field, 'tracking') !== false) {
-                $group = 'Tracking Related';
-            }
-            $grouped_fields[$group][] = $field;
-        }
-        
-        foreach ($grouped_fields as $group => $fields) {
-            echo '<optgroup label="' . esc_attr($group) . '">';
-            foreach ($fields as $field) {
-                $selected = selected($value, $field, false);
-                echo '<option value="' . esc_attr($field) . '"' . $selected . '>' . esc_html($field) . '</option>';
-            }
-            echo '</optgroup>';
-        }
-        
-        echo '</select>';
-        echo '<p class="description">' . __('Select the meta field that contains the ELTA Hellenic Post voucher number for each order.', 'dmm-delivery-bridge') . '</p>';
-    }
     
     public function auto_send_callback() {
         $value = isset($this->options['auto_send']) ? $this->options['auto_send'] : 'yes';
@@ -5205,40 +5115,6 @@ class DMM_Delivery_Bridge {
         }
     }
     
-    /**
-     * Get courier from order
-     */
-    private function get_courier_from_order($order) {
-        // Check for specific courier meta fields first
-        $acs_meta_field = isset($this->options['acs_courier_meta_field']) ? $this->options['acs_courier_meta_field'] : '';
-        $geniki_meta_field = isset($this->options['geniki_courier_meta_field']) ? $this->options['geniki_courier_meta_field'] : '';
-        $elta_meta_field = isset($this->options['elta_courier_meta_field']) ? $this->options['elta_courier_meta_field'] : '';
-        // Check ACS field first
-        if (!empty($acs_meta_field)) {
-            $acs_value = get_post_meta($order->get_id(), $acs_meta_field, true);
-            if (!empty($acs_value)) {
-                return 'ACS';
-            }
-        }
-        
-        // Check Geniki field
-        if (!empty($geniki_meta_field)) {
-            $geniki_value = get_post_meta($order->get_id(), $geniki_meta_field, true);
-            if (!empty($geniki_value)) {
-                return 'GTX';
-            }
-        }
-        
-        // Check ELTA field
-        if (!empty($elta_meta_field)) {
-            $elta_value = get_post_meta($order->get_id(), $elta_meta_field, true);
-            if (!empty($elta_value)) {
-                return 'ELT';
-            }
-        }
-        
-            return null;
-    }
     
     /**
      * AJAX: Start bulk order sending
@@ -11373,9 +11249,9 @@ function dmm_voucher_meta_map(): array {
 }
 
 function dmm_courier_priority(): array {
-    $csv = get_option('dmm_courier_priority', 'acs,speedex,generic');
+    $csv = get_option('dmm_courier_priority', 'acs,geniki,elta,speedex,generic');
     $order = array_values(array_filter(array_map('trim', explode(',', $csv))));
-    return $order ?: ['acs', 'speedex', 'generic'];
+    return $order ?: ['acs', 'geniki', 'elta', 'speedex', 'generic'];
 }
 
 // HPOS compatibility declaration

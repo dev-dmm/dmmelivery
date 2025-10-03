@@ -22,6 +22,28 @@ class MetaMapping {
                 '_appsbyb_acs_courier_gr_no_pod',
                 '_appsbyb_acs_courier_gr_no_pod_pieces'
             ],
+            'geniki' => [
+                '_geniki_voucher',
+                'geniki_voucher',
+                'geniki_tracking',
+                '_geniki_tracking',
+                'gtx_voucher',
+                'gtx_tracking',
+                '_gtx_voucher',
+                '_gtx_tracking',
+                'taxidromiki_voucher',
+                'taxidromiki_tracking'
+            ],
+            'elta' => [
+                '_elta_voucher',
+                'elta_voucher',
+                'elta_tracking',
+                '_elta_tracking',
+                'elta_reference',
+                '_elta_reference',
+                'hellenic_post_voucher',
+                'hellenic_post_tracking'
+            ],
             'speedex' => [
                 'obs_speedex_courier',
                 'obs_speedex_courier_pieces'
@@ -68,8 +90,8 @@ class MetaMapping {
      * Get courier priority order
      */
     public static function getCourierPriority(): array {
-        $priority = get_option('dmm_courier_priority', ['acs', 'speedex', 'generic']);
-        return is_array($priority) ? $priority : ['acs', 'speedex', 'generic'];
+        $priority = get_option('dmm_courier_priority', ['acs', 'geniki', 'elta', 'speedex', 'generic']);
+        return is_array($priority) ? $priority : ['acs', 'geniki', 'elta', 'speedex', 'generic'];
     }
 
     /**
@@ -79,6 +101,16 @@ class MetaMapping {
         // ACS patterns
         if (preg_match('/\b(ACS|ΑCS)\b/i', $note_content)) {
             return 'acs';
+        }
+
+        // Geniki patterns
+        if (preg_match('/\b(GENIKI|Geniki|geniki|GTX|gtx|TAXIDROMIKI|Taxidromiki|taxidromiki)\b/i', $note_content)) {
+            return 'geniki';
+        }
+
+        // ELTA patterns
+        if (preg_match('/\b(ELTA|elta|HELLENIC POST|Hellenic Post|hellenic post)\b/i', $note_content)) {
+            return 'elta';
         }
 
         // Speedex patterns
