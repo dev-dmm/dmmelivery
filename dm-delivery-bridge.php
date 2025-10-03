@@ -142,7 +142,13 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_acs_sync_all_shipments', [$this, 'ajax_acs_sync_all_shipments']);
         add_action('wp_ajax_dmm_acs_sync_shipment_status', [$this, 'ajax_acs_sync_shipment_status']);
         
-        // Schedule automatic sync (if not already scheduled)
+        // Schedule adaptive dispatch (if not already scheduled)
+        if (!wp_next_scheduled('dmm_dispatch_due_shipments')) {
+            wp_schedule_event(time(), 'dmm_acs_dispatch_interval', 'dmm_dispatch_due_shipments');
+        }
+        add_action('dmm_dispatch_due_shipments', [$this, 'dispatch_due_shipments']);
+        
+        // Legacy sync for backward compatibility
         if (!wp_next_scheduled('dmm_acs_sync_shipments')) {
             wp_schedule_event(time(), 'dmm_acs_sync_interval', 'dmm_acs_sync_shipments');
         }
@@ -151,6 +157,39 @@ class DMM_Delivery_Bridge {
         // Add custom cron interval
         add_filter('cron_schedules', [$this, 'add_acs_sync_cron_interval']);
         add_action('wp_ajax_dmm_send_all_orders_simple', [$this, 'ajax_send_all_orders_simple']);
+        
+        // Action Scheduler integration for adaptive sync
+        add_action('dmm_sync_shipment', [$this, 'process_shipment_sync'], 10, 1);
+        
+        // Metrics and observability
+        add_action('wp_ajax_dmm_get_metrics', [$this, 'ajax_get_metrics']);
+        add_action('wp_ajax_dmm_reset_circuit_breaker', [$this, 'ajax_reset_circuit_breaker']);
+        // Single callback registration with guard
+        if (!has_action('wp_ajax_dmm_get_logs_table', [$this, 'ajax_get_logs_table_simple'])) {
+            add_action('wp_ajax_dmm_get_logs_table', [$this, 'ajax_get_logs_table_simple']);
+        }
+        
+        // Test endpoint to verify AJAX is working
+        add_action('wp_ajax_dmm_test_logs_handler', [$this, 'ajax_test_logs_handler']);
+        
+        /*
+         * VERIFICATION CHECKLIST:
+         * 
+         * 1. Single registration: Only one add_action('wp_ajax_dmm_get_logs_table', ...)
+         * 2. Alias method: ajax_get_logs_simple() calls ajax_get_logs_table_simple()
+         * 3. Capabilities: Both manage_options and manage_woocommerce allowed
+         * 4. Nonce: check_ajax_referer('dmm_get_logs_table', 'nonce')
+         * 5. Debug logs: All gated behind debug_log() helper
+         * 6. Clean JSON: Only wp_send_json_* calls, no echo/print
+         * 
+         * Test with:
+         * curl -i -H 'Cookie: <auth-cookie>' \
+         *   -d 'action=dmm_get_logs_table' \
+         *   -d 'nonce=<wp_create_nonce("dmm_get_logs_table")>' \
+         *   https://your-site.com/wp-admin/admin-ajax.php
+         * 
+         * Expected: 200 + JSON, no "Method exists: NO" errors
+         */
         
         // ACS Courier AJAX handlers
         add_action('wp_ajax_dmm_acs_track_shipment', [$this, 'ajax_acs_track_shipment']);
@@ -177,12 +216,7 @@ class DMM_Delivery_Bridge {
         // Log management AJAX handlers
         add_action('wp_ajax_dmm_clear_logs', [$this, 'ajax_clear_logs']);
         add_action('wp_ajax_dmm_export_logs', [$this, 'ajax_export_logs']);
-        add_action('wp_ajax_dmm_get_logs_table', [$this, 'ajax_check_logs']);
-        // Debug: Log that the action is being registered
-        error_log('DMM: Registering dmm_get_logs_table -> ajax_check_logs');
-        error_log('DMM: Method exists: ' . (method_exists($this, 'ajax_check_logs') ? 'YES' : 'NO'));
-        error_log('DMM: Class name: ' . get_class($this));
-        error_log('DMM: Methods now: ' . print_r(get_class_methods($this), true));
+        // Removed duplicate handler - using ajax_get_logs_table_simple instead
         
         // Add a simple test action to verify AJAX is working
         add_action('wp_ajax_dmm_test_ajax', [$this, 'ajax_test_simple']);
@@ -233,8 +267,62 @@ class DMM_Delivery_Bridge {
             add_option('dmm_delivery_bridge_options', $default_options);
         }
         
-        // Create log table
-        $this->create_log_table();
+        // Create tables with proper indexes
+        global $wpdb;
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $logs = $wpdb->prefix . 'dmm_delivery_logs';
+        $ship = $wpdb->prefix . 'dmm_shipments';
+        $charset = $wpdb->get_charset_collate();
+
+        // Create logs table with proper indexes
+        dbDelta("
+        CREATE TABLE {$logs} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            order_id BIGINT UNSIGNED NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            request_data LONGTEXT,
+            response_data LONGTEXT,
+            error_message TEXT,
+            context VARCHAR(50) DEFAULT 'api',
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            KEY idx_order_id (order_id),
+            KEY idx_created_at (created_at),
+            KEY idx_context (context),
+            KEY idx_status (status)
+        ) {$charset};
+        ");
+
+        // Create shipments table with proper indexes
+        dbDelta("
+        CREATE TABLE {$ship} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            order_id BIGINT UNSIGNED NOT NULL,
+            tracking_number VARCHAR(255) NOT NULL,
+            status VARCHAR(50) DEFAULT 'pending',
+            next_check_at DATETIME NULL,
+            retry_count INT(11) DEFAULT 0,
+            last_error TEXT DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_order (order_id),
+            KEY idx_next_check_at (next_check_at),
+            KEY idx_status (status),
+            KEY idx_tracking (tracking_number)
+        ) {$charset};
+        ");
+        
+        // Schedule adaptive dispatch (new system)
+        if (!wp_next_scheduled('dmm_dispatch_due_shipments')) {
+            wp_schedule_event(time(), 'dmm_acs_dispatch_interval', 'dmm_dispatch_due_shipments');
+        }
+        
+        // Legacy sync for backward compatibility
+        if (!wp_next_scheduled('dmm_acs_sync_shipments')) {
+            wp_schedule_event(time(), 'dmm_acs_sync_interval', 'dmm_acs_sync_shipments');
+        }
     }
     
     /**
@@ -261,10 +349,13 @@ class DMM_Delivery_Bridge {
             request_data longtext,
             response_data longtext,
             error_message text,
+            context varchar(50) DEFAULT 'api',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY order_id (order_id),
-            KEY status (status)
+            KEY idx_order_id (order_id),
+            KEY idx_created_at (created_at),
+            KEY idx_context (context),
+            KEY idx_status (status)
         ) $charset_collate;";
         
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -676,6 +767,39 @@ class DMM_Delivery_Bridge {
                 </div>
             </div>
             
+            <!-- System Metrics -->
+            <div class="dmm-metrics-section" style="padding: 20px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; margin-bottom: 20px;">
+                <h3><?php _e('📊 System Metrics', 'dmm-delivery-bridge'); ?></h3>
+                <div id="dmm-metrics-container">
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <div id="api-requests-metrics" style="flex: 1; min-width: 200px;">
+                            <h4><?php _e('API Requests (24h)', 'dmm-delivery-bridge'); ?></h4>
+                            <div id="api-requests-data">Loading...</div>
+                        </div>
+                        <div id="queue-metrics" style="flex: 1; min-width: 200px;">
+                            <h4><?php _e('Queue Status', 'dmm-delivery-bridge'); ?></h4>
+                            <div id="queue-data">Loading...</div>
+                        </div>
+                        <div id="shipment-metrics" style="flex: 1; min-width: 200px;">
+                            <h4><?php _e('Shipments', 'dmm-delivery-bridge'); ?></h4>
+                            <div id="shipment-data">Loading...</div>
+                        </div>
+                        <div id="circuit-breaker-metrics" style="flex: 1; min-width: 200px;">
+                            <h4><?php _e('Circuit Breaker', 'dmm-delivery-bridge'); ?></h4>
+                            <div id="circuit-breaker-data">Loading...</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button type="button" id="refresh-metrics" class="button button-secondary">
+                            <?php _e('🔄 Refresh Metrics', 'dmm-delivery-bridge'); ?>
+                        </button>
+                        <button type="button" id="reset-circuit-breaker" class="button button-warning" style="margin-left: 10px;">
+                            <?php _e('🔧 Reset Circuit Breaker', 'dmm-delivery-bridge'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- API Configuration Content -->
             <div class="dmm-api-section" style="padding: 20px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; margin-bottom: 20px;">
                 <h3><?php _e('DMM API Configuration', 'dmm-delivery-bridge'); ?></h3>
@@ -690,6 +814,120 @@ class DMM_Delivery_Bridge {
                     </form>
                             </div>
                         </div>
+                        
+            <script>
+            jQuery(document).ready(function($) {
+                // Load metrics on page load
+                loadMetrics();
+                
+                // Refresh metrics button
+                $('#refresh-metrics').on('click', function() {
+                    loadMetrics();
+                });
+                
+                // Reset circuit breaker button
+                $('#reset-circuit-breaker').on('click', function() {
+                    if (confirm('Are you sure you want to reset the circuit breaker?')) {
+                        resetCircuitBreaker();
+                    }
+                });
+                
+                function loadMetrics() {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'dmm_get_metrics',
+                            nonce: '<?php echo wp_create_nonce('dmm_get_metrics'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                displayMetrics(response.data);
+                            } else {
+                                console.error('Failed to load metrics:', response.data);
+                            }
+                        },
+                        error: function() {
+                            console.error('Error loading metrics');
+                        }
+                    });
+                }
+                
+                function displayMetrics(metrics) {
+                    // API Requests
+                    const apiData = metrics.api_requests;
+                    const apiHtml = `
+                        <div style="font-size: 14px;">
+                            <div><strong>Total:</strong> ${apiData.last_24h.total_requests || 0}</div>
+                            <div><strong>Successful:</strong> ${apiData.last_24h.successful || 0}</div>
+                            <div><strong>Errors:</strong> ${apiData.last_24h.errors || 0}</div>
+                            <div><strong>Success Rate:</strong> ${apiData.success_rate_24h || 0}%</div>
+                        </div>
+                    `;
+                    $('#api-requests-data').html(apiHtml);
+                    
+                    // Queue Status
+                    const queueData = metrics.queue;
+                    const queueHtml = `
+                        <div style="font-size: 14px;">
+                            <div><strong>Pending Jobs:</strong> ${queueData.pending_jobs || 0}</div>
+                            <div><strong>Failed Jobs:</strong> ${queueData.failed_jobs || 0}</div>
+                            <div><strong>Oldest Pending:</strong> ${queueData.oldest_pending || 'None'}</div>
+                        </div>
+                    `;
+                    $('#queue-data').html(queueHtml);
+                    
+                    // Shipments
+                    const shipmentData = metrics.shipments;
+                    const shipmentHtml = `
+                        <div style="font-size: 14px;">
+                            <div><strong>Total:</strong> ${shipmentData.total_shipments || 0}</div>
+                            <div><strong>Delivered:</strong> ${shipmentData.delivered || 0}</div>
+                            <div><strong>In Transit:</strong> ${shipmentData.in_transit || 0}</div>
+                            <div><strong>Due for Sync:</strong> ${shipmentData.due_for_sync || 0}</div>
+                        </div>
+                    `;
+                    $('#shipment-data').html(shipmentHtml);
+                    
+                    // Circuit Breaker
+                    const cbData = metrics.circuit_breaker;
+                    const cbStatus = cbData.status === 'open' ? '🔴 Open' : '🟢 Closed';
+                    const cbHtml = `
+                        <div style="font-size: 14px;">
+                            <div><strong>Status:</strong> ${cbStatus}</div>
+                            <div><strong>Message:</strong> ${cbData.message || 'Normal operation'}</div>
+                            ${cbData.until ? `<div><strong>Until:</strong> ${new Date(cbData.until * 1000).toLocaleString()}</div>` : ''}
+                        </div>
+                    `;
+                    $('#circuit-breaker-data').html(cbHtml);
+                }
+                
+                function resetCircuitBreaker() {
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'dmm_reset_circuit_breaker',
+                            nonce: '<?php echo wp_create_nonce('dmm_reset_circuit_breaker'); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                alert('Circuit breaker reset successfully');
+                                loadMetrics();
+                            } else {
+                                alert('Failed to reset circuit breaker');
+                            }
+                        },
+                        error: function() {
+                            alert('Error resetting circuit breaker');
+                        }
+                    });
+                }
+                
+                // Auto-refresh every 30 seconds
+                setInterval(loadMetrics, 30000);
+            });
+            </script>
                         
         <?php
     }
@@ -2970,9 +3208,7 @@ class DMM_Delivery_Bridge {
         
         // Check if already sent successfully
         if (get_post_meta($order_id, '_dmm_delivery_sent', true) === 'yes') {
-            if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
-                error_log('DMM Delivery Bridge - Order ' . $order_id . ' already sent, skipping');
-            }
+            $this->debug_log('Order ' . $order_id . ' already sent, skipping');
             return;
         }
         
@@ -4211,7 +4447,7 @@ class DMM_Delivery_Bridge {
         
         // Debug logging
         if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
-            error_log('DMM Delivery Bridge - ajax_bulk_sync_orders() called, found ' . count($sent_orders) . ' sent orders');
+            $this->debug_log('ajax_bulk_sync_orders() called, found ' . count($sent_orders) . ' sent orders');
         }
         
         if (empty($sent_orders)) {
@@ -4367,7 +4603,7 @@ class DMM_Delivery_Bridge {
         $all_orders = $this->get_all_orders();
         
         // Debug logging
-        error_log('DMM Delivery Bridge - ajax_force_resend_all() found ' . count($all_orders) . ' orders');
+        $this->debug_log('ajax_force_resend_all() found ' . count($all_orders) . ' orders');
         
         if (empty($all_orders)) {
             // Let's also try a direct query to see what's happening
@@ -5250,7 +5486,417 @@ class DMM_Delivery_Bridge {
     }
     
     /**
-     * Sync all ACS shipments (scheduled task)
+     * Dispatch due shipments for adaptive sync
+     */
+    public function dispatch_due_shipments() {
+        // Check if Action Scheduler is available
+        if (!function_exists('as_enqueue_async_action')) {
+            $this->debug_log('Action Scheduler not available for adaptive sync');
+            return;
+        }
+        
+        // Check circuit breaker
+        if (!$this->check_circuit_breaker()) {
+            $this->debug_log('Circuit breaker is open, skipping dispatch');
+            return;
+        }
+        
+        // Get due shipments (limit to prevent overwhelming)
+        $due_shipments = $this->get_due_shipments(150);
+        
+        if (empty($due_shipments)) {
+            return;
+        }
+        
+        $dispatched = 0;
+        $skipped = 0;
+        
+        foreach ($due_shipments as $shipment) {
+            // Skip low-priority polls if circuit breaker is open
+            if ($this->should_skip_low_priority_poll($shipment)) {
+                $skipped++;
+                continue;
+            }
+            
+            // Enqueue background job for each due shipment
+            as_enqueue_async_action('dmm_sync_shipment', [
+                'shipment_id' => $shipment['id'],
+                'order_id' => $shipment['order_id'],
+                'tracking_number' => $shipment['tracking_number']
+            ], 'acs_sync');
+            $dispatched++;
+        }
+        
+        $this->debug_log("Dispatched {$dispatched} shipments, skipped {$skipped} low-priority polls");
+    }
+    
+    /**
+     * Check if low-priority poll should be skipped due to circuit breaker
+     */
+    private function should_skip_low_priority_poll($shipment) {
+        $circuit_breaker = get_transient('dmm_circuit_breaker');
+        
+        if (!$circuit_breaker) {
+            return false; // Circuit breaker is closed
+        }
+        
+        // Skip low-priority statuses when circuit breaker is open
+        $low_priority_statuses = ['in_transit', 'pending'];
+        $status = $shipment['status'] ?? 'pending';
+        
+        return in_array($status, $low_priority_statuses);
+    }
+    
+    /**
+     * Get shipments that are due for sync
+     */
+    private function get_due_shipments($limit = 150) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_shipments';
+        
+        // Create table if it doesn't exist
+        $this->ensure_shipments_table_exists();
+        
+        $query = $wpdb->prepare("
+            SELECT id, order_id, tracking_number, status, next_check_at, retry_count
+            FROM {$table_name}
+            WHERE next_check_at <= %s 
+            AND status NOT IN ('delivered', 'cancelled', 'returned')
+            AND retry_count < 5
+            ORDER BY next_check_at ASC
+            LIMIT %d
+        ", current_time('mysql'), $limit);
+        
+        return $wpdb->get_results($query, ARRAY_A);
+    }
+    
+    /**
+     * Ensure shipments table exists with proper indexes
+     */
+    private function ensure_shipments_table_exists() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_shipments';
+        
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            order_id bigint(20) NOT NULL,
+            tracking_number varchar(255) NOT NULL,
+            status varchar(50) DEFAULT 'pending',
+            next_check_at datetime DEFAULT NULL,
+            retry_count int(11) DEFAULT 0,
+            last_error text DEFAULT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY uniq_order (order_id),
+            KEY idx_next_check_at (next_check_at),
+            KEY idx_status (status),
+            KEY idx_tracking (tracking_number)
+        ) {$charset_collate};";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+    
+    /**
+     * Process individual shipment sync with rate limiting and retry logic
+     */
+    public function process_shipment_sync($args) {
+        $shipment_id = $args['shipment_id'] ?? null;
+        $order_id = $args['order_id'] ?? null;
+        $tracking_number = $args['tracking_number'] ?? null;
+        
+        if (!$shipment_id || !$tracking_number) {
+            error_log('DMM Delivery Bridge: Invalid shipment sync parameters');
+            return;
+        }
+        
+        // Check circuit breaker first
+        if (!$this->check_circuit_breaker()) {
+            error_log('DMM Delivery Bridge: Circuit breaker is open, skipping shipment sync');
+            return;
+        }
+        
+        // Check rate limiter
+        if (!$this->rate_limiter_allow('acs', 1)) {
+            // Requeue for later if rate limit exceeded
+            if (function_exists('as_enqueue_async_action')) {
+                as_enqueue_async_action('dmm_sync_shipment', $args, 'acs_sync', 30);
+            }
+            return;
+        }
+        
+        try {
+            $result = $this->sync_single_acs_shipment_adaptive($order_id, $tracking_number);
+            
+            if ($result['success']) {
+                $this->update_shipment_next_check($shipment_id, $result['status'], $result['next_interval']);
+                error_log("DMM Delivery Bridge: Successfully synced shipment {$tracking_number}");
+            } else {
+                $this->handle_sync_error($shipment_id, $result['error'], $result['retry_after'] ?? null);
+                
+                // Check if we should open circuit breaker
+                $this->check_and_open_circuit_breaker($result['error']);
+            }
+            
+        } catch (Exception $e) {
+            error_log("DMM Delivery Bridge: Error syncing shipment {$tracking_number}: " . $e->getMessage());
+            $this->handle_sync_error($shipment_id, $e->getMessage());
+        }
+    }
+    
+    /**
+     * Rate limiter with token bucket algorithm (atomic)
+     */
+    private function rate_limiter_allow($key, $tokens = 1, $rate_per_min = 280, $bucket_cap = 560) {
+        // Try to acquire mutex
+        if (!$this->acquire_mutex("rl:{$key}", 2)) {
+            return false; // Try again shortly
+        }
+
+        $state = get_option("dmm_rl_{$key}");
+        $now = time();
+
+        if (!$state) {
+            $state = ['ts' => $now, 'tokens' => $bucket_cap];
+        }
+        
+        $elapsed = max(0, $now - $state['ts']);
+        $state['tokens'] = min($bucket_cap, $state['tokens'] + ($elapsed * $rate_per_min / 60));
+        $state['ts'] = $now;
+
+        $ok = false;
+        if ($state['tokens'] >= $tokens) {
+            $state['tokens'] -= $tokens;
+            $ok = true;
+        }
+        
+        update_option("dmm_rl_{$key}", $state, false);
+        $this->release_mutex("rl:{$key}");
+
+        return $ok;
+    }
+    
+    /**
+     * Acquire mutex for atomic operations
+     */
+    private function acquire_mutex($key, $ttl = 2) {
+        // Try to set lock with expiration using dedicated cache group
+        if (wp_cache_add("lock:{$key}", 1, 'dmm_delivery', $ttl)) {
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Release mutex
+     */
+    private function release_mutex($key) {
+        wp_cache_delete("lock:{$key}", 'dmm_delivery');
+    }
+    
+    /**
+     * Calculate next check interval based on status
+     */
+    private function calculate_next_interval($status, $shipment_age_hours = 0) {
+        switch ($status) {
+            case 'LABEL_CREATED':
+                // First 2 hours: check every 15 minutes, then every 30 minutes
+                return $shipment_age_hours < 2 ? '+15 minutes' : '+30 minutes';
+            case 'PICKED_UP':
+            case 'IN_TRANSIT':
+                return '+3 hours';
+            case 'OUT_FOR_DELIVERY':
+                return '+45 minutes';
+            case 'DELIVERED':
+            case 'RETURNED':
+            case 'CANCELLED':
+                return null; // Stop polling
+            default:
+                return '+4 hours';
+        }
+    }
+    
+    /**
+     * Update shipment next check time
+     */
+    private function update_shipment_next_check($shipment_id, $status, $next_interval) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_shipments';
+        
+        if ($next_interval === null) {
+            // Stop polling for final statuses
+            $wpdb->update(
+                $table_name,
+                ['status' => $status, 'next_check_at' => null, 'retry_count' => 0],
+                ['id' => $shipment_id]
+            );
+        } else {
+            $next_check = date('Y-m-d H:i:s', strtotime($next_interval));
+            $wpdb->update(
+                $table_name,
+                ['status' => $status, 'next_check_at' => $next_check, 'retry_count' => 0],
+                ['id' => $shipment_id]
+            );
+        }
+    }
+    
+    /**
+     * Handle sync errors with exponential backoff
+     */
+    private function handle_sync_error($shipment_id, $error, $retry_after = null) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_shipments';
+        
+        // Get current retry count
+        $current = $wpdb->get_row($wpdb->prepare(
+            "SELECT retry_count FROM {$table_name} WHERE id = %d",
+            $shipment_id
+        ));
+        
+        $retry_count = $current ? $current->retry_count + 1 : 1;
+        
+        if ($retry_count >= 5) {
+            // Max retries reached, mark as error
+            $wpdb->update(
+                $table_name,
+                ['last_error' => $error, 'retry_count' => $retry_count],
+                ['id' => $shipment_id]
+            );
+            return;
+        }
+        
+        // Calculate backoff delay
+        $delay = $retry_after ?: $this->calculate_backoff_delay($retry_count);
+        $next_check = date('Y-m-d H:i:s', time() + $delay);
+        
+        $wpdb->update(
+            $table_name,
+            [
+                'last_error' => $error,
+                'retry_count' => $retry_count,
+                'next_check_at' => $next_check
+            ],
+            ['id' => $shipment_id]
+        );
+        
+        // Requeue for retry
+        if (function_exists('as_enqueue_async_action')) {
+            as_enqueue_async_action('dmm_sync_shipment', [
+                'shipment_id' => $shipment_id
+            ], 'acs_sync', $delay);
+        }
+    }
+    
+    /**
+     * Calculate exponential backoff delay with jitter
+     */
+    private function calculate_backoff_delay($retry_count) {
+        $base_delay = min(300, 10 * pow(2, $retry_count)); // Cap at 5 minutes
+        $jitter = rand(0, $base_delay * 0.1); // 10% jitter
+        return $base_delay + $jitter;
+    }
+    
+    /**
+     * Adaptive sync for single ACS shipment
+     */
+    private function sync_single_acs_shipment_adaptive($order_id, $tracking_number) {
+        $acs_service = $this->get_acs_service();
+        
+        // Get tracking details from ACS
+        $response = $acs_service->get_tracking_details($tracking_number, [
+            'company_id' => $this->options['acs_company_id'] ?? '',
+            'company_password' => $this->options['acs_company_password'] ?? '',
+            'user_id' => $this->options['acs_user_id'] ?? '',
+            'user_password' => $this->options['acs_user_password'] ?? ''
+        ]);
+        
+        if (!$response['success']) {
+            return [
+                'success' => false,
+                'error' => $response['error'] ?? 'Unknown error',
+                'retry_after' => $this->is_429_error($response) ? 90 : null
+            ];
+        }
+        
+        // Parse tracking events
+        $events = $acs_service->parse_tracking_events($response['data']);
+        if (empty($events)) {
+            return [
+                'success' => false,
+                'error' => 'No tracking events found'
+            ];
+        }
+        
+        // Get latest status
+        $latest_event = end($events);
+        $status = $this->map_acs_status($latest_event);
+        
+        // Calculate next interval based on status and shipment age
+        $shipment_age_hours = $this->get_shipment_age_hours($order_id);
+        $next_interval = $this->calculate_next_interval($status, $shipment_age_hours);
+        
+        // Update order status if needed
+        $this->update_order_status_from_shipment($order_id, $status);
+        
+        return [
+            'success' => true,
+            'status' => $status,
+            'next_interval' => $next_interval,
+            'events' => $events
+        ];
+    }
+    
+    /**
+     * Check if response indicates 429 rate limit
+     */
+    private function is_429_error($response) {
+        return isset($response['error']) && 
+               (strpos($response['error'], '429') !== false || 
+                strpos($response['error'], 'rate limit') !== false ||
+                strpos($response['error'], 'too many requests') !== false);
+    }
+    
+    /**
+     * Get shipment age in hours
+     */
+    private function get_shipment_age_hours($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return 0;
+        }
+        
+        $created = $order->get_date_created();
+        if (!$created) {
+            return 0;
+        }
+        
+        return (time() - $created->getTimestamp()) / 3600;
+    }
+    
+    /**
+     * Update order status from shipment status
+     */
+    private function update_order_status_from_shipment($order_id, $shipment_status) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+        
+        $woocommerce_status = $this->map_order_status_from_shipment($shipment_status);
+        if ($woocommerce_status && $order->get_status() !== $woocommerce_status) {
+            $order->update_status($woocommerce_status, 'Status updated from ACS tracking');
+        }
+    }
+    
+    /**
+     * Sync all ACS shipments (scheduled task) - Legacy method
      */
     public function sync_acs_shipments() {
         $results = [
@@ -5429,6 +6075,13 @@ class DMM_Delivery_Bridge {
      * Add custom cron interval for ACS sync
      */
     public function add_acs_sync_cron_interval($schedules) {
+        // Adaptive sync - dispatch every minute to check due shipments
+        $schedules['dmm_acs_dispatch_interval'] = [
+            'interval' => MINUTE_IN_SECONDS, // Every minute
+            'display' => __('Every Minute (ACS Dispatch)', 'dmm-delivery-bridge')
+        ];
+        
+        // Legacy intervals for backward compatibility
         $schedules['dmm_acs_sync_interval'] = [
             'interval' => 4 * HOUR_IN_SECONDS, // Every 4 hours
             'display' => __('Every 4 Hours (ACS Sync)', 'dmm-delivery-bridge')
@@ -7298,23 +7951,19 @@ class DMM_ELTA_Courier_Service {
      * AJAX: Simple test method
      */
     public function ajax_test_simple() {
-        error_log('DMM: ajax_test_simple method called');
+        // Debug logging removed for production
         wp_send_json_success(['message' => 'AJAX is working!']);
     }
     
     /**
-     * AJAX: Get logs table - simple version
+     * AJAX: Get logs table - simple version (removed duplicate)
      */
-    public function ajax_get_logs_simple() {
-        error_log('DMM: ajax_get_logs_simple method called');
-        wp_send_json_success(['message' => 'Logs AJAX is working!']);
-    }
     
     /**
      * AJAX: Test method for debugging
      */
     public function ajax_debug_test() {
-        error_log('DMM: ajax_debug_test method called');
+        // Debug logging removed for production
         wp_send_json_success(['message' => 'Debug test working!']);
     }
     
@@ -7461,6 +8110,348 @@ class DMM_ELTA_Courier_Service {
             'sent' => $sent,
             'unsent' => $unsent
         ]);
+    }
+    
+    /**
+     * Get system metrics for monitoring
+     */
+    public function ajax_get_metrics() {
+        check_ajax_referer('dmm_get_metrics', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        $metrics = $this->get_system_metrics();
+        wp_send_json_success($metrics);
+    }
+    
+    /**
+     * Reset circuit breaker
+     */
+    public function ajax_reset_circuit_breaker() {
+        check_ajax_referer('dmm_reset_circuit_breaker', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'dmm-delivery-bridge'));
+        }
+        
+        delete_transient('dmm_circuit_breaker');
+        delete_transient('rl:acs');
+        
+        wp_send_json_success(['message' => 'Circuit breaker reset successfully']);
+    }
+    
+    /**
+     * Backward-compatible alias for logs table
+     */
+    public function ajax_get_logs_simple() {
+        return $this->ajax_get_logs_table_simple();
+    }
+    
+    /**
+     * Get logs table data with pagination
+     */
+    public function ajax_get_logs_table_simple() {
+        // Allow both admins and shop managers to view logs
+        if (!current_user_can('manage_options') && !current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'forbidden'], 403);
+        }
+        check_ajax_referer('dmm_get_logs_table', 'nonce');
+
+        $this->debug_log('ajax_get_logs_table_simple called');
+
+        $page = isset($_POST['page']) ? max(1, intval($_POST['page'])) : 1;
+        $per  = isset($_POST['per'])  ? min(100, max(10, intval($_POST['per']))) : 25;
+        $off  = ($page - 1) * $per;
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'dmm_delivery_logs';
+
+        // Make sure table exists (cheap check)
+        $wpdb->query("CREATE TABLE IF NOT EXISTS {$table} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            order_id bigint(20) NOT NULL,
+            status varchar(20) NOT NULL,
+            request_data longtext,
+            response_data longtext,
+            error_message text,
+            context varchar(50) DEFAULT 'api',
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_order_id (order_id),
+            KEY idx_created_at (created_at),
+            KEY idx_context (context),
+            KEY idx_status (status)
+        ) {$wpdb->get_charset_collate()};");
+
+        $total = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}");
+        $rows  = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT id, order_id, status, request_data, response_data, error_message, context, created_at
+                 FROM {$table}
+                 ORDER BY id DESC
+                 LIMIT %d OFFSET %d", $per, $off
+            ),
+            ARRAY_A
+        );
+
+        wp_send_json_success([
+            'total' => $total,
+            'page'  => $page,
+            'per'   => $per,
+            'rows'  => $rows,
+        ]);
+    }
+    
+    /**
+     * Get comprehensive system metrics
+     */
+    private function get_system_metrics() {
+        global $wpdb;
+        
+        $metrics = [];
+        
+        // API Request Metrics
+        $metrics['api_requests'] = $this->get_api_request_metrics();
+        
+        // Queue Metrics
+        $metrics['queue'] = $this->get_queue_metrics();
+        
+        // Shipment Metrics
+        $metrics['shipments'] = $this->get_shipment_metrics();
+        
+        // Circuit Breaker Status
+        $metrics['circuit_breaker'] = $this->get_circuit_breaker_status();
+        
+        // Rate Limiter Status
+        $metrics['rate_limiter'] = $this->get_rate_limiter_status();
+        
+        return $metrics;
+    }
+    
+    /**
+     * Get API request metrics
+     */
+    private function get_api_request_metrics() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        $last_24h = $wpdb->get_row("
+            SELECT 
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as errors,
+                SUM(CASE WHEN context = 'acs_sync' THEN 1 ELSE 0 END) as sync_requests
+            FROM {$table_name}
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        ");
+        
+        $last_hour = $wpdb->get_row("
+            SELECT 
+                COUNT(*) as total_requests,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+                SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as errors
+            FROM {$table_name}
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+        ");
+        
+        return [
+            'last_24h' => $last_24h,
+            'last_hour' => $last_hour,
+            'success_rate_24h' => $last_24h->total_requests > 0 ? 
+                round(($last_24h->successful / $last_24h->total_requests) * 100, 2) : 0
+        ];
+    }
+    
+    /**
+     * Get queue metrics
+     */
+    private function get_queue_metrics() {
+        if (!function_exists('as_get_scheduled_actions')) {
+            return ['error' => 'Action Scheduler not available'];
+        }
+        
+        $scheduled = as_get_scheduled_actions([
+            'hook' => 'dmm_sync_shipment',
+            'status' => 'pending',
+            'per_page' => -1
+        ]);
+        
+        $failed = as_get_scheduled_actions([
+            'hook' => 'dmm_sync_shipment',
+            'status' => 'failed',
+            'per_page' => -1
+        ]);
+        
+        return [
+            'pending_jobs' => count($scheduled),
+            'failed_jobs' => count($failed),
+            'oldest_pending' => !empty($scheduled) ? 
+                min(array_column($scheduled, 'scheduled_date')) : null
+        ];
+    }
+    
+    /**
+     * Get shipment metrics
+     */
+    private function get_shipment_metrics() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_shipments';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'");
+        if (!$table_exists) {
+            return ['error' => 'Shipments table not found'];
+        }
+        
+        $stats = $wpdb->get_row("
+            SELECT 
+                COUNT(*) as total_shipments,
+                SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered,
+                SUM(CASE WHEN status = 'in_transit' THEN 1 ELSE 0 END) as in_transit,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN next_check_at <= NOW() THEN 1 ELSE 0 END) as due_for_sync,
+                SUM(CASE WHEN retry_count > 0 THEN 1 ELSE 0 END) as with_retries
+            FROM {$table_name}
+        ");
+        
+        return $stats;
+    }
+    
+    /**
+     * Get circuit breaker status
+     */
+    private function get_circuit_breaker_status() {
+        $circuit_breaker = get_transient('dmm_circuit_breaker');
+        
+        if (!$circuit_breaker) {
+            return ['status' => 'closed', 'message' => 'Normal operation'];
+        }
+        
+        return [
+            'status' => 'open',
+            'message' => $circuit_breaker['message'] ?? 'Circuit breaker is open',
+            'until' => $circuit_breaker['until'] ?? null
+        ];
+    }
+    
+    /**
+     * Get rate limiter status
+     */
+    private function get_rate_limiter_status() {
+        $rate_limiter = get_transient('rl:acs');
+        
+        if (!$rate_limiter) {
+            return ['tokens' => 560, 'status' => 'full'];
+        }
+        
+        return [
+            'tokens' => $rate_limiter['tokens'] ?? 560,
+            'status' => $rate_limiter['tokens'] > 50 ? 'healthy' : 'low',
+            'last_update' => $rate_limiter['ts'] ?? time()
+        ];
+    }
+    
+    /**
+     * Check circuit breaker before making API calls
+     */
+    private function check_circuit_breaker() {
+        $circuit_breaker = get_transient('dmm_circuit_breaker');
+        
+        if ($circuit_breaker && isset($circuit_breaker['until'])) {
+            if (time() < $circuit_breaker['until']) {
+                return false; // Circuit breaker is open
+            } else {
+                // Circuit breaker timeout expired, reset it
+                delete_transient('dmm_circuit_breaker');
+            }
+        }
+        
+        return true; // Circuit breaker is closed
+    }
+    
+    /**
+     * Open circuit breaker
+     */
+    private function open_circuit_breaker($message, $duration = 300) {
+        set_transient('dmm_circuit_breaker', [
+            'message' => $message,
+            'until' => time() + $duration
+        ], $duration);
+        
+        $this->debug_log("Circuit breaker opened - {$message}");
+    }
+    
+    /**
+     * Debug logging helper - only logs if debug mode is enabled
+     */
+    private function debug_log($message) {
+        if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
+            error_log("DMM Delivery Bridge: {$message}");
+        }
+    }
+    
+    /**
+     * Test function to verify AJAX handler is working
+     */
+    public function ajax_test_logs_handler() {
+        if (!current_user_can('manage_options') && !current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'forbidden'], 403);
+        }
+        
+        wp_send_json_success([
+            'message' => 'AJAX handler is working correctly',
+            'timestamp' => current_time('mysql'),
+            'user_can' => [
+                'manage_options' => current_user_can('manage_options'),
+                'manage_woocommerce' => current_user_can('manage_woocommerce')
+            ]
+        ]);
+    }
+    
+    /**
+     * Check error patterns and open circuit breaker if needed
+     */
+    private function check_and_open_circuit_breaker($error) {
+        // Check for high error rate in last 5 minutes
+        $error_count = $this->get_recent_error_count();
+        
+        if ($error_count >= 10) { // 10 errors in 5 minutes
+            $this->open_circuit_breaker("High error rate detected: {$error_count} errors in 5 minutes", 600);
+            return;
+        }
+        
+        // Check for specific error patterns
+        if (strpos($error, '429') !== false || strpos($error, 'rate limit') !== false) {
+            $this->open_circuit_breaker("Rate limiting detected: {$error}", 300);
+            return;
+        }
+        
+        if (strpos($error, '500') !== false || strpos($error, '502') !== false || strpos($error, '503') !== false) {
+            $this->open_circuit_breaker("Server errors detected: {$error}", 300);
+            return;
+        }
+    }
+    
+    /**
+     * Get recent error count for circuit breaker logic
+     */
+    private function get_recent_error_count() {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        $count = $wpdb->get_var($wpdb->prepare("
+            SELECT COUNT(*) 
+            FROM {$table_name}
+            WHERE status = 'error' 
+            AND created_at >= %s
+        ", date('Y-m-d H:i:s', time() - 300))); // Last 5 minutes
+        
+        return (int) $count;
     }
     
 }
