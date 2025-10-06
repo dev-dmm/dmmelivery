@@ -89,6 +89,10 @@ class DMM_Delivery_Bridge {
             return;
         }
         
+        // CRITICAL: Add error handler to prevent plugin from crashing WooCommerce
+        set_error_handler([$this, 'handle_plugin_errors']);
+        register_shutdown_function([$this, 'handle_plugin_shutdown']);
+        
         // Prevent double hook registration
         if (did_action('dmm_delivery_bridge_hooks_registered')) {
             return;
@@ -113,11 +117,12 @@ class DMM_Delivery_Bridge {
             add_action('admin_init', [$this, 'admin_init']);
         }
         
-        // Hook into WooCommerce order processing - comprehensive triggers
-        add_action('woocommerce_payment_complete', [$this, 'queue_send_to_api'], 10, 1);
-        add_action('woocommerce_order_status_changed', [$this, 'maybe_queue_send_on_status'], 10, 4);
-        add_action('woocommerce_order_status_processing', [$this, 'queue_send_to_api']);
-        add_action('woocommerce_order_status_completed', [$this, 'queue_send_to_api']);
+        // Hook into WooCommerce order processing - SAFE ASYNC TRIGGERS ONLY
+        // Use lower priority to ensure WooCommerce completes first
+        add_action('woocommerce_payment_complete', [$this, 'queue_send_to_api'], 20, 1);
+        add_action('woocommerce_order_status_changed', [$this, 'maybe_queue_send_on_status'], 20, 4);
+        add_action('woocommerce_order_status_processing', [$this, 'queue_send_to_api'], 20);
+        add_action('woocommerce_order_status_completed', [$this, 'queue_send_to_api'], 20);
         
         // Subscriptions support
         add_action('wcs_renewal_order_created', [$this, 'queue_send_to_api'], 10, 1);
@@ -307,6 +312,32 @@ class DMM_Delivery_Bridge {
         add_action('wp_ajax_dmm_test_ajax', [$this, 'ajax_test_simple']);
         add_action('wp_ajax_dmm_resend_log', [$this, 'ajax_resend_log']);
         add_action('wp_ajax_dmm_get_order_stats', [$this, 'ajax_get_order_stats']);
+    }
+    
+    /**
+     * Handle plugin errors to prevent WooCommerce crashes
+     */
+    public function handle_plugin_errors($errno, $errstr, $errfile, $errline) {
+        // Only handle errors from our plugin
+        if (strpos($errfile, 'dm-delivery-bridge.php') === false) {
+            return false; // Let WordPress handle other errors
+        }
+        
+        // Log the error but don't let it crash WooCommerce
+        error_log("DMM Delivery Bridge - Plugin Error: $errstr in $errfile on line $errline");
+        
+        // Return true to prevent the error from propagating
+        return true;
+    }
+    
+    /**
+     * Handle plugin shutdown to catch fatal errors
+     */
+    public function handle_plugin_shutdown() {
+        $error = error_get_last();
+        if ($error && strpos($error['file'], 'dm-delivery-bridge.php') !== false) {
+            error_log("DMM Delivery Bridge - Fatal Error: " . $error['message'] . " in " . $error['file'] . " on line " . $error['line']);
+        }
     }
     
     /**
@@ -3439,75 +3470,93 @@ class DMM_Delivery_Bridge {
      * Queue order for sending to API (Action Scheduler)
      */
     public function queue_send_to_api($order_id) {
-        // Check if auto send is enabled
-        if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
+        // CRITICAL: Always return early to prevent blocking WooCommerce
+        try {
+            // Check if auto send is enabled
+            if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
+                return;
+            }
+            
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                return;
+            }
+            
+            // Check if this status should trigger sending
+            $order_statuses = isset($this->options['order_statuses']) ? $this->options['order_statuses'] : ['processing', 'completed'];
+            if (!in_array($order->get_status(), $order_statuses)) {
+                return;
+            }
+            
+            // Check if already sent successfully
+            if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
+                return;
+            }
+            
+            // Check for race condition with transient lock
+            $lock_key = 'dmm_sending_' . $order_id;
+            if (get_transient($lock_key)) {
+                return; // Already being processed
+            }
+            
+            // Set lock with longer TTL for queue backup scenarios (10 minutes)
+            set_transient($lock_key, true, 600);
+            
+            // Enqueue Action Scheduler job with stable group
+            as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
+            
+            $this->debug_log("Queued order {$order_id} for sending to API");
+            
+        } catch (Exception $e) {
+            // CRITICAL: Log error but NEVER let it bubble up to WooCommerce
+            error_log('DMM Delivery Bridge - Error in queue_send_to_api: ' . $e->getMessage());
+            // Always return to prevent blocking order completion
             return;
         }
-        
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            return;
-        }
-        
-        // Check if this status should trigger sending
-        $order_statuses = isset($this->options['order_statuses']) ? $this->options['order_statuses'] : ['processing', 'completed'];
-        if (!in_array($order->get_status(), $order_statuses)) {
-            return;
-        }
-        
-        // Check if already sent successfully
-        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
-            return;
-        }
-        
-        // Check for race condition with transient lock
-        $lock_key = 'dmm_sending_' . $order_id;
-        if (get_transient($lock_key)) {
-            return; // Already being processed
-        }
-        
-        // Set lock with longer TTL for queue backup scenarios (10 minutes)
-        set_transient($lock_key, true, 600);
-        
-        // Enqueue Action Scheduler job with stable group
-        as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
-        
-        $this->debug_log("Queued order {$order_id} for sending to API");
     }
     
     /**
      * Handle status change events with comprehensive checking
      */
     public function maybe_queue_send_on_status($order_id, $old_status, $new_status, $order) {
-        // Check if auto send is enabled
-        if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
+        // CRITICAL: Always return early to prevent blocking WooCommerce
+        try {
+            // Check if auto send is enabled
+            if (isset($this->options['auto_send']) && $this->options['auto_send'] !== 'yes') {
+                return;
+            }
+            
+            // Check if this status should trigger sending
+            $order_statuses = isset($this->options['order_statuses']) ? $this->options['order_statuses'] : ['processing', 'completed'];
+            if (!in_array($new_status, $order_statuses)) {
+                return;
+            }
+            
+            // Check if already sent successfully
+            if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
+                return;
+            }
+            
+            // Check for race condition with transient lock
+            $lock_key = 'dmm_sending_' . $order_id;
+            if (get_transient($lock_key)) {
+                return; // Already being processed
+            }
+            
+            // Set lock with longer TTL for queue backup scenarios (10 minutes)
+            set_transient($lock_key, true, 600);
+            
+            // Enqueue Action Scheduler job with stable group
+            as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
+            
+            $this->debug_log("Queued order {$order_id} for sending to API (status change: {$old_status} -> {$new_status})");
+            
+        } catch (Exception $e) {
+            // CRITICAL: Log error but NEVER let it bubble up to WooCommerce
+            error_log('DMM Delivery Bridge - Error in maybe_queue_send_on_status: ' . $e->getMessage());
+            // Always return to prevent blocking order completion
             return;
         }
-        
-        // Check if this status should trigger sending
-        $order_statuses = isset($this->options['order_statuses']) ? $this->options['order_statuses'] : ['processing', 'completed'];
-        if (!in_array($new_status, $order_statuses)) {
-            return;
-        }
-        
-        // Check if already sent successfully
-        if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
-            return;
-        }
-        
-        // Check for race condition with transient lock
-        $lock_key = 'dmm_sending_' . $order_id;
-        if (get_transient($lock_key)) {
-            return; // Already being processed
-        }
-        
-        // Set lock with longer TTL for queue backup scenarios (10 minutes)
-        set_transient($lock_key, true, 600);
-        
-        // Enqueue Action Scheduler job with stable group
-        as_enqueue_async_action('dmm_send_order', ['order_id' => $order_id], 'dmm');
-        
-        $this->debug_log("Queued order {$order_id} for sending to API (status change: {$old_status} -> {$new_status})");
     }
     
     /**
@@ -4183,7 +4232,8 @@ class DMM_Delivery_Bridge {
             error_log('DMM Delivery Bridge - Fatal error in prepare_order_data: ' . $e->getMessage());
             error_log('DMM Delivery Bridge - Stack trace: ' . $e->getTraceAsString());
             
-            // Return minimal data to prevent complete failure
+            // CRITICAL: Return minimal data to prevent complete failure
+            // This ensures WooCommerce can continue processing the order
             return [
                 'source' => 'woocommerce',
                 'order' => [
@@ -5969,7 +6019,9 @@ class DMM_Delivery_Bridge {
             return;
         }
         
-        $value = trim((string)$value);
+        // Handle array values safely
+        $value = is_array($value) ? json_encode($value) : (string)$value;
+        $value = trim($value);
         if ($value === '') return;
 
         // 1) Try mapping by meta key
@@ -6316,9 +6368,12 @@ class DMM_Delivery_Bridge {
     private function log_canary_skip($order_id, $meta_key, $value) {
         $canary_percentage = isset($this->options['acs_canary_percentage']) ? intval($this->options['acs_canary_percentage']) : 100;
         
+        // Handle array values safely
+        $value_str = is_array($value) ? json_encode($value) : (string)$value;
+        
         error_log(sprintf(
             'DMM Canary Skip: Order %d, Key %s, Voucher %s****, Canary %d%%',
-            $order_id, $meta_key, substr($value, 0, 4), $canary_percentage
+            $order_id, $meta_key, substr($value_str, 0, 4), $canary_percentage
         ));
     }
     
@@ -10917,7 +10972,7 @@ class DMM_ELTA_Courier_Service {
     /**
      * Debug logging helper - only logs if debug mode is enabled
      */
-    private function debug_log($message) {
+    public function debug_log($message) {
         if (isset($this->options['debug_mode']) && $this->options['debug_mode'] === 'yes') {
             error_log("DMM Delivery Bridge: {$message}");
         }
