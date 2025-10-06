@@ -66,16 +66,10 @@ export default function AuthenticatedLayout({ header, children }) {
               </div>
 
               <div className="hidden space-x-2 lg:space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                {/* Core Operations */}
                 {hasRoute('dashboard') && (
                   <NavLink href={route('dashboard')} active={route().current('dashboard')}>
                     Πίνακας Ελέγχου
-                  </NavLink>
-                )}
-
-                {hasRoute('courier.performance') && (
-                  <NavLink href={route('courier.performance')} active={route().current('courier.performance')}>
-                    <span className="hidden lg:inline">📊 Απόδοση Courier</span>
-                    <span className="lg:hidden">📊 Courier</span>
                   </NavLink>
                 )}
 
@@ -88,11 +82,27 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 {hasRoute('shipments.index') && (
                   <NavLink href={route('shipments.index')} active={route().current('shipments.*')}>
-                    <span className="hidden lg:inline">Πίνακας Αποστολών</span>
-                    <span className="lg:hidden">Αποστολές</span>
+                    <span className="hidden lg:inline">🚚 Πίνακας Αποστολών</span>
+                    <span className="lg:hidden">🚚 Αποστολές</span>
                   </NavLink>
                 )}
 
+                {/* Analytics & Reports */}
+                {hasRoute('courier.performance') && (
+                  <NavLink href={route('courier.performance')} active={route().current('courier.performance')}>
+                    <span className="hidden lg:inline">📊 Απόδοση Courier</span>
+                    <span className="lg:hidden">📊 Courier</span>
+                  </NavLink>
+                )}
+
+                {hasRoute('courier-reports.import.index') && (
+                  <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
+                    <span className="hidden lg:inline">📈 Αναφορές</span>
+                    <span className="lg:hidden">📈 Αναφορές</span>
+                  </NavLink>
+                )}
+
+                {/* AI & Monitoring */}
                 {hasRoute('predictive-eta.index') && (
                   <NavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
                     <span className="hidden lg:inline">🤖 Προγνωστικά ETA</span>
@@ -100,34 +110,6 @@ export default function AuthenticatedLayout({ header, children }) {
                   </NavLink>
                 )}
 
-                {hasRoute('alerts.index') && (
-                  <NavLink href={route('alerts.index')} active={route().current('alerts.*')}>
-                    <span className="hidden lg:inline">🚨 Ειδοποιήσεις</span>
-                    <span className="lg:hidden">🚨 Ειδοποιήσεις</span>
-                  </NavLink>
-                )}
-
-                {hasRoute('chatbot.index') && (
-                  <NavLink href={route('chatbot.index')} active={route().current('chatbot.*')}>
-                    <span className="hidden lg:inline">💬 AI Chatbot</span>
-                    <span className="lg:hidden">💬 Chatbot</span>
-                  </NavLink>
-                )}
-
-
-                {hasRoute('courier-reports.import.index') && (
-                  <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
-                    <span className="hidden lg:inline">📊 Αναφορές Courier</span>
-                    <span className="lg:hidden">📊 Αναφορές</span>
-                  </NavLink>
-                )}
-
-                {hasRoute('settings.index') && (
-                  <NavLink href={route('settings.index')} active={route().current('settings.*')}>
-                    <span className="hidden lg:inline">⚙️ Ρυθμίσεις</span>
-                    <span className="lg:hidden">⚙️</span>
-                  </NavLink>
-                )}
 
                 {isSuperAdmin() && (
                   <div className="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium text-gray-500">
@@ -194,6 +176,12 @@ export default function AuthenticatedLayout({ header, children }) {
                     {hasRoute('profile.edit') && (
                       <Dropdown.Link href={route('profile.edit')}>Προφίλ</Dropdown.Link>
                     )}
+                    {hasRoute('settings.index') && (
+                      <Dropdown.Link href={route('settings.index')}>⚙️ Ρυθμίσεις</Dropdown.Link>
+                    )}
+                    {hasRoute('alerts.index') && (
+                      <Dropdown.Link href={route('alerts.index')}>🚨 Ειδοποιήσεις</Dropdown.Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
@@ -235,15 +223,10 @@ export default function AuthenticatedLayout({ header, children }) {
         {/* Mobile menu */}
         <div className={(showingNavigationDropdown ? 'block' : 'hidden') + ' sm:hidden'}>
           <div className="space-y-1 pb-3 pt-2">
+            {/* Core Operations */}
             {hasRoute('dashboard') && (
               <ResponsiveNavLink href={route('dashboard')} active={route().current('dashboard')}>
                 Πίνακας Ελέγχου
-              </ResponsiveNavLink>
-            )}
-
-            {hasRoute('courier.performance') && (
-              <ResponsiveNavLink href={route('courier.performance')} active={route().current('courier.performance')}>
-                📊 Απόδοση Courier
               </ResponsiveNavLink>
             )}
 
@@ -255,38 +238,27 @@ export default function AuthenticatedLayout({ header, children }) {
 
             {hasRoute('shipments.index') && (
               <ResponsiveNavLink href={route('shipments.index')} active={route().current('shipments.*')}>
-                Αποστολές
+                🚚 Αποστολές
               </ResponsiveNavLink>
             )}
 
-            {hasRoute('predictive-eta.index') && (
-              <ResponsiveNavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
-                🤖 Προγνωστικά ETA
+            {/* Analytics & Reports */}
+            {hasRoute('courier.performance') && (
+              <ResponsiveNavLink href={route('courier.performance')} active={route().current('courier.performance')}>
+                📊 Απόδοση Courier
               </ResponsiveNavLink>
             )}
-
-            {hasRoute('alerts.index') && (
-              <ResponsiveNavLink href={route('alerts.index')} active={route().current('alerts.*')}>
-                🚨 Ειδοποιήσεις
-              </ResponsiveNavLink>
-            )}
-
-            {hasRoute('chatbot.index') && (
-              <ResponsiveNavLink href={route('chatbot.index')} active={route().current('chatbot.*')}>
-                💬 AI Chatbot
-              </ResponsiveNavLink>
-            )}
-
 
             {hasRoute('courier-reports.import.index') && (
               <ResponsiveNavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
-                📊 Αναφορές Courier
+                📈 Αναφορές
               </ResponsiveNavLink>
             )}
 
-            {hasRoute('settings.index') && (
-              <ResponsiveNavLink href={route('settings.index')} active={route().current('settings.*')}>
-                ⚙️ Ρυθμίσεις
+            {/* AI & Monitoring */}
+            {hasRoute('predictive-eta.index') && (
+              <ResponsiveNavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
+                🤖 Προγνωστικά ETA
               </ResponsiveNavLink>
             )}
 
@@ -330,6 +302,8 @@ export default function AuthenticatedLayout({ header, children }) {
 
             <div className="mt-3 space-y-1">
               {hasRoute('profile.edit') && <ResponsiveNavLink href={route('profile.edit')}>Προφίλ</ResponsiveNavLink>}
+              {hasRoute('settings.index') && <ResponsiveNavLink href={route('settings.index')}>⚙️ Ρυθμίσεις</ResponsiveNavLink>}
+              {hasRoute('alerts.index') && <ResponsiveNavLink href={route('alerts.index')}>🚨 Ειδοποιήσεις</ResponsiveNavLink>}
               <button
                 onClick={handleLogout}
                 className="block w-full px-4 py-2 text-start text-base font-medium text-gray-500 transition duration-150 ease-in-out hover:bg-gray-50 hover:text-gray-700 focus:bg-gray-50 focus:text-gray-700 focus:outline-none"
