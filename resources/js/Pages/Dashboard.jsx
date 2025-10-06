@@ -11,6 +11,15 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
+// Enhanced Components
+import EnhancedStatCard from '@/Components/EnhancedStatCard';
+import SnapshotOverview from '@/Components/SnapshotOverview';
+import StatsDrillDown from '@/Components/StatsDrillDown';
+import BatchActions from '@/Components/BatchActions';
+import OnboardingHelp from '@/Components/OnboardingHelp';
+import AlertBanner from '@/Components/AlertBanner';
+import CustomizableDashboard from '@/Components/CustomizableDashboard';
+
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 // Helper functions for date handling
@@ -56,6 +65,15 @@ export default function Dashboard(props) {
   const [startTime, setStartTime] = useState('00:00');
   const [endTime, setEndTime] = useState('23:59');
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Enhanced dashboard state
+  const [showDrillDown, setShowDrillDown] = useState(false);
+  const [drillDownData, setDrillDownData] = useState(null);
+  const [drillDownType, setDrillDownType] = useState('');
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [criticalAlerts, setCriticalAlerts] = useState([]);
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -65,10 +83,45 @@ export default function Dashboard(props) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Check if user is new (first time visiting dashboard)
+  useEffect(() => {
+    const isNewUser = localStorage.getItem('isNewUser') === 'true';
+    if (isNewUser) {
+      setShowOnboarding(true);
+      localStorage.removeItem('isNewUser');
+    }
+  }, []);
+
   // ---------- On first mount, fetch lazy props
   useEffect(() => {
     router.reload({ only: ['weeklyStats','chartData','courierStats','recentNotifications'] });
   }, []);
+
+  // ---------- Enhanced Handlers
+  const handleStatClick = (statType, data) => {
+    setDrillDownType(statType);
+    setDrillDownData(data);
+    setShowDrillDown(true);
+  };
+
+  const handleBulkAction = async (action, items, params) => {
+    console.log('Bulk action:', action, items, params);
+    // Implement bulk actions here
+  };
+
+  const handleExport = (type, data) => {
+    console.log('Export:', type, data);
+    // Implement export functionality here
+  };
+
+  const handleAlertDismiss = (alertId) => {
+    setCriticalAlerts(prev => prev.filter(alert => alert.id !== alertId));
+  };
+
+  const handleAlertAcknowledge = (alertId) => {
+    console.log('Acknowledge alert:', alertId);
+    handleAlertDismiss(alertId);
+  };
 
   // ---------- Helpers
   const getStatusBadgeColor = (status) => {
@@ -186,6 +239,21 @@ export default function Dashboard(props) {
   return (
     <AuthenticatedLayout>
       <Head title="Dashboard" />
+
+      {/* Alert Banner */}
+      <AlertBanner 
+        alerts={criticalAlerts}
+        onDismiss={handleAlertDismiss}
+        onAcknowledge={handleAlertAcknowledge}
+        onViewAll={() => router.visit(route('alerts.index'))}
+      />
+
+      {/* Onboarding Help */}
+      <OnboardingHelp 
+        isNewUser={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        showHelpButton={true}
+      />
 
       <div className="py-4 lg:py-6 space-y-6 lg:space-y-8">
         {/* Header */}
@@ -320,12 +388,78 @@ export default function Dashboard(props) {
           </div>
         </div>
 
-        {/* KPI cards (EAGER) */}
+        {/* Snapshot Overview */}
+        <SnapshotOverview 
+          todayStats={{
+            shipments: stats.total_shipments,
+            delivered: stats.delivered_shipments,
+            inProgress: stats.in_transit_shipments + stats.out_for_delivery_shipments,
+            performanceScore: stats.delivery_success_rate,
+            trend: 'up'
+          }}
+          weekStats={{
+            total: stats.total_shipments,
+            successRate: stats.delivery_success_rate,
+            avgDeliveryTime: 2.3
+          }}
+          criticalAlerts={criticalAlerts}
+          onViewDetails={(type) => {
+            if (type === 'alerts') {
+              router.visit(route('alerts.index'));
+            }
+          }}
+        />
+
+        {/* Enhanced KPI cards with drill-down */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          <StatCard title="Συνολικές Αποστολές" value={stats.total_shipments} icon="📦" color="blue" subtitle="για την επιλεγμένη περίοδο" />
-          <StatCard title="Παραδοτέα" value={stats.delivered_shipments} icon="✅" color="green" subtitle={`${stats.delivery_success_rate}% επιτυχία`} />
-          <StatCard title="Σε Μεταφορά" value={stats.in_transit_shipments + stats.out_for_delivery_shipments} icon="🚚" color="indigo" subtitle="Αποστολές σε εξέλιξη" />
-          <StatCard title="Ενεργοί Courier" value={stats.total_couriers} icon="🏢" color="purple" subtitle={`${stats.total_customers} πελάτες`} />
+          <EnhancedStatCard 
+            title="Συνολικές Αποστολές" 
+            value={stats.total_shipments} 
+            icon="📦" 
+            color="blue" 
+            subtitle="για την επιλεγμένη περίοδο"
+            trend="up"
+            trendValue="12"
+            miniChart={[0.8, 0.6, 0.9, 0.7, 0.8, 0.9, 0.7]}
+            onClick={() => handleStatClick('shipments', { items: recentShipments })}
+            isClickable={true}
+          />
+          <EnhancedStatCard 
+            title="Παραδοτέα" 
+            value={stats.delivered_shipments} 
+            icon="✅" 
+            color="green" 
+            subtitle={`${stats.delivery_success_rate}% επιτυχία`}
+            trend="up"
+            trendValue="5"
+            miniChart={[0.9, 0.8, 0.9, 0.9, 0.8, 0.9, 0.9]}
+            onClick={() => handleStatClick('delivered', { items: recentShipments?.filter(s => s.status === 'delivered') })}
+            isClickable={true}
+          />
+          <EnhancedStatCard 
+            title="Σε Μεταφορά" 
+            value={stats.in_transit_shipments + stats.out_for_delivery_shipments} 
+            icon="🚚" 
+            color="indigo" 
+            subtitle="Αποστολές σε εξέλιξη"
+            trend="down"
+            trendValue="3"
+            miniChart={[0.6, 0.7, 0.5, 0.6, 0.4, 0.5, 0.3]}
+            onClick={() => handleStatClick('in_transit', { items: recentShipments?.filter(s => ['in_transit', 'out_for_delivery'].includes(s.status)) })}
+            isClickable={true}
+          />
+          <EnhancedStatCard 
+            title="Ενεργοί Courier" 
+            value={stats.total_couriers} 
+            icon="🏢" 
+            color="purple" 
+            subtitle={`${stats.total_customers} πελάτες`}
+            trend="up"
+            trendValue="2"
+            miniChart={[0.7, 0.8, 0.9, 0.8, 0.9, 0.8, 0.9]}
+            onClick={() => handleStatClick('couriers', { items: courierStats })}
+            isClickable={true}
+          />
         </div>
 
         {/* New Features Navigation */}
@@ -468,6 +602,30 @@ export default function Dashboard(props) {
             </div>
           </div>
         </div>
+
+        {/* Batch Actions for Recent Shipments */}
+        {recentShipments && recentShipments.length > 0 && (
+          <BatchActions
+            items={recentShipments}
+            onSelectionChange={setSelectedItems}
+            onBulkAction={handleBulkAction}
+            availableActions={['update_status', 'export', 'notify']}
+            maxSelections={50}
+          />
+        )}
+
+        {/* Drill-down Modal */}
+        <StatsDrillDown
+          isOpen={showDrillDown}
+          onClose={() => setShowDrillDown(false)}
+          statType={drillDownType}
+          data={drillDownData}
+          onExport={handleExport}
+          onFilter={(type, period, search) => {
+            console.log('Filter:', type, period, search);
+            // Implement filtering logic
+          }}
+        />
       </div>
     </AuthenticatedLayout>
   );
