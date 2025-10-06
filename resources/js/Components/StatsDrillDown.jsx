@@ -22,7 +22,7 @@ export default function StatsDrillDown({
   }, [isOpen, data, statType]);
 
   const getChartConfig = () => {
-    const baseConfig = {
+    const baseOptions = {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -40,8 +40,6 @@ export default function StatsDrillDown({
     switch (statType) {
       case 'shipments':
         return {
-          ...baseConfig,
-          type: 'bar',
           data: {
             labels: selectedData.map(item => item.date || item.status),
             datasets: [{
@@ -51,12 +49,11 @@ export default function StatsDrillDown({
               borderColor: 'rgba(59, 130, 246, 1)',
               borderWidth: 1
             }]
-          }
+          },
+          options: baseOptions
         };
       case 'couriers':
         return {
-          ...baseConfig,
-          type: 'bar',
           data: {
             labels: selectedData.map(item => item.name),
             datasets: [{
@@ -66,7 +63,8 @@ export default function StatsDrillDown({
               borderColor: 'rgba(16, 185, 129, 1)',
               borderWidth: 1
             }]
-          }
+          },
+          options: baseOptions
         };
       default:
         return null;
@@ -160,7 +158,10 @@ export default function StatsDrillDown({
             <div className="mb-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Γράφημα Τάσεων</h3>
               <div className="h-64">
-                <Bar {...getChartConfig()} />
+                <Bar 
+                  data={getChartConfig().data} 
+                  options={getChartConfig().options} 
+                />
               </div>
             </div>
           )}

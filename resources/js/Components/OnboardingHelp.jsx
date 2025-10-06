@@ -73,25 +73,29 @@ export default function OnboardingHelp({
       id: 'getting-started',
       title: 'Ξεκινώντας',
       icon: <BookOpen className="w-5 h-5" />,
-      content: 'Βασικές οδηγίες για τη χρήση του συστήματος'
+      content: 'Βασικές οδηγίες για τη χρήση του συστήματος',
+      href: '/help/getting-started'
     },
     {
       id: 'shipments',
       title: 'Διαχείριση Αποστολών',
       icon: <FileText className="w-5 h-5" />,
-      content: 'Πώς να δημιουργείτε και να παρακολουθείτε αποστολές'
+      content: 'Πώς να δημιουργείτε και να παρακολουθείτε αποστολές',
+      href: '/help/shipments'
     },
     {
       id: 'analytics',
       title: 'Αναλύσεις',
       icon: <Lightbulb className="w-5 h-5" />,
-      content: 'Κατανόηση των αναλυτικών στοιχείων και μετρικών'
+      content: 'Κατανόηση των αναλυτικών στοιχείων και μετρικών',
+      href: '/help/analytics'
     },
     {
-      id: 'alerts',
+      id: 'notifications',
       title: 'Ειδοποιήσεις',
       icon: <MessageCircle className="w-5 h-5" />,
-      content: 'Ρύθμιση και διαχείριση ειδοποιήσεων'
+      content: 'Ρύθμιση και διαχείριση ειδοποιήσεων',
+      href: '/help/notifications'
     }
   ];
 
@@ -285,13 +289,18 @@ export default function OnboardingHelp({
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Θέματα Βοήθειας</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {helpTopics.map((topic) => (
-                        <div key={topic.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <a
+                          key={topic.id}
+                          href={topic.href}
+                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+                        >
                           <div className="flex items-center mb-2">
                             {topic.icon}
                             <h4 className="font-medium text-gray-900 ml-3">{topic.title}</h4>
+                            <ArrowRight className="w-4 h-4 text-gray-400 ml-auto group-hover:text-blue-600 transition-colors" />
                           </div>
                           <p className="text-sm text-gray-500">{topic.content}</p>
-                        </div>
+                        </a>
                       ))}
                     </div>
                   </div>
