@@ -6,6 +6,7 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link, router, usePage } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import { useState } from 'react';
+import { HelpCircle } from 'lucide-react';
 
 export default function AuthenticatedLayout({ header, children }) {
   const { props } = usePage();
@@ -346,6 +347,20 @@ export default function AuthenticatedLayout({ header, children }) {
         </header>
       )}
       <main className="container">{children}</main>
+      
+      {/* Floating Help Button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Link
+          href={hasRoute('help.index') ? route('help.index') : '/help'}
+          className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors flex items-center justify-center group"
+          title="Βοήθεια"
+        >
+          <HelpCircle className="w-6 h-6" />
+          <span className="ml-2 text-sm font-medium hidden group-hover:block">
+            Βοήθεια
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }

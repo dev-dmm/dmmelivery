@@ -122,4 +122,86 @@ class ShipmentController extends Controller
                 ]),
         ]);
     }
+
+    public function create(Request $request): Response
+    {
+        $user = $request->user();
+        
+        if (!$user || !$user->tenant) {
+            return redirect()->route('login')
+                ->with('error', 'Unable to identify your tenant. Please log in again.');
+        }
+
+        $tenantId = $user->tenant->id;
+        
+        // Bind tenant to container for this request if not already bound
+        if (!app()->bound('tenant')) {
+            app()->instance('tenant', $user->tenant);
+        }
+
+        // Get couriers for the dropdown
+        $couriers = \App\Models\Courier::where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->select('id', 'name', 'code')
+            ->orderBy('name')
+            ->get();
+
+        // Get customers for the dropdown
+        $customers = \App\Models\Customer::where('tenant_id', $tenantId)
+            ->select('id', 'name', 'email', 'phone')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Shipments/Create', [
+            'couriers' => $couriers,
+            'customers' => $customers,
+        ]);
+    }
+
+    public function search(Request $request): Response
+    {
+        $user = $request->user();
+        
+        if (!$user || !$user->tenant) {
+            return redirect()->route('login')
+                ->with('error', 'Unable to identify your tenant. Please log in again.');
+        }
+
+        $tenantId = $user->tenant->id;
+        
+        // Bind tenant to container for this request if not already bound
+        if (!app()->bound('tenant')) {
+            app()->instance('tenant', $user->tenant);
+        }
+
+        $searchQuery = $request->get('q', '');
+        $searchResults = [];
+
+        if (!empty($searchQuery)) {
+            $searchResults = \App\Models\Shipment::where('tenant_id', $tenantId)
+                ->where(function($query) use ($searchQuery) {
+                    $query->where('tracking_number', 'like', "%{$searchQuery}%")
+                          ->orWhere('id', 'like', "%{$searchQuery}%")
+                          ->orWhere('courier_tracking_id', 'like', "%{$searchQuery}%")
+                          ->orWhereHas('order', function($q) use ($searchQuery) {
+                              $q->where('external_order_id', 'like', "%{$searchQuery}%")
+                                ->orWhere('order_number', 'like', "%{$searchQuery}%");
+                          })
+                          ->orWhereHas('customer', function($q) use ($searchQuery) {
+                              $q->where('name', 'like', "%{$searchQuery}%")
+                                ->orWhere('email', 'like', "%{$searchQuery}%");
+                          });
+                })
+                ->with(['customer:id,name,email', 'courier:id,name,code'])
+                ->orderBy('created_at', 'desc')
+                ->limit(20)
+                ->get()
+                ->map(fn($s) => new ShipmentResource($s));
+        }
+
+        return Inertia::render('Shipments/Search', [
+            'searchQuery' => $searchQuery,
+            'searchResults' => $searchResults,
+        ]);
+    }
 }

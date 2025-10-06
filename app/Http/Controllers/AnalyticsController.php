@@ -50,4 +50,21 @@ class AnalyticsController extends Controller
             'filters' => $filters,
         ]);
     }
+
+    /**
+     * Export analytics data
+     */
+    public function export(Request $request): Response
+    {
+        $tenantId = auth()->user()->tenant_id;
+        $filters = $request->only(['start_date', 'end_date', 'period', 'format']);
+        
+        // Get analytics data for export
+        $analytics = $this->analyticsService->getTenantAnalytics($tenantId, $filters);
+        
+        return Inertia::render('Analytics/Export', [
+            'analytics' => $analytics,
+            'filters' => $filters,
+        ]);
+    }
 }

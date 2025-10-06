@@ -126,9 +126,20 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
     // Analytics Dashboard
     Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/advanced', [AnalyticsController::class, 'advanced'])->name('analytics.advanced');
+    Route::get('/analytics/export', [AnalyticsController::class, 'export'])->name('analytics.export');
     
     // Real-time Dashboard
     Route::get('/realtime', [DashboardController::class, 'realtime'])->name('realtime.dashboard');
+    
+    // Notifications
+    Route::get('/notifications', function () {
+        return Inertia::render('Notifications/Index');
+    })->name('notifications.index');
+    
+    // Users
+    Route::get('/users', function () {
+        return Inertia::render('Users/Index');
+    })->name('users.index');
     
     // Settings (keep sensitive actions POST/DELETE and CSRF-protected)
     Route::get('/settings',                                 [SettingsController::class, 'index'])->name('settings.index');
@@ -288,6 +299,8 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])->group(function () {
 
     // Shipments (IDOR protection via model binding + policy)
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
+    Route::get('/shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');
+    Route::get('/shipments/search', [ShipmentController::class, 'search'])->name('shipments.search');
 
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])
     ->middleware('can:view,shipment')  // ✅ Security maintained via policy
@@ -422,6 +435,18 @@ Route::middleware(['auth', 'verified', 'identify.tenant'])
         Route::get('/notifications', function () {
             return Inertia::render('Help/Notifications');
         })->name('notifications');
+        
+        Route::get('/shipments/create-first', function () {
+            return Inertia::render('Help/ShipmentsCreateFirst');
+        })->name('shipments.create-first');
+        
+        Route::get('/notifications/setup', function () {
+            return Inertia::render('Help/NotificationsSetup');
+        })->name('notifications.setup');
+        
+        Route::get('/dashboard/overview', function () {
+            return Inertia::render('Help/DashboardOverview');
+        })->name('dashboard.overview');
     });
 
 // -----------------------------
