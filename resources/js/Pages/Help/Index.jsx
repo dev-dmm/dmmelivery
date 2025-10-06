@@ -147,7 +147,10 @@ export default function HelpIndex() {
               Επικοινωνήστε με την ομάδα υποστήριξης για άμεση βοήθεια.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center">
+              <button 
+                onClick={() => window.location.href = route('chatbot.index')}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center"
+              >
                 <MessageCircle className="w-4 h-4 mr-2" />
                 Ζωντανή Συνομιλία
               </button>

@@ -315,7 +315,10 @@ export default function OnboardingHelp({
                       Επικοινωνήστε με την ομάδα υποστήριξης για άμεση βοήθεια.
                     </p>
                     <div className="flex space-x-3">
-                      <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors">
+                      <button 
+                        onClick={() => window.location.href = route('chatbot.index')}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                      >
                         Ζωντανή Συνομιλία
                       </button>
                       <button className="px-4 py-2 bg-white text-blue-600 text-sm border border-blue-300 rounded-md hover:bg-blue-50 transition-colors">
