@@ -1,0 +1,173 @@
+# Greek translation for DMM Delivery Bridge
+# Copyright (C) 2025 DMM
+# This file is distributed under the same license as the DMM Delivery Bridge plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: DMM Delivery Bridge 1.0.0\n"
+"Report-Msgid-Bugs-To: https://dmm.gr\n"
+"POT-Creation-Date: 2025-01-06 12:00+0000\n"
+"PO-Revision-Date: 2025-01-06 12:00+0000\n"
+"Last-Translator: DMM <info@dmm.gr>\n"
+"Language-Team: Greek\n"
+"Language: el\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "View file not found: %s"
+msgstr "Το αρχείο προβολής δεν βρέθηκε: %s"
+
+msgid "DMM Delivery Bridge"
+msgstr "DMM Delivery Bridge"
+
+msgid "DMM Delivery"
+msgstr "DMM Delivery"
+
+msgid "ACS Courier Integration"
+msgstr "Ενσωμάτωση ACS Courier"
+
+msgid "ACS Courier"
+msgstr "ACS Courier"
+
+msgid "Geniki Taxidromiki Integration"
+msgstr "Ενσωμάτωση Γενική Ταχυδρομική"
+
+msgid "Geniki Taxidromiki"
+msgstr "Γενική Ταχυδρομική"
+
+msgid "ELTA Hellenic Post Integration"
+msgstr "Ενσωμάτωση ΕΛΤΑ"
+
+msgid "ELTA Hellenic Post"
+msgstr "ΕΛΤΑ"
+
+msgid "Bulk Processing"
+msgstr "Μαζική Επεξεργασία"
+
+msgid "Error Logs"
+msgstr "Καταγραφές Σφαλμάτων"
+
+msgid "Orders Management"
+msgstr "Διαχείριση Παραγγελιών"
+
+msgid "Monitoring"
+msgstr "Παρακολούθηση"
+
+msgid "Log Details"
+msgstr "Λεπτομέρειες Καταγραφής"
+
+msgid "API Configuration"
+msgstr "Ρυθμίσεις API"
+
+msgid "Behavior Settings"
+msgstr "Ρυθμίσεις Συμπεριφοράς"
+
+msgid "Log Management"
+msgstr "Διαχείριση Καταγραφών"
+
+msgid "Log Retention (Days)"
+msgstr "Διατήρηση Καταγραφών (Ημέρες)"
+
+msgid "Max Log File Size (MB)"
+msgstr "Μέγιστο Μέγεθος Αρχείου Καταγραφής (MB)"
+
+msgid "Configure your DMM Delivery API settings."
+msgstr "Ρυθμίστε τις παραμέτρους API του DMM Delivery."
+
+msgid "Configure plugin behavior settings."
+msgstr "Ρυθμίστε τις ρυθμίσεις συμπεριφοράς του πρόσθετου."
+
+msgid "Configure log file management settings. Logs are automatically rotated and cleaned up based on these settings."
+msgstr "Ρυθμίστε τις παραμέτρους διαχείρισης αρχείων καταγραφής. Οι καταγραφές περιστρέφονται και καθαρίζονται αυτόματα βάσει αυτών των ρυθμίσεων."
+
+msgid "Number of days to keep log files. Logs older than this will be automatically deleted. (Default: 7 days, Range: 1-90 days)"
+msgstr "Αριθμός ημερών διατήρησης αρχείων καταγραφής. Οι καταγραφές παλαιότερες από αυτό θα διαγραφούν αυτόματα. (Προεπιλογή: 7 ημέρες, Εύρος: 1-90 ημέρες)"
+
+msgid "Maximum size of log files in MB. When a log file exceeds this size, it will be automatically rotated. (Default: 10 MB, Range: 1-100 MB)"
+msgstr "Μέγιστο μέγεθος αρχείων καταγραφής σε MB. Όταν ένα αρχείο καταγραφής ξεπεράσει αυτό το μέγεθος, θα περιστραφεί αυτόματα. (Προεπιλογή: 10 MB, Εύρος: 1-100 MB)"
+
+msgid "DMM Delivery Bridge requires WooCommerce to be installed and activated."
+msgstr "Το DMM Delivery Bridge απαιτεί το WooCommerce να είναι εγκατεστημένο και ενεργοποιημένο."
+
+msgid "DMM Delivery Status"
+msgstr "Κατάσταση DMM Delivery"
+
+msgid "Sent to DMM Delivery"
+msgstr "Στάλθηκε στο DMM Delivery"
+
+msgid "Order ID:"
+msgstr "ID Παραγγελίας:"
+
+msgid "Shipment ID:"
+msgstr "ID Αποστολής:"
+
+msgid "Failed to send"
+msgstr "Αποτυχία αποστολής"
+
+msgid "Not sent yet"
+msgstr "Δεν έχει σταλεί ακόμα"
+
+msgid "Order updated in DMM Delivery system."
+msgstr "Η παραγγελία ενημερώθηκε στο σύστημα DMM Delivery."
+
+msgid "Order sent to DMM Delivery system successfully."
+msgstr "Η παραγγελία στάλθηκε επιτυχώς στο σύστημα DMM Delivery."
+
+msgid "Unknown error occurred"
+msgstr "Προέκυψε άγνωστο σφάλμα"
+
+msgid "Failed to send order to DMM Delivery system (attempt %d): %s"
+msgstr "Αποτυχία αποστολής παραγγελίας στο σύστημα DMM Delivery (προσπάθεια %d): %s"
+
+msgid "Order failed to send to DMM Delivery system after maximum retries. Please check manually."
+msgstr "Η παραγγελία απέτυχε να σταλεί στο σύστημα DMM Delivery μετά από τις μέγιστες επαναλήψεις. Παρακαλώ ελέγξτε χειροκίνητα."
+
+msgid "Every Minute (ACS Dispatch)"
+msgstr "Κάθε Λεπτό (Αποστολή ACS)"
+
+msgid "Every 4 Hours (ACS Sync)"
+msgstr "Κάθε 4 Ώρες (Συγχρονισμός ACS)"
+
+msgid "Every 2 Hours (ACS Sync)"
+msgstr "Κάθε 2 Ώρες (Συγχρονισμός ACS)"
+
+msgid "Daily (ACS Sync)"
+msgstr "Καθημερινά (Συγχρονισμός ACS)"
+
+msgid "DMM Delivery Bridge Settings"
+msgstr "Ρυθμίσεις DMM Delivery Bridge"
+
+msgid "Configure your DMM Delivery API settings to automatically send WooCommerce orders for tracking."
+msgstr "Ρυθμίστε τις παραμέτρους API του DMM Delivery για να στέλνονται αυτόματα οι παραγγελίες WooCommerce για παρακολούθηση."
+
+msgid "⚙️ API Configuration"
+msgstr "⚙️ Ρυθμίσεις API"
+
+msgid "🚚 ACS Courier"
+msgstr "🚚 ACS Courier"
+
+msgid "📮 Geniki Taxidromiki"
+msgstr "📮 Γενική Ταχυδρομική"
+
+msgid "📬 ELTA Hellenic Post"
+msgstr "📬 ΕΛΤΑ"
+
+msgid "📤 Bulk Processing"
+msgstr "📤 Μαζική Επεξεργασία"
+
+msgid "📋 Error Logs"
+msgstr "📋 Καταγραφές Σφαλμάτων"
+
+msgid "📦 Orders Management"
+msgstr "📦 Διαχείριση Παραγγελιών"
+
+msgid "📊 Monitoring"
+msgstr "📊 Παρακολούθηση"
+
+msgid "Note:"
+msgstr "Σημείωση:"
+
+msgid "The admin views have been refactored. The actual HTML content from the original admin pages needs to be extracted and placed in the admin/views/ directory. This is a placeholder template."
+msgstr "Οι προβολές διαχειριστή έχουν αναδιαμορφωθεί. Το πραγματικό περιεχόμενο HTML από τις αρχικές σελίδες διαχειριστή πρέπει να εξαχθεί και να τοποθετηθεί στον κατάλογο admin/views/. Αυτό είναι ένα πρότυπο placeholder."
+

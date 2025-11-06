@@ -1,0 +1,224 @@
+# Copyright (C) 2025 DMM
+# This file is distributed under the same license as the DMM Delivery Bridge plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: DMM Delivery Bridge 1.0.0\n"
+"Report-Msgid-Bugs-To: https://dmm.gr\n"
+"POT-Creation-Date: 2025-01-06 12:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: includes/class-dmm-admin.php:73
+msgid "View file not found: %s"
+msgstr ""
+
+#: includes/class-dmm-admin.php:86
+msgid "DMM Delivery Bridge"
+msgstr ""
+
+#: includes/class-dmm-admin.php:87
+msgid "DMM Delivery"
+msgstr ""
+
+#: includes/class-dmm-admin.php:98
+msgid "ACS Courier Integration"
+msgstr ""
+
+#: includes/class-dmm-admin.php:99
+msgid "ACS Courier"
+msgstr ""
+
+#: includes/class-dmm-admin.php:108
+msgid "Geniki Taxidromiki Integration"
+msgstr ""
+
+#: includes/class-dmm-admin.php:109
+msgid "Geniki Taxidromiki"
+msgstr ""
+
+#: includes/class-dmm-admin.php:118
+msgid "ELTA Hellenic Post Integration"
+msgstr ""
+
+#: includes/class-dmm-admin.php:119
+msgid "ELTA Hellenic Post"
+msgstr ""
+
+#: includes/class-dmm-admin.php:128
+msgid "Bulk Processing"
+msgstr ""
+
+#: includes/class-dmm-admin.php:138
+msgid "Error Logs"
+msgstr ""
+
+#: includes/class-dmm-admin.php:148
+msgid "Orders Management"
+msgstr ""
+
+#: includes/class-dmm-admin.php:158
+msgid "Monitoring"
+msgstr ""
+
+#: includes/class-dmm-admin.php:168
+msgid "Log Details"
+msgstr ""
+
+#: includes/class-dmm-admin.php:189
+msgid "API Configuration"
+msgstr ""
+
+#: includes/class-dmm-admin.php:196
+msgid "Behavior Settings"
+msgstr ""
+
+#: includes/class-dmm-admin.php:203
+msgid "Log Management"
+msgstr ""
+
+#: includes/class-dmm-admin.php:211
+msgid "Log Retention (Days)"
+msgstr ""
+
+#: includes/class-dmm-admin.php:219
+msgid "Max Log File Size (MB)"
+msgstr ""
+
+#: includes/class-dmm-admin.php:296
+msgid "Configure your DMM Delivery API settings."
+msgstr ""
+
+#: includes/class-dmm-admin.php:300
+msgid "Configure plugin behavior settings."
+msgstr ""
+
+#: includes/class-dmm-admin.php:304
+msgid "Configure log file management settings. Logs are automatically rotated and cleaned up based on these settings."
+msgstr ""
+
+#: includes/class-dmm-admin.php:320
+msgid "Number of days to keep log files. Logs older than this will be automatically deleted. (Default: 7 days, Range: 1-90 days)"
+msgstr ""
+
+#: includes/class-dmm-admin.php:338
+msgid "Maximum size of log files in MB. When a log file exceeds this size, it will be automatically rotated. (Default: 10 MB, Range: 1-100 MB)"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:322
+msgid "DMM Delivery Bridge requires WooCommerce to be installed and activated."
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:356
+msgid "DMM Delivery Status"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:396
+msgid "Sent to DMM Delivery"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:398
+msgid "Order ID:"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:401
+msgid "Shipment ID:"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:404
+msgid "Failed to send"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:406
+msgid "Not sent yet"
+msgstr ""
+
+#: includes/class-dmm-delivery-bridge.php:445
+msgid "Order updated in DMM Delivery system."
+msgstr ""
+
+#: includes/class-dmm-order-processor.php:308
+msgid "Order sent to DMM Delivery system successfully."
+msgstr ""
+
+#: includes/class-dmm-order-processor.php:333
+msgid "Unknown error occurred"
+msgstr ""
+
+#: includes/class-dmm-order-processor.php:335
+msgid "Failed to send order to DMM Delivery system (attempt %d): %s"
+msgstr ""
+
+#: includes/class-dmm-order-processor.php:371
+msgid "Order failed to send to DMM Delivery system after maximum retries. Please check manually."
+msgstr ""
+
+#: includes/class-dmm-scheduler.php:75
+msgid "Every Minute (ACS Dispatch)"
+msgstr ""
+
+#: includes/class-dmm-scheduler.php:81
+msgid "Every 4 Hours (ACS Sync)"
+msgstr ""
+
+#: includes/class-dmm-scheduler.php:86
+msgid "Every 2 Hours (ACS Sync)"
+msgstr ""
+
+#: includes/class-dmm-scheduler.php:91
+msgid "Daily (ACS Sync)"
+msgstr ""
+
+#: admin/views/settings-page.php:15
+msgid "DMM Delivery Bridge Settings"
+msgstr ""
+
+#: admin/views/settings-page.php:18
+msgid "Configure your DMM Delivery API settings to automatically send WooCommerce orders for tracking."
+msgstr ""
+
+#: admin/views/settings-page.php:25
+msgid "⚙️ API Configuration"
+msgstr ""
+
+#: admin/views/settings-page.php:28
+msgid "🚚 ACS Courier"
+msgstr ""
+
+#: admin/views/settings-page.php:31
+msgid "📮 Geniki Taxidromiki"
+msgstr ""
+
+#: admin/views/settings-page.php:34
+msgid "📬 ELTA Hellenic Post"
+msgstr ""
+
+#: admin/views/settings-page.php:37
+msgid "📤 Bulk Processing"
+msgstr ""
+
+#: admin/views/settings-page.php:40
+msgid "📋 Error Logs"
+msgstr ""
+
+#: admin/views/settings-page.php:43
+msgid "📦 Orders Management"
+msgstr ""
+
+#: admin/views/settings-page.php:46
+msgid "📊 Monitoring"
+msgstr ""
+
+#: admin/views/settings-page.php:60
+msgid "Note:"
+msgstr ""
+
+#: admin/views/settings-page.php:60
+msgid "The admin views have been refactored. The actual HTML content from the original admin pages needs to be extracted and placed in the admin/views/ directory. This is a placeholder template."
+msgstr ""
+

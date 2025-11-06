@@ -1,0 +1,440 @@
+/**
+ * DMM Delivery Bridge Admin Styles
+ * 
+ * Modern, clean styling for admin interface with loading states,
+ * progress indicators, and improved error messaging.
+ */
+
+/* Loading Spinner */
+.dmm-loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    min-height: 200px;
+}
+
+.dmm-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #2271b1;
+    border-radius: 50%;
+    animation: dmm-spin 1s linear infinite;
+}
+
+.dmm-spinner-small {
+    padding: 1rem;
+    min-height: 100px;
+}
+
+.dmm-spinner-small .dmm-spinner {
+    width: 24px;
+    height: 24px;
+    border-width: 3px;
+}
+
+.dmm-spinner-large {
+    padding: 3rem;
+    min-height: 300px;
+}
+
+.dmm-spinner-large .dmm-spinner {
+    width: 60px;
+    height: 60px;
+    border-width: 5px;
+}
+
+.dmm-loading-message {
+    margin-top: 1rem;
+    color: #646970;
+    font-size: 14px;
+}
+
+@keyframes dmm-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Progress Bar */
+.dmm-progress-container {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.dmm-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.dmm-progress-label {
+    font-weight: 600;
+    color: #1d2327;
+    font-size: 14px;
+}
+
+.dmm-progress-percentage {
+    font-weight: 600;
+    color: #2271b1;
+    font-size: 14px;
+}
+
+.dmm-progress-bar-wrapper {
+    width: 100%;
+    height: 24px;
+    background-color: #f0f0f1;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.dmm-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #2271b1 0%, #135e96 100%);
+    border-radius: 12px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.dmm-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: dmm-progress-shimmer 2s infinite;
+}
+
+@keyframes dmm-progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.dmm-progress-stats {
+    font-size: 13px;
+    color: #646970;
+    text-align: right;
+}
+
+/* Error/Success Messages */
+.dmm-message {
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    border-left: 4px solid;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.dmm-message-error {
+    border-left-color: #d63638;
+    background-color: #fcf0f1;
+}
+
+.dmm-message-warning {
+    border-left-color: #dba617;
+    background-color: #fcf9e8;
+}
+
+.dmm-message-success {
+    border-left-color: #00a32a;
+    background-color: #f0f6f3;
+}
+
+.dmm-message-info {
+    border-left-color: #2271b1;
+    background-color: #f0f6fc;
+}
+
+.dmm-message-dismissible {
+    padding-right: 3rem;
+}
+
+.dmm-message-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dmm-message-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.dmm-message-error .dmm-message-title {
+    color: #d63638;
+}
+
+.dmm-message-warning .dmm-message-title {
+    color: #dba617;
+}
+
+.dmm-message-success .dmm-message-title {
+    color: #00a32a;
+}
+
+.dmm-message-info .dmm-message-title {
+    color: #2271b1;
+}
+
+.dmm-message-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #1d2327;
+}
+
+.dmm-message-details {
+    margin-top: 0.5rem;
+    font-size: 12px;
+}
+
+.dmm-message-details summary {
+    cursor: pointer;
+    color: #2271b1;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.dmm-message-details summary:hover {
+    text-decoration: underline;
+}
+
+.dmm-message-details pre {
+    background: #f0f0f1;
+    padding: 0.75rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1d2327;
+    margin: 0;
+}
+
+.dmm-message-dismiss {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    color: #646970;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: all 0.2s;
+}
+
+.dmm-message-dismiss:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #1d2327;
+}
+
+/* Bulk Operations */
+.dmm-bulk-operations {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.dmm-bulk-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.dmm-bulk-action-select {
+    min-width: 200px;
+    padding: 6px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+}
+
+.dmm-bulk-action-select:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: none;
+}
+
+.dmm-bulk-progress {
+    margin-top: 1rem;
+}
+
+/* Button Improvements */
+.dmm-button-loading {
+    position: relative;
+    color: transparent !important;
+    pointer-events: none;
+}
+
+.dmm-button-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: dmm-spin 0.6s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 782px) {
+    .dmm-bulk-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .dmm-bulk-action-select {
+        width: 100%;
+    }
+    
+    .dmm-progress-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+/* Admin Page Specific Styles */
+.dmm-admin-page {
+    max-width: 1200px;
+}
+
+.dmm-admin-page .dmm-navigation {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dmm-admin-page .dmm-navigation .button {
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Table Improvements */
+.dmm-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.dmm-admin-table th {
+    background: #f6f7f7;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: #1d2327;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.dmm-admin-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f0f0f1;
+    font-size: 13px;
+    color: #1d2327;
+}
+
+.dmm-admin-table tr:hover {
+    background: #f6f7f7;
+}
+
+.dmm-admin-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Status Badges */
+.dmm-status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.dmm-status-badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.dmm-status-badge-error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.dmm-status-badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.dmm-status-badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Card Layout */
+.dmm-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.dmm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.dmm-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1d2327;
+    margin: 0;
+}
+
+.dmm-card-content {
+    color: #1d2327;
+}
+

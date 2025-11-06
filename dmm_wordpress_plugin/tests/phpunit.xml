@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="bootstrap.php"
+         colors="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>Unit</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>../includes</directory>
+        </include>
+    </source>
+    <php>
+        <env name="WP_TESTS_PHPUNIT_POLYFILLS_PATH" value="vendor/phpunit/phpunit/src/Util/PHP"/>
+    </php>
+</phpunit>
+
