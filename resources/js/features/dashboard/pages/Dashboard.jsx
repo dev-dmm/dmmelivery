@@ -12,13 +12,13 @@ import {
 import { Bar } from 'react-chartjs-2';
 
 // Enhanced Components
-import EnhancedStatCard from '@/Components/EnhancedStatCard';
-import SnapshotOverview from '@/Components/SnapshotOverview';
-import StatsDrillDown from '@/Components/StatsDrillDown';
-import BatchActions from '@/Components/BatchActions';
-import OnboardingHelp from '@/Components/OnboardingHelp';
-import AlertBanner from '@/Components/AlertBanner';
-import CustomizableDashboard from '@/Components/CustomizableDashboard';
+import EnhancedStatCard from '@/features/dashboard/components/EnhancedStatCard';
+import SnapshotOverview from '@/features/dashboard/components/SnapshotOverview';
+import StatsDrillDown from '@/features/dashboard/components/StatsDrillDown';
+import BatchActions from '@/features/dashboard/components/BatchActions';
+import OnboardingHelp from '@/features/dashboard/components/OnboardingHelp';
+import AlertBanner from '@/features/dashboard/components/AlertBanner';
+import CustomizableDashboard from '@/features/dashboard/components/CustomizableDashboard';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
