@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\AnalyticsService;
+use App\Services\Contracts\AnalyticsServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
 class AnalyticsController extends Controller
 {
-    private AnalyticsService $analyticsService;
+    private AnalyticsServiceInterface $analyticsService;
 
-    public function __construct(AnalyticsService $analyticsService)
+    public function __construct(AnalyticsServiceInterface $analyticsService)
     {
         $this->analyticsService = $analyticsService;
     }

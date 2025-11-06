@@ -86,7 +86,7 @@ class ShipmentController extends Controller
 
         // Try to sync with real DMM Delivery data if available
         try {
-            $dmmService = app(\App\Services\DMMDeliveryService::class);
+            $dmmService = app(\App\Services\Contracts\DMMDeliveryServiceInterface::class);
             $dmmService->updateShipmentWithRealData($shipment);
             
             // Refresh the shipment to get updated data

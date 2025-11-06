@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\AnalyticsService;
-use App\Services\CacheService;
+use App\Services\Contracts\AnalyticsServiceInterface;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AnalyticsController extends Controller
 {
-    private AnalyticsService $analyticsService;
+    private AnalyticsServiceInterface $analyticsService;
 
-    public function __construct(AnalyticsService $analyticsService)
+    public function __construct(AnalyticsServiceInterface $analyticsService)
     {
         $this->analyticsService = $analyticsService;
     }

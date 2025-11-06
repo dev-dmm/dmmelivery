@@ -30,7 +30,7 @@ Route::prefix('public')->group(function () {
 });
 
 // Authenticated endpoints
-Route::middleware(['auth:sanctum', 'tenant.scope'])->group(function () {
+Route::middleware(['auth:sanctum', 'enforce.tenant'])->group(function () {
     
     // Shipments
     Route::apiResource('shipments', ShipmentController::class);

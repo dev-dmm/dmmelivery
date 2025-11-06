@@ -5,11 +5,12 @@ namespace App\Services;
 use App\Models\Shipment;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Contracts\WebSocketServiceInterface;
 use Illuminate\Support\Facades\Log;
 use Pusher\Pusher;
 use Pusher\PusherException;
 
-class WebSocketService
+class WebSocketService implements WebSocketServiceInterface
 {
     private Pusher $pusher;
     private string $channelPrefix;

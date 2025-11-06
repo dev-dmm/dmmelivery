@@ -52,19 +52,19 @@ class Shipment extends Model
         
         // WebSocket events
         static::created(function ($shipment) {
-            app(\App\Services\WebSocketService::class)->broadcastNewShipment($shipment);
+            app(\App\Services\Contracts\WebSocketServiceInterface::class)->broadcastNewShipment($shipment);
         });
         
         static::updated(function ($shipment) {
             if ($shipment->wasChanged('status')) {
-                app(\App\Services\WebSocketService::class)->broadcastShipmentUpdate($shipment, [
+                app(\App\Services\Contracts\WebSocketServiceInterface::class)->broadcastShipmentUpdate($shipment, [
                     'old_status' => $shipment->getOriginal('status'),
                     'new_status' => $shipment->status,
                 ]);
                 
                 // Special handling for delivered status
                 if ($shipment->status === 'delivered' && $shipment->wasChanged('status')) {
-                    app(\App\Services\WebSocketService::class)->broadcastShipmentDelivered($shipment);
+                    app(\App\Services\Contracts\WebSocketServiceInterface::class)->broadcastShipmentDelivered($shipment);
                 }
             }
         });

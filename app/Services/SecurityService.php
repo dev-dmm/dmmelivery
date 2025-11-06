@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Contracts\SecurityServiceInterface;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 use App\Models\Tenant;
 use App\Models\User;
 
-class SecurityService
+class SecurityService implements SecurityServiceInterface
 {
     /**
      * Encrypt sensitive data

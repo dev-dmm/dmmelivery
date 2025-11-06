@@ -7,11 +7,12 @@ use App\Models\AlertRule;
 use App\Models\Alert;
 use App\Models\NotificationLog;
 use App\Models\User;
+use App\Services\Contracts\AlertSystemServiceInterface;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 
-class AlertSystemService
+class AlertSystemService implements AlertSystemServiceInterface
 {
     /**
      * Check all active shipments for alert conditions

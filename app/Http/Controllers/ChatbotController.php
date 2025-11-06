@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ChatSession;
 use App\Models\ChatMessage;
-use App\Services\ChatbotService;
+use App\Services\Contracts\ChatbotServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -13,9 +13,9 @@ use Inertia\Response;
 
 class ChatbotController extends Controller
 {
-    private ChatbotService $chatbotService;
+    private ChatbotServiceInterface $chatbotService;
 
-    public function __construct(ChatbotService $chatbotService)
+    public function __construct(ChatbotServiceInterface $chatbotService)
     {
         $this->chatbotService = $chatbotService;
     }

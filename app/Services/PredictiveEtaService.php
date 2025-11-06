@@ -5,11 +5,12 @@ namespace App\Services;
 use App\Models\Shipment;
 use App\Models\PredictiveEta;
 use App\Models\ShipmentStatusHistory;
+use App\Services\Contracts\PredictiveEtaServiceInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-class PredictiveEtaService
+class PredictiveEtaService implements PredictiveEtaServiceInterface
 {
     private ?string $weatherApiKey;
     private ?string $trafficApiKey;

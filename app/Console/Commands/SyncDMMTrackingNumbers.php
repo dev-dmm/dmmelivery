@@ -31,7 +31,7 @@ class SyncDMMTrackingNumbers extends Command
     {
         $this->info('Starting DMM Delivery tracking number sync...');
 
-        $dmmService = app(DMMDeliveryService::class);
+        $dmmService = app(\App\Services\Contracts\DMMDeliveryServiceInterface::class);
         
         // Get shipments to process
         $query = Shipment::with(['order']);

@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Alert;
 use App\Models\AlertRule;
-use App\Services\AlertSystemService;
+use App\Services\Contracts\AlertSystemServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -13,9 +13,9 @@ use Inertia\Response;
 
 class AlertController extends Controller
 {
-    private AlertSystemService $alertSystemService;
+    private AlertSystemServiceInterface $alertSystemService;
 
-    public function __construct(AlertSystemService $alertSystemService)
+    public function __construct(AlertSystemServiceInterface $alertSystemService)
     {
         $this->alertSystemService = $alertSystemService;
     }

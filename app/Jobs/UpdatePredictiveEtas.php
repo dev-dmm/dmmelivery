@@ -4,8 +4,8 @@ namespace App\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use App\Services\PredictiveEtaService;
-use App\Services\AlertSystemService;
+use App\Services\Contracts\PredictiveEtaServiceInterface;
+use App\Services\Contracts\AlertSystemServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class UpdatePredictiveEtas implements ShouldQueue
@@ -29,13 +29,13 @@ class UpdatePredictiveEtas implements ShouldQueue
 
         try {
             // Update predictive ETAs
-            $predictiveEtaService = app(PredictiveEtaService::class);
+            $predictiveEtaService = app(PredictiveEtaServiceInterface::class);
             $updatedEtas = $predictiveEtaService->updateAllPredictiveEtas();
             
             Log::info("✅ Updated {$updatedEtas} predictive ETAs");
 
             // Check for alerts
-            $alertSystemService = app(AlertSystemService::class);
+            $alertSystemService = app(AlertSystemServiceInterface::class);
             $alertsTriggered = $alertSystemService->checkAllShipments();
             
             Log::info("🚨 Triggered {$alertsTriggered} alerts");

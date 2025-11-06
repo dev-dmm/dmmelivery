@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\WebSocketService;
+use App\Services\Contracts\WebSocketServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
 class WebSocketController extends Controller
 {
-    private WebSocketService $webSocketService;
+    private WebSocketServiceInterface $webSocketService;
 
-    public function __construct(WebSocketService $webSocketService)
+    public function __construct(WebSocketServiceInterface $webSocketService)
     {
         $this->webSocketService = $webSocketService;
     }

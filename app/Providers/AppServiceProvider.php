@@ -4,6 +4,28 @@ namespace App\Providers;
 
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Http\Request;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+use App\Services\Contracts\AnalyticsServiceInterface;
+use App\Services\Contracts\AlertSystemServiceInterface;
+use App\Services\Contracts\CacheServiceInterface;
+use App\Services\Contracts\ChatbotServiceInterface;
+use App\Services\Contracts\PredictiveEtaServiceInterface;
+use App\Services\Contracts\WebSocketServiceInterface;
+use App\Services\Contracts\SecurityServiceInterface;
+use App\Services\Contracts\DMMDeliveryServiceInterface;
+use App\Services\Contracts\CourierServiceInterface;
+use App\Services\AnalyticsService;
+use App\Services\AlertSystemService;
+use App\Services\CacheService;
+use App\Services\ChatbotService;
+use App\Services\PredictiveEtaService;
+use App\Services\WebSocketService;
+use App\Services\SecurityService;
+use App\Services\DMMDeliveryService;
+use App\Services\ACSCourierService;
+use App\Models\Courier;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -12,7 +34,33 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Register service interfaces with their implementations
+        $this->app->singleton(AnalyticsServiceInterface::class, AnalyticsService::class);
+        $this->app->singleton(AlertSystemServiceInterface::class, AlertSystemService::class);
+        $this->app->singleton(CacheServiceInterface::class, CacheService::class);
+        $this->app->singleton(ChatbotServiceInterface::class, ChatbotService::class);
+        $this->app->singleton(PredictiveEtaServiceInterface::class, PredictiveEtaService::class);
+        $this->app->singleton(WebSocketServiceInterface::class, WebSocketService::class);
+        $this->app->singleton(SecurityServiceInterface::class, SecurityService::class);
+        $this->app->singleton(DMMDeliveryServiceInterface::class, DMMDeliveryService::class);
+
+        // Courier service is context-dependent (requires Courier model)
+        // Register a factory closure that can be resolved with app()->make()
+        // Usage: app()->makeWith(CourierServiceInterface::class, ['courier' => $courier])
+        $this->app->bind(CourierServiceInterface::class, function ($app, $parameters) {
+            $courier = $parameters['courier'] ?? null;
+            if (!$courier instanceof Courier) {
+                throw new \InvalidArgumentException('CourierServiceInterface requires a Courier instance. Use app()->makeWith(CourierServiceInterface::class, [\'courier\' => $courier])');
+            }
+            return new ACSCourierService($courier);
+        });
+        
+        // Register a factory helper for easier instantiation
+        $this->app->singleton('courier.service.factory', function ($app) {
+            return function (Courier $courier) use ($app) {
+                return $app->makeWith(CourierServiceInterface::class, ['courier' => $courier]);
+            };
+        });
     }
 
     /**
@@ -21,5 +69,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+        
+        // Configure tenant-aware API rate limiting
+        // Each tenant gets its own rate limit bucket
+        RateLimiter::for('api', function (Request $request) {
+            $tenantId = tenant_id() ?? 'no-tenant';
+            $userId = $request->user()?->getAuthIdentifier() ?? $request->ip();
+            
+            $key = sprintf('api:%s:%s', $tenantId, $userId);
+            
+            return Limit::perMinute(120)->by($key);
+        });
+        
+        // Stricter rate limit for unauthenticated API requests
+        RateLimiter::for('api:unauthenticated', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
+        });
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\CacheService;
+use App\Services\Contracts\CacheServiceInterface;
 use App\Models\Shipment;
 use App\Models\Order;
 use App\Models\Courier;
@@ -12,9 +12,9 @@ use Carbon\Carbon;
 
 class OptimizedDashboardController extends Controller
 {
-    private CacheService $cacheService;
+    private CacheServiceInterface $cacheService;
 
-    public function __construct(CacheService $cacheService)
+    public function __construct(CacheServiceInterface $cacheService)
     {
         $this->cacheService = $cacheService;
     }

@@ -343,7 +343,7 @@ class Order extends Model
     private function generateTrackingNumber(): string
     {
         // Try to get real tracking number from DMM Delivery Bridge first
-        $dmmService = app(\App\Services\DMMDeliveryService::class);
+        $dmmService = app(\App\Services\Contracts\DMMDeliveryServiceInterface::class);
         $realTrackingNumber = $dmmService->getRealTrackingNumber($this->id);
         
         if ($realTrackingNumber) {

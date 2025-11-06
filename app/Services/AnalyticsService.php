@@ -8,15 +8,17 @@ use App\Models\Courier;
 use App\Models\Customer;
 use App\Models\PredictiveEta;
 use App\Models\Alert;
+use App\Services\Contracts\AnalyticsServiceInterface;
+use App\Services\Contracts\CacheServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
-class AnalyticsService
+class AnalyticsService implements AnalyticsServiceInterface
 {
-    private CacheService $cacheService;
+    private CacheServiceInterface $cacheService;
 
-    public function __construct(CacheService $cacheService)
+    public function __construct(CacheServiceInterface $cacheService)
     {
         $this->cacheService = $cacheService;
     }

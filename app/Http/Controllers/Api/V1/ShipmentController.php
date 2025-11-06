@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Shipment;
-use App\Services\WebSocketService;
-use App\Services\CacheService;
+use App\Services\Contracts\WebSocketServiceInterface;
+use App\Services\Contracts\CacheServiceInterface;
 use App\Exceptions\ShipmentNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -14,10 +14,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ShipmentController extends Controller
 {
-    private WebSocketService $webSocketService;
-    private CacheService $cacheService;
+    private WebSocketServiceInterface $webSocketService;
+    private CacheServiceInterface $cacheService;
 
-    public function __construct(WebSocketService $webSocketService, CacheService $cacheService)
+    public function __construct(WebSocketServiceInterface $webSocketService, CacheServiceInterface $cacheService)
     {
         $this->webSocketService = $webSocketService;
         $this->cacheService = $cacheService;

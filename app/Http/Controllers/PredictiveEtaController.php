@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Shipment;
 use App\Models\PredictiveEta;
-use App\Services\PredictiveEtaService;
+use App\Services\Contracts\PredictiveEtaServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -13,9 +13,9 @@ use Inertia\Response;
 
 class PredictiveEtaController extends Controller
 {
-    private PredictiveEtaService $predictiveEtaService;
+    private PredictiveEtaServiceInterface $predictiveEtaService;
 
-    public function __construct(PredictiveEtaService $predictiveEtaService)
+    public function __construct(PredictiveEtaServiceInterface $predictiveEtaService)
     {
         $this->predictiveEtaService = $predictiveEtaService;
     }

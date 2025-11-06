@@ -144,6 +144,73 @@ class Tenant extends Model
         return $this->hasMany(Order::class);
     }
 
+    // Query Scopes
+    /**
+     * Scope a query to only include active tenants.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Boot the model and set up event listeners.
+     */
+    protected static function booted(): void
+    {
+        // Clear tenant cache when tenant is updated
+        static::saved(function (Tenant $tenant) {
+            static::clearTenantCache();
+        });
+
+        static::deleted(function (Tenant $tenant) {
+            static::clearTenantCache();
+        });
+    }
+
+    /**
+     * Clear tenant cache, handling both tagged and non-tagged cache stores.
+     * 
+     * For tagged stores (Redis, Memcached): Clears only tenant-related cache.
+     * For non-tagged stores: Optionally flushes entire cache if configured.
+     * 
+     * @return void
+     */
+    protected static function clearTenantCache(): void
+    {
+        // Try to use cache tags if supported (only Redis and Memcached support tags)
+        try {
+            $cache = \Cache::store();
+            if (method_exists($cache, 'supportsTags') && $cache->supportsTags()) {
+                $tags = config('tenancy.cache_tags', ['tenants']);
+                \Cache::tags($tags)->flush();
+                return;
+            }
+        } catch (\BadMethodCallException $e) {
+            // Cache driver doesn't support tags, fall through to fallback
+        }
+        
+        // For non-tagged stores (file, database, array), we can't selectively
+        // clear tenant cache. Log a warning and optionally flush entire cache.
+        \Log::warning('Tenant cache cannot be selectively cleared - cache driver does not support tags. Consider using Redis or Memcached for production.');
+        
+        // Only flush entire cache if explicitly allowed in config
+        // This is a safety measure - in production you should use Redis/Memcached
+        if (config('tenancy.allow_cache_flush', false)) {
+            try {
+                \Cache::flush();
+                \Log::info('Tenant cache cleared via full cache flush (non-tagged store)');
+            } catch (\Exception $e) {
+                \Log::error('Failed to flush cache', ['error' => $e->getMessage()]);
+            }
+        } else {
+            \Log::info('Tenant cache not cleared - tags not supported and allow_cache_flush is false. Set TENANCY_ALLOW_CACHE_FLUSH=true to enable full cache flush, or use Redis/Memcached for tag support.');
+        }
+    }
+
     // Onboarding Status Methods
     public function isOnboardingComplete(): bool
     {

@@ -7,11 +7,12 @@ use App\Models\ChatMessage;
 use App\Models\Customer;
 use App\Models\Shipment;
 use App\Models\PredictiveEta;
+use App\Services\Contracts\ChatbotServiceInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-class ChatbotService
+class ChatbotService implements ChatbotServiceInterface
 {
     private ?string $openaiApiKey;
     private ?string $openaiEndpoint;

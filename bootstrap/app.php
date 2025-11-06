@@ -15,7 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Aliases (optional if you use them in routes)
         $middleware->alias([
-            'tenant.scope'    => \App\Http\Middleware\TenantScope::class,
+            'enforce.tenant'  => \App\Http\Middleware\EnforceTenant::class,
+            'tenant.scope'    => \App\Http\Middleware\EnforceTenant::class, // Legacy alias for backward compatibility
             'identify.tenant' => \App\Http\Middleware\IdentifyTenant::class,
             'super.admin'     => \App\Http\Middleware\SuperAdminMiddleware::class,
         ]);

@@ -4,20 +4,23 @@ namespace App\Services;
 
 use App\Models\Courier;
 use App\Models\Shipment;
-use App\Services\CacheService;
+use App\Services\Contracts\CourierServiceInterface;
+use App\Services\Contracts\CacheServiceInterface;
 use App\Exceptions\CourierApiException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class ACSCourierService
+class ACSCourierService implements CourierServiceInterface
 {
     private string $apiEndpoint;
-    private CacheService $cacheService;
+    private ?string $apiKey;
+    private CacheServiceInterface $cacheService;
 
     public function __construct(Courier $courier)
     {
         $this->apiEndpoint = $courier->api_endpoint;
-        $this->cacheService = app(CacheService::class);
+        $this->apiKey = $courier->api_key;
+        $this->cacheService = app(CacheServiceInterface::class);
     }
 
     /**
@@ -189,10 +192,16 @@ class ACSCourierService
                 'alias' => $payload['ACSAlias'] ?? 'unknown'
             ]);
 
-            $response = Http::withHeaders([
+            $headers = [
                 'Content-Type' => 'application/json',
-                'ACSApiKey' => $this->apiKey
-            ])->timeout(30)->post($this->apiEndpoint, $payload);
+            ];
+            
+            // Add API key to headers if available
+            if ($this->apiKey) {
+                $headers['ACSApiKey'] = $this->apiKey;
+            }
+            
+            $response = Http::withHeaders($headers)->timeout(30)->post($this->apiEndpoint, $payload);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -320,5 +329,47 @@ class ACSCourierService
         });
 
         return $events;
+    }
+
+    /**
+     * Test courier API connection
+     */
+    public function testConnection(array $credentials): bool
+    {
+        try {
+            $payload = [
+                'ACSAlias' => 'ACS_TrackingDetails',
+                'ACSInputParameters' => [
+                    'Company_ID' => $credentials['company_id'] ?? '',
+                    'Company_Password' => $credentials['company_password'] ?? '',
+                    'User_ID' => $credentials['user_id'] ?? '',
+                    'User_Password' => $credentials['user_password'] ?? '',
+                    'Language' => 'GR',
+                    'Voucher_No' => 'TEST' // Test voucher number
+                ]
+            ];
+
+            $response = $this->makeApiCall($payload);
+            return $response['success'] ?? false;
+        } catch (\Exception $e) {
+            Log::error('ACS Connection Test Failed', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    /**
+     * Create shipment via courier API
+     */
+    public function createShipment(array $shipmentData, array $credentials = []): array
+    {
+        // This would implement the ACS shipment creation API
+        // For now, return a placeholder
+        Log::info('ACS Create Shipment', ['shipment_data' => $shipmentData]);
+        
+        return [
+            'success' => false,
+            'error' => 'Shipment creation not yet implemented',
+            'data' => null
+        ];
     }
 } 

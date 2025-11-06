@@ -4,10 +4,11 @@ namespace App\Services;
 
 use App\Models\Shipment;
 use App\Models\Order;
+use App\Services\Contracts\DMMDeliveryServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class DMMDeliveryService
+class DMMDeliveryService implements DMMDeliveryServiceInterface
 {
     /**
      * Get real tracking number from DMM Delivery Bridge plugin

@@ -38,7 +38,7 @@ class UpdatePredictiveEtasCommand extends Command
             // Also run alert system check immediately for testing
             if ($this->option('force')) {
                 $this->info('🔍 Running immediate alert check...');
-                $alertService = app(AlertSystemService::class);
+                $alertService = app(\App\Services\Contracts\AlertSystemServiceInterface::class);
                 $alertsTriggered = $alertService->checkAllShipments();
                 $this->info("🚨 Triggered {$alertsTriggered} alerts");
             }

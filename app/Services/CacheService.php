@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Contracts\CacheServiceInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use App\Models\Shipment;
@@ -9,7 +10,7 @@ use App\Models\Order;
 use App\Models\Tenant;
 use Carbon\Carbon;
 
-class CacheService
+class CacheService implements CacheServiceInterface
 {
     private const DEFAULT_TTL = 300; // 5 minutes
     private const LONG_TTL = 3600; // 1 hour
@@ -235,9 +236,9 @@ class CacheService
     }
 
     /**
-     * Clear all caches (use with caution)
+     * Clear all cache (use with caution)
      */
-    public function clearAllCaches(): void
+    public function clearAllCache(): void
     {
         Cache::flush();
         Log::warning("All caches cleared");

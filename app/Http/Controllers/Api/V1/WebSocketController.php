@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\WebSocketService;
+use App\Services\Contracts\WebSocketServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Validator;
 
 class WebSocketController extends Controller
 {
-    private WebSocketService $webSocketService;
+    private WebSocketServiceInterface $webSocketService;
 
-    public function __construct(WebSocketService $webSocketService)
+    public function __construct(WebSocketServiceInterface $webSocketService)
     {
         $this->webSocketService = $webSocketService;
     }

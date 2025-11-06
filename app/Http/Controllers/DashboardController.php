@@ -6,7 +6,7 @@ use App\Models\Shipment;
 use App\Models\Customer;
 use App\Models\Courier;
 use App\Http\Resources\TenantResource;
-use App\Services\AnalyticsService;
+use App\Services\Contracts\AnalyticsServiceInterface;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
