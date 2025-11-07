@@ -52,12 +52,8 @@ if (!defined('ABSPATH')) {
         <?php
         settings_fields('dmm_delivery_bridge_settings');
         do_settings_sections('dmm_delivery_bridge_settings');
-        submit_button();
+        submit_button(__('Save Changes', 'dmm-delivery-bridge'));
         ?>
     </form>
-    
-    <div class="notice notice-warning">
-        <p><strong><?php _e('Note:', 'dmm-delivery-bridge'); ?></strong> <?php _e('The admin views have been refactored. The actual HTML content from the original admin pages needs to be extracted and placed in the admin/views/ directory. This is a placeholder template.', 'dmm-delivery-bridge'); ?></p>
-    </div>
 </div>
 

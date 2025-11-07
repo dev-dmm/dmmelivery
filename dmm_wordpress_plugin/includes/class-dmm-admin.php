@@ -273,8 +273,71 @@ class DMM_Admin {
             'dmm_delivery_bridge_log_section'
         );
         
-        // TODO: Add all settings fields from original file
-        // This is a placeholder - extract all add_settings_field calls from original
+        // API Configuration fields
+        add_settings_field(
+            'api_endpoint',
+            __('API Endpoint', 'dmm-delivery-bridge'),
+            [$this, 'api_endpoint_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_api_section'
+        );
+        
+        add_settings_field(
+            'api_key',
+            __('API Key', 'dmm-delivery-bridge'),
+            [$this, 'api_key_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_api_section'
+        );
+        
+        add_settings_field(
+            'api_secret',
+            __('API Secret', 'dmm-delivery-bridge'),
+            [$this, 'api_secret_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_api_section'
+        );
+        
+        add_settings_field(
+            'tenant_id',
+            __('Tenant ID', 'dmm-delivery-bridge'),
+            [$this, 'tenant_id_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_api_section'
+        );
+        
+        // Behavior Settings fields
+        add_settings_field(
+            'auto_send',
+            __('Auto Send Orders', 'dmm-delivery-bridge'),
+            [$this, 'auto_send_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_behavior_section'
+        );
+        
+        add_settings_field(
+            'order_statuses',
+            __('Send on Order Status', 'dmm-delivery-bridge'),
+            [$this, 'order_statuses_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_behavior_section'
+        );
+        
+        add_settings_field(
+            'create_shipment',
+            __('Create Shipment', 'dmm-delivery-bridge'),
+            [$this, 'create_shipment_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_behavior_section'
+        );
+        
+        add_settings_field(
+            'debug_mode',
+            __('Debug Mode', 'dmm-delivery-bridge'),
+            [$this, 'debug_mode_field_callback'],
+            'dmm_delivery_bridge_settings',
+            'dmm_delivery_bridge_behavior_section'
+        );
     }
     
     // Placeholder admin page methods - these need to be extracted from original file
@@ -392,6 +455,165 @@ class DMM_Admin {
     }
     
     /**
+     * API Endpoint field callback
+     */
+    public function api_endpoint_field_callback() {
+        $value = isset($this->options['api_endpoint']) ? esc_attr($this->options['api_endpoint']) : '';
+        ?>
+        <input type="url" 
+               name="dmm_delivery_bridge_options[api_endpoint]" 
+               value="<?php echo $value; ?>" 
+               class="regular-text" 
+               placeholder="https://oreksi.gr/api/woocommerce/order" />
+        <p class="description">
+            <?php _e('Your DMM Delivery API endpoint URL. This is where orders will be sent for tracking.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * API Key field callback
+     */
+    public function api_key_field_callback() {
+        $value = isset($this->options['api_key']) ? esc_attr($this->options['api_key']) : '';
+        ?>
+        <input type="text" 
+               name="dmm_delivery_bridge_options[api_key]" 
+               value="<?php echo $value; ?>" 
+               class="regular-text" 
+               autocomplete="off" />
+        <p class="description">
+            <?php _e('Your API key from the DMM Delivery system. This is required for the bridge to work.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * API Secret field callback
+     */
+    public function api_secret_field_callback() {
+        $value = isset($this->options['api_secret']) ? esc_attr($this->options['api_secret']) : '';
+        ?>
+        <input type="password" 
+               name="dmm_delivery_bridge_options[api_secret]" 
+               value="<?php echo $value; ?>" 
+               class="regular-text" 
+               autocomplete="off" />
+        <p class="description">
+            <?php _e('Your API secret from the DMM Delivery system. This is required for secure authentication.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Tenant ID field callback
+     */
+    public function tenant_id_field_callback() {
+        $value = isset($this->options['tenant_id']) ? esc_attr($this->options['tenant_id']) : '';
+        ?>
+        <input type="text" 
+               name="dmm_delivery_bridge_options[tenant_id]" 
+               value="<?php echo $value; ?>" 
+               class="regular-text" />
+        <p class="description">
+            <?php _e('Your tenant ID from the DMM Delivery system. This identifies your account.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Auto Send field callback
+     */
+    public function auto_send_field_callback() {
+        $value = isset($this->options['auto_send']) ? $this->options['auto_send'] : 'yes';
+        ?>
+        <label>
+            <input type="checkbox" 
+                   name="dmm_delivery_bridge_options[auto_send]" 
+                   value="yes" 
+                   <?php checked($value, 'yes'); ?> />
+            <?php _e('Automatically send orders to DMM Delivery when order status changes', 'dmm-delivery-bridge'); ?>
+        </label>
+        <p class="description">
+            <?php _e('If enabled, orders will be automatically sent when they reach the selected order statuses.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Order Statuses field callback
+     */
+    public function order_statuses_field_callback() {
+        $selected = isset($this->options['order_statuses']) && is_array($this->options['order_statuses']) 
+            ? $this->options['order_statuses'] 
+            : ['processing', 'completed'];
+        
+        $statuses = [
+            'pending' => __('Pending Payment', 'dmm-delivery-bridge'),
+            'processing' => __('Processing', 'dmm-delivery-bridge'),
+            'on-hold' => __('On Hold', 'dmm-delivery-bridge'),
+            'completed' => __('Completed', 'dmm-delivery-bridge'),
+            'cancelled' => __('Cancelled', 'dmm-delivery-bridge'),
+            'refunded' => __('Refunded', 'dmm-delivery-bridge'),
+            'failed' => __('Failed', 'dmm-delivery-bridge'),
+        ];
+        ?>
+        <fieldset>
+            <?php foreach ($statuses as $status => $label): ?>
+                <label>
+                    <input type="checkbox" 
+                           name="dmm_delivery_bridge_options[order_statuses][]" 
+                           value="<?php echo esc_attr($status); ?>" 
+                           <?php checked(in_array($status, $selected)); ?> />
+                    <?php echo esc_html($label); ?>
+                </label><br>
+            <?php endforeach; ?>
+        </fieldset>
+        <p class="description">
+            <?php _e('Select which order statuses should trigger automatic sending to DMM Delivery.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Create Shipment field callback
+     */
+    public function create_shipment_field_callback() {
+        $value = isset($this->options['create_shipment']) ? $this->options['create_shipment'] : 'yes';
+        ?>
+        <label>
+            <input type="checkbox" 
+                   name="dmm_delivery_bridge_options[create_shipment]" 
+                   value="yes" 
+                   <?php checked($value, 'yes'); ?> />
+            <?php _e('Create shipment in DMM Delivery system', 'dmm-delivery-bridge'); ?>
+        </label>
+        <p class="description">
+            <?php _e('If enabled, a shipment will be created in the DMM Delivery system when sending orders.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
+     * Debug Mode field callback
+     */
+    public function debug_mode_field_callback() {
+        $value = isset($this->options['debug_mode']) ? $this->options['debug_mode'] : 'no';
+        ?>
+        <label>
+            <input type="checkbox" 
+                   name="dmm_delivery_bridge_options[debug_mode]" 
+                   value="yes" 
+                   <?php checked($value, 'yes'); ?> />
+            <?php _e('Enable debug mode (logs detailed information)', 'dmm-delivery-bridge'); ?>
+        </label>
+        <p class="description">
+            <?php _e('When enabled, detailed debug information will be logged. Only enable this for troubleshooting.', 'dmm-delivery-bridge'); ?>
+        </p>
+        <?php
+    }
+    
+    /**
      * Get default plugin options
      * Static method so it can be called from anywhere (e.g., during activation)
      *
@@ -480,18 +702,10 @@ class DMM_Admin {
             $sanitized['tenant_id'] = sanitize_text_field($input['tenant_id']);
         }
         
-        // Sanitize behavior settings
-        if (isset($input['auto_send'])) {
-            $sanitized['auto_send'] = in_array($input['auto_send'], ['yes', 'no']) ? $input['auto_send'] : $defaults['auto_send'];
-        }
-        
-        if (isset($input['create_shipment'])) {
-            $sanitized['create_shipment'] = in_array($input['create_shipment'], ['yes', 'no']) ? $input['create_shipment'] : $defaults['create_shipment'];
-        }
-        
-        if (isset($input['debug_mode'])) {
-            $sanitized['debug_mode'] = in_array($input['debug_mode'], ['yes', 'no']) ? $input['debug_mode'] : $defaults['debug_mode'];
-        }
+        // Sanitize behavior settings (checkboxes - unchecked means 'no')
+        $sanitized['auto_send'] = isset($input['auto_send']) && $input['auto_send'] === 'yes' ? 'yes' : 'no';
+        $sanitized['create_shipment'] = isset($input['create_shipment']) && $input['create_shipment'] === 'yes' ? 'yes' : 'no';
+        $sanitized['debug_mode'] = isset($input['debug_mode']) && $input['debug_mode'] === 'yes' ? 'yes' : 'no';
         
         if (isset($input['performance_mode'])) {
             $allowed_modes = ['balanced', 'fast', 'thorough'];
@@ -512,10 +726,8 @@ class DMM_Admin {
             }
         }
         
-        // Sanitize ACS Courier settings
-        if (isset($input['acs_enabled'])) {
-            $sanitized['acs_enabled'] = in_array($input['acs_enabled'], ['yes', 'no']) ? $input['acs_enabled'] : $defaults['acs_enabled'];
-        }
+        // Sanitize ACS Courier settings (checkboxes - unchecked means 'no')
+        $sanitized['acs_enabled'] = isset($input['acs_enabled']) && $input['acs_enabled'] === 'yes' ? 'yes' : 'no';
         
         if (isset($input['acs_api_endpoint'])) {
             $sanitized['acs_api_endpoint'] = esc_url_raw(trim($input['acs_api_endpoint']));
@@ -541,10 +753,8 @@ class DMM_Admin {
             $sanitized['acs_user_password'] = sanitize_text_field($input['acs_user_password']);
         }
         
-        // Sanitize Geniki Taxidromiki settings
-        if (isset($input['geniki_enabled'])) {
-            $sanitized['geniki_enabled'] = in_array($input['geniki_enabled'], ['yes', 'no']) ? $input['geniki_enabled'] : $defaults['geniki_enabled'];
-        }
+        // Sanitize Geniki Taxidromiki settings (checkboxes - unchecked means 'no')
+        $sanitized['geniki_enabled'] = isset($input['geniki_enabled']) && $input['geniki_enabled'] === 'yes' ? 'yes' : 'no';
         
         if (isset($input['geniki_soap_endpoint'])) {
             $sanitized['geniki_soap_endpoint'] = esc_url_raw(trim($input['geniki_soap_endpoint']));
@@ -562,10 +772,8 @@ class DMM_Admin {
             $sanitized['geniki_application_key'] = sanitize_text_field($input['geniki_application_key']);
         }
         
-        // Sanitize ELTA Hellenic Post settings
-        if (isset($input['elta_enabled'])) {
-            $sanitized['elta_enabled'] = in_array($input['elta_enabled'], ['yes', 'no']) ? $input['elta_enabled'] : $defaults['elta_enabled'];
-        }
+        // Sanitize ELTA Hellenic Post settings (checkboxes - unchecked means 'no')
+        $sanitized['elta_enabled'] = isset($input['elta_enabled']) && $input['elta_enabled'] === 'yes' ? 'yes' : 'no';
         
         if (isset($input['elta_api_endpoint'])) {
             $sanitized['elta_api_endpoint'] = esc_url_raw(trim($input['elta_api_endpoint']));
