@@ -16,6 +16,10 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     if (Auth::check()) {
+        $user = Auth::user();
+        if ($user && $user->isSuperAdmin()) {
+            return redirect()->route('super-admin.dashboard');
+        }
         return redirect()->route('dashboard');
     }
 

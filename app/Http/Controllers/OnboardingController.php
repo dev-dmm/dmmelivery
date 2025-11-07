@@ -19,10 +19,14 @@ class OnboardingController extends Controller
      */
     public function welcome(): Response
     {
+        $user = auth()->user();
         $tenant = $this->getCurrentTenant();
         
         if (!$tenant || $tenant->onboarding_status === 'active') {
-            return redirect()->route('dashboard');
+            $redirectRoute = ($user && $user->isSuperAdmin())
+                ? route('super-admin.dashboard')
+                : route('dashboard');
+            return redirect($redirectRoute);
         }
 
         return Inertia::render('Onboarding/Welcome', [
@@ -286,7 +290,12 @@ class OnboardingController extends Controller
         // Clear registration session
         session()->forget(['registration_tenant_id', 'registration_user_id']);
 
-        return redirect()->route('dashboard')
+        $user = auth()->user();
+        $redirectRoute = ($user && $user->isSuperAdmin())
+            ? route('super-admin.dashboard')
+            : route('dashboard');
+
+        return redirect($redirectRoute)
             ->with('success', 'Welcome to eShop Tracker! Your account is now active.');
     }
 
@@ -308,6 +317,11 @@ class OnboardingController extends Controller
             return redirect()->route('register');
         }
 
+        $user = auth()->user();
+        $dashboardRoute = ($user && $user->isSuperAdmin())
+            ? route('super-admin.dashboard')
+            : route('dashboard');
+
         return match($tenant->onboarding_status) {
             'pending' => redirect()->route('registration.email-verification'),
             'email_verified' => redirect()->route('onboarding.profile'),
@@ -315,7 +329,7 @@ class OnboardingController extends Controller
             'payment_setup' => redirect()->route('onboarding.api-config'),
             'api_configured' => redirect()->route('onboarding.testing'),
             'testing' => redirect()->route('onboarding.testing'),
-            'active' => redirect()->route('dashboard'),
+            'active' => redirect($dashboardRoute),
             default => redirect()->route('onboarding.welcome'),
         };
     }

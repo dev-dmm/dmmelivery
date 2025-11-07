@@ -60,92 +60,90 @@ export default function AuthenticatedLayout({ header, children }) {
             {/* Left: brand + primary nav */}
             <div className="flex">
               <div className="flex shrink-0 items-center">
-                <Link href={hasRoute('dashboard') ? route('dashboard') : '/'}>
+                <Link href={isSuperAdmin() && hasRoute('super-admin.dashboard') 
+                  ? route('super-admin.dashboard') 
+                  : hasRoute('dashboard') ? route('dashboard') : '/'}>
                   <ApplicationLogo className="block h-9 w-auto fill-current text-gray-800" />
                 </Link>
               </div>
 
               <div className="hidden space-x-2 lg:space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                {/* Core Operations */}
-                {hasRoute('dashboard') && (
-                  <NavLink href={route('dashboard')} active={route().current('dashboard')}>
-                    Πίνακας Ελέγχου
-                  </NavLink>
-                )}
+                {!isSuperAdmin() && (
+                  <>
+                    {/* Core Operations */}
+                    {hasRoute('dashboard') && (
+                      <NavLink href={route('dashboard')} active={route().current('dashboard')}>
+                        Πίνακας Ελέγχου
+                      </NavLink>
+                    )}
 
-                {hasRoute('orders.index') && (
-                  <NavLink href={route('orders.index')} active={route().current('orders.*')}>
-                    <span className="hidden lg:inline">📦 Παραγγελίες</span>
-                    <span className="lg:hidden">📦 Παραγγελίες</span>
-                  </NavLink>
-                )}
+                    {hasRoute('orders.index') && (
+                      <NavLink href={route('orders.index')} active={route().current('orders.*')}>
+                        <span className="hidden lg:inline">📦 Παραγγελίες</span>
+                        <span className="lg:hidden">📦 Παραγγελίες</span>
+                      </NavLink>
+                    )}
 
-                {hasRoute('shipments.index') && (
-                  <NavLink href={route('shipments.index')} active={route().current('shipments.*')}>
-                    <span className="hidden lg:inline">🚚 Πίνακας Αποστολών</span>
-                    <span className="lg:hidden">🚚 Αποστολές</span>
-                  </NavLink>
-                )}
+                    {hasRoute('shipments.index') && (
+                      <NavLink href={route('shipments.index')} active={route().current('shipments.*')}>
+                        <span className="hidden lg:inline">🚚 Πίνακας Αποστολών</span>
+                        <span className="lg:hidden">🚚 Αποστολές</span>
+                      </NavLink>
+                    )}
 
-                {/* Analytics & Reports */}
-                {hasRoute('courier.performance') && (
-                  <NavLink href={route('courier.performance')} active={route().current('courier.performance')}>
-                    <span className="hidden lg:inline">📊 Απόδοση Courier</span>
-                    <span className="lg:hidden">📊 Courier</span>
-                  </NavLink>
-                )}
+                    {/* Analytics & Reports */}
+                    {hasRoute('courier.performance') && (
+                      <NavLink href={route('courier.performance')} active={route().current('courier.performance')}>
+                        <span className="hidden lg:inline">📊 Απόδοση Courier</span>
+                        <span className="lg:hidden">📊 Courier</span>
+                      </NavLink>
+                    )}
 
-                {hasRoute('courier-reports.import.index') && (
-                  <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
-                    <span className="hidden lg:inline">📈 Αναφορές</span>
-                    <span className="lg:hidden">📈 Αναφορές</span>
-                  </NavLink>
-                )}
+                    {hasRoute('courier-reports.import.index') && (
+                      <NavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
+                        <span className="hidden lg:inline">📈 Αναφορές</span>
+                        <span className="lg:hidden">📈 Αναφορές</span>
+                      </NavLink>
+                    )}
 
-                {/* AI & Monitoring */}
-                {hasRoute('predictive-eta.index') && (
-                  <NavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
-                    <span className="hidden lg:inline">🤖 Προγνωστικά ETA</span>
-                    <span className="lg:hidden">🤖 ETA</span>
-                  </NavLink>
+                    {/* AI & Monitoring */}
+                    {hasRoute('predictive-eta.index') && (
+                      <NavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
+                        <span className="hidden lg:inline">🤖 Προγνωστικά ETA</span>
+                        <span className="lg:hidden">🤖 ETA</span>
+                      </NavLink>
+                    )}
+                  </>
                 )}
-
 
                 {isSuperAdmin() && (
-                  <div className="inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium text-gray-500">
-                    <Dropdown>
-                      <Dropdown.Trigger>
-                        <button className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium leading-5 text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                          <span className="hidden lg:inline">👑 Super Admin</span>
-                          <span className="lg:hidden">👑</span>
-                          <svg className="ml-1 -mr-0.5 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </Dropdown.Trigger>
-                      <Dropdown.Content>
-                        {hasRoute('super-admin.dashboard') && (
-                          <Dropdown.Link href={route('super-admin.dashboard')}>📊 Πίνακας Ελέγχου</Dropdown.Link>
-                        )}
-                        {hasRoute('super-admin.orders') && (
-                          <Dropdown.Link href={route('super-admin.orders')}>📦 Όλες οι Παραγγελίες</Dropdown.Link>
-                        )}
-                        {hasRoute('super-admin.order-items') && (
-                          <Dropdown.Link href={route('super-admin.order-items')}>🛍️ Προϊόντα E-Shop</Dropdown.Link>
-                        )}
-                        {hasRoute('super-admin.tenants') && (
-                          <Dropdown.Link href={route('super-admin.tenants')}>🏢 Όλοι οι Ενοικιαστές</Dropdown.Link>
-                        )}
-                        {hasRoute('super-admin.users') && (
-                          <Dropdown.Link href={route('super-admin.users')}>👥 Όλοι οι Χρήστες</Dropdown.Link>
-                        )}
-                      </Dropdown.Content>
-                    </Dropdown>
-                  </div>
+                  <>
+                    {hasRoute('super-admin.dashboard') && (
+                      <NavLink href={route('super-admin.dashboard')} active={route().current('super-admin.dashboard')}>
+                        📊 Πίνακας Ελέγχου
+                      </NavLink>
+                    )}
+                    {hasRoute('super-admin.orders') && (
+                      <NavLink href={route('super-admin.orders')} active={route().current('super-admin.orders')}>
+                        📦 Όλες οι Παραγγελίες
+                      </NavLink>
+                    )}
+                    {hasRoute('super-admin.order-items') && (
+                      <NavLink href={route('super-admin.order-items')} active={route().current('super-admin.order-items')}>
+                        🛍️ Προϊόντα E-Shop
+                      </NavLink>
+                    )}
+                    {hasRoute('super-admin.tenants') && (
+                      <NavLink href={route('super-admin.tenants')} active={route().current('super-admin.tenants')}>
+                        🏢 Όλοι οι Ενοικιαστές
+                      </NavLink>
+                    )}
+                    {hasRoute('super-admin.users') && (
+                      <NavLink href={route('super-admin.users')} active={route().current('super-admin.users')}>
+                        👥 Όλοι οι Χρήστες
+                      </NavLink>
+                    )}
+                  </>
                 )}
 
               </div>
@@ -223,50 +221,54 @@ export default function AuthenticatedLayout({ header, children }) {
         {/* Mobile menu */}
         <div className={(showingNavigationDropdown ? 'block' : 'hidden') + ' sm:hidden'}>
           <div className="space-y-1 pb-3 pt-2">
-            {/* Core Operations */}
-            {hasRoute('dashboard') && (
-              <ResponsiveNavLink href={route('dashboard')} active={route().current('dashboard')}>
-                Πίνακας Ελέγχου
-              </ResponsiveNavLink>
-            )}
+            {!isSuperAdmin() && (
+              <>
+                {/* Core Operations */}
+                {hasRoute('dashboard') && (
+                  <ResponsiveNavLink href={route('dashboard')} active={route().current('dashboard')}>
+                    Πίνακας Ελέγχου
+                  </ResponsiveNavLink>
+                )}
 
-            {hasRoute('orders.index') && (
-              <ResponsiveNavLink href={route('orders.index')} active={route().current('orders.*')}>
-                📦 Παραγγελίες
-              </ResponsiveNavLink>
-            )}
+                {hasRoute('orders.index') && (
+                  <ResponsiveNavLink href={route('orders.index')} active={route().current('orders.*')}>
+                    📦 Παραγγελίες
+                  </ResponsiveNavLink>
+                )}
 
-            {hasRoute('shipments.index') && (
-              <ResponsiveNavLink href={route('shipments.index')} active={route().current('shipments.*')}>
-                🚚 Αποστολές
-              </ResponsiveNavLink>
-            )}
+                {hasRoute('shipments.index') && (
+                  <ResponsiveNavLink href={route('shipments.index')} active={route().current('shipments.*')}>
+                    🚚 Αποστολές
+                  </ResponsiveNavLink>
+                )}
 
-            {/* Analytics & Reports */}
-            {hasRoute('courier.performance') && (
-              <ResponsiveNavLink href={route('courier.performance')} active={route().current('courier.performance')}>
-                📊 Απόδοση Courier
-              </ResponsiveNavLink>
-            )}
+                {/* Analytics & Reports */}
+                {hasRoute('courier.performance') && (
+                  <ResponsiveNavLink href={route('courier.performance')} active={route().current('courier.performance')}>
+                    📊 Απόδοση Courier
+                  </ResponsiveNavLink>
+                )}
 
-            {hasRoute('courier-reports.import.index') && (
-              <ResponsiveNavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
-                📈 Αναφορές
-              </ResponsiveNavLink>
-            )}
+                {hasRoute('courier-reports.import.index') && (
+                  <ResponsiveNavLink href={route('courier-reports.import.index')} active={route().current('courier-reports.import.*')}>
+                    📈 Αναφορές
+                  </ResponsiveNavLink>
+                )}
 
-            {/* AI & Monitoring */}
-            {hasRoute('predictive-eta.index') && (
-              <ResponsiveNavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
-                🤖 Προγνωστικά ETA
-              </ResponsiveNavLink>
+                {/* AI & Monitoring */}
+                {hasRoute('predictive-eta.index') && (
+                  <ResponsiveNavLink href={route('predictive-eta.index')} active={route().current('predictive-eta.*')}>
+                    🤖 Προγνωστικά ETA
+                  </ResponsiveNavLink>
+                )}
+              </>
             )}
 
             {isSuperAdmin() && (
               <>
                 {hasRoute('super-admin.dashboard') && (
                   <ResponsiveNavLink href={route('super-admin.dashboard')} active={route().current('super-admin.dashboard')}>
-                    📊 Super Admin Πίνακας Ελέγχου
+                    📊 Πίνακας Ελέγχου
                   </ResponsiveNavLink>
                 )}
                 {hasRoute('super-admin.orders') && (

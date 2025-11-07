@@ -75,6 +75,10 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        $redirectRoute = ($user && $user->isSuperAdmin())
+            ? route('super-admin.dashboard', absolute: false)
+            : route('dashboard', absolute: false);
+
+        return redirect($redirectRoute);
     }
 }
