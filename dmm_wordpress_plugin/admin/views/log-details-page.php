@@ -21,6 +21,12 @@ $log_id = isset($_GET['log_id']) ? absint($_GET['log_id']) : 0;
         <p><?php _e('View detailed information about a specific log entry.', 'dmm-delivery-bridge'); ?></p>
     </div>
     
+    <!-- Navigation Links -->
+    <?php 
+    $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : 'dmm-delivery-bridge-log-details';
+    DMM_Admin::render_navigation('dmm-delivery-bridge-logs'); // Highlight logs page since this is a sub-page
+    ?>
+    
     <div class="dmm-log-details-container">
         <?php if ($log_id > 0): ?>
             <p><?php printf(__('Viewing details for log entry #%d', 'dmm-delivery-bridge'), $log_id); ?></p>

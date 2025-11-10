@@ -19,16 +19,10 @@ if (!defined('ABSPATH')) {
     </div>
     
     <!-- Navigation Links -->
-    <div class="dmm-navigation" style="margin-bottom: 20px;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge'); ?>" class="button button-secondary">
-                <?php _e('⚙️ API Configuration', 'dmm-delivery-bridge'); ?>
-            </a>
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge-orders'); ?>" class="button button-primary">
-                <?php _e('📦 Orders Management', 'dmm-delivery-bridge'); ?>
-            </a>
-        </div>
-    </div>
+    <?php 
+    $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : 'dmm-delivery-bridge-orders';
+    DMM_Admin::render_navigation($current_page);
+    ?>
     
     <div class="dmm-orders-container">
         <p><?php _e('Orders management functionality will be implemented here. This will display a list of WooCommerce orders and their DMM Delivery status.', 'dmm-delivery-bridge'); ?></p>

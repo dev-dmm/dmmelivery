@@ -409,17 +409,21 @@ class DMM_AJAX_Handlers {
         }
         
         $processed = 0;
-        $batch_size = 10; // Process 10 at a time
+        $batch_size = 5; // Process 5 at a time to avoid timeouts
         
         foreach (array_chunk($orders, $batch_size) as $batch) {
             foreach ($batch as $order) {
                 try {
-                    if ($type === 'send') {
+                    if ($type === 'send' || $type === 'resend') {
                         if ($this->plugin && $this->plugin->order_processor) {
-                            $this->plugin->order_processor->process_order_async($order->get_id());
+                            // Process order directly using robust method
+                            $this->plugin->order_processor->process_order_robust($order);
                         }
                     } elseif ($type === 'sync') {
-                        // Sync logic here
+                        // Sync order status
+                        if ($this->plugin && $order->get_meta('_dmm_delivery_sent') === 'yes') {
+                            $this->plugin->process_order_update(['order_id' => $order->get_id()]);
+                        }
                     }
                     
                     $processed++;
@@ -428,13 +432,13 @@ class DMM_AJAX_Handlers {
                 } catch (Exception $e) {
                     // Log error but continue
                     if ($this->plugin && $this->plugin->logger) {
-                        $this->plugin->logger->log('Bulk operation error: ' . $e->getMessage(), 'error');
+                        $this->plugin->logger->log('Bulk operation error for order ' . $order->get_id() . ': ' . $e->getMessage(), 'error');
                     }
                 }
             }
             
             // Small delay to prevent timeout
-            usleep(100000); // 0.1 second
+            usleep(200000); // 0.2 second delay between batches
         }
         
         $job_data['status'] = 'completed';

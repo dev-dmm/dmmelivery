@@ -19,22 +19,10 @@ if (!defined('ABSPATH')) {
     </div>
     
     <!-- Navigation Links -->
-    <div class="dmm-navigation" style="margin-bottom: 20px;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge'); ?>" class="button button-secondary">
-                <?php _e('⚙️ API Configuration', 'dmm-delivery-bridge'); ?>
-            </a>
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge-acs'); ?>" class="button button-secondary">
-                <?php _e('🚚 ACS Courier', 'dmm-delivery-bridge'); ?>
-            </a>
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge-geniki'); ?>" class="button button-primary">
-                <?php _e('📮 Geniki Taxidromiki', 'dmm-delivery-bridge'); ?>
-            </a>
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge-elta'); ?>" class="button button-secondary">
-                <?php _e('📬 ELTA Hellenic Post', 'dmm-delivery-bridge'); ?>
-            </a>
-        </div>
-    </div>
+    <?php 
+    $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : 'dmm-delivery-bridge-geniki';
+    DMM_Admin::render_navigation($current_page);
+    ?>
     
     <form method="post" action="options.php">
         <?php

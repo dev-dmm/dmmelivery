@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
 }
 ?>
 
-<div class="wrap">
+<div class="wrap dmm-admin-page">
     <h1><?php _e('Error Logs', 'dmm-delivery-bridge'); ?></h1>
     
     <div class="notice notice-info">
@@ -19,16 +19,10 @@ if (!defined('ABSPATH')) {
     </div>
     
     <!-- Navigation Links -->
-    <div class="dmm-navigation" style="margin-bottom: 20px;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge'); ?>" class="button button-secondary">
-                <?php _e('⚙️ API Configuration', 'dmm-delivery-bridge'); ?>
-            </a>
-            <a href="<?php echo admin_url('admin.php?page=dmm-delivery-bridge-logs'); ?>" class="button button-primary">
-                <?php _e('📋 Error Logs', 'dmm-delivery-bridge'); ?>
-            </a>
-        </div>
-    </div>
+    <?php 
+    $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : 'dmm-delivery-bridge-logs';
+    DMM_Admin::render_navigation($current_page);
+    ?>
     
     <div class="dmm-logs-container">
         <p><?php _e('Log viewing functionality will be implemented here. This will display error logs from API operations, courier integrations, and system events.', 'dmm-delivery-bridge'); ?></p>

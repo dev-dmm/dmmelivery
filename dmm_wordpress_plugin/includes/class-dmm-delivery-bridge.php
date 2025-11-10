@@ -204,6 +204,7 @@ class DMM_Delivery_Bridge {
         // Action Scheduler handlers
         add_action('dmm_send_order', [$this->order_processor, 'process_order_async'], 10, 1);
         add_action('dmm_update_order', [$this, 'process_order_update'], 10, 1);
+        add_action('dmm_bulk_process_orders', [$this, 'process_bulk_orders'], 10, 2);
         
         // Database table creation
         add_action('init', [$this->database, 'create_dedupe_table']);
@@ -535,6 +536,85 @@ class DMM_Delivery_Bridge {
             $order->update_meta_data('_dmm_delivery_updated_at', gmdate('c'));
             $order->save();
             $order->add_order_note(__('Order updated in DMM Delivery system.', 'dmm-delivery-bridge'));
+        }
+    }
+    
+    /**
+     * Process bulk orders via Action Scheduler
+     * 
+     * Called asynchronously to process multiple orders in bulk.
+     * Processes orders in batches and updates progress in transient.
+     * 
+     * @param string $job_id Job ID for tracking progress
+     * @param string $type Operation type (send, sync, resend)
+     * @return void
+     * @since 1.0.0
+     */
+    public function process_bulk_orders($job_id, $type) {
+        $job_data = get_transient('dmm_bulk_job_' . $job_id);
+        if (!$job_data || $job_data['status'] !== 'running') {
+            return;
+        }
+        
+        $order_ids = isset($job_data['order_ids']) ? $job_data['order_ids'] : [];
+        $current = isset($job_data['current']) ? intval($job_data['current']) : 0;
+        $total = isset($job_data['total']) ? intval($job_data['total']) : 0;
+        $batch_size = 5; // Process 5 orders per batch
+        
+        // Get next batch of orders
+        $remaining_ids = array_slice($order_ids, $current, $batch_size);
+        
+        if (empty($remaining_ids)) {
+            // All orders processed
+            $job_data['status'] = 'completed';
+            $job_data['current'] = $total;
+            set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+            return;
+        }
+        
+        // Process batch
+        foreach ($remaining_ids as $order_id) {
+            try {
+                if ($type === 'send' || $type === 'resend') {
+                    // Send order to API - use the order processor's robust method
+                    if ($this->order_processor) {
+                        $order = wc_get_order($order_id);
+                        if ($order) {
+                            // Use the robust processing method directly
+                            $this->order_processor->process_order_robust($order);
+                        }
+                    }
+                } elseif ($type === 'sync') {
+                    // Sync order status
+                    $order = wc_get_order($order_id);
+                    if ($order && $order->get_meta('_dmm_delivery_sent') === 'yes') {
+                        $this->process_order_update(['order_id' => $order_id]);
+                    }
+                }
+                
+                $current++;
+                $job_data['current'] = $current;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+            } catch (Exception $e) {
+                // Log error but continue
+                if ($this->logger) {
+                    $this->logger->log('Bulk operation error for order ' . $order_id . ': ' . $e->getMessage(), 'error');
+                }
+            }
+        }
+        
+        // Schedule next batch if there are more orders
+        if ($current < $total && function_exists('as_schedule_single_action')) {
+            as_schedule_single_action(
+                time() + 1, // Schedule 1 second later
+                'dmm_bulk_process_orders',
+                [$job_id, $type],
+                'dmm_bulk_operations'
+            );
+        } elseif ($current >= $total) {
+            // All done
+            $job_data['status'] = 'completed';
+            set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
         }
     }
 }

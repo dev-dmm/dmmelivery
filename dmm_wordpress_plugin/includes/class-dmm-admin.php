@@ -129,6 +129,61 @@ class DMM_Admin {
     }
     
     /**
+     * Render navigation header with all menu items
+     *
+     * @param string $current_page Current page slug to highlight
+     */
+    public static function render_navigation($current_page = '') {
+        $pages = [
+            'dmm-delivery-bridge' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge'),
+                'label' => __('⚙️ API Configuration', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-acs' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-acs'),
+                'label' => __('🚚 ACS Courier', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-geniki' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-geniki'),
+                'label' => __('📮 Geniki Taxidromiki', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-elta' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-elta'),
+                'label' => __('📬 ELTA Hellenic Post', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-bulk' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-bulk'),
+                'label' => __('📤 Bulk Processing', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-logs' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-logs'),
+                'label' => __('📋 Error Logs', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-orders' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-orders'),
+                'label' => __('📦 Orders Management', 'dmm-delivery-bridge'),
+            ],
+            'dmm-delivery-bridge-monitoring' => [
+                'url' => admin_url('admin.php?page=dmm-delivery-bridge-monitoring'),
+                'label' => __('📊 Monitoring', 'dmm-delivery-bridge'),
+            ],
+        ];
+        
+        ?>
+        <div class="dmm-navigation" style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <?php foreach ($pages as $page_slug => $page_data): ?>
+                    <a href="<?php echo esc_url($page_data['url']); ?>" 
+                       class="button <?php echo $current_page === $page_slug ? 'button-primary' : 'button-secondary'; ?>">
+                        <?php echo esc_html($page_data['label']); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php
+    }
+    
+    /**
      * Add admin menu
      */
     public function add_admin_menu() {
