@@ -129,6 +129,7 @@ class DMM_AJAX_Handlers {
         add_action('wp_ajax_dmm_export_logs', [$this, 'ajax_export_logs']);
         add_action('wp_ajax_dmm_resend_log', [$this, 'ajax_resend_log']);
         add_action('wp_ajax_dmm_get_order_stats', [$this, 'ajax_get_order_stats']);
+        add_action('wp_ajax_dmm_get_order_meta_fields', [$this, 'ajax_get_order_meta_fields']);
     }
     
     /**
@@ -1038,6 +1039,67 @@ class DMM_AJAX_Handlers {
         $this->verify_ajax_request('dmm_get_order_stats');
         // TODO: Extract implementation from original file
         wp_send_json_error(['message' => 'Method not yet extracted from original file']);
+    }
+    
+    /**
+     * Get all unique meta field keys from orders
+     * Used to populate dropdown for voucher field selection
+     */
+    public function ajax_get_order_meta_fields() {
+        $this->verify_ajax_request('dmm_get_order_meta_fields');
+        
+        global $wpdb;
+        
+        // Get all unique meta keys from orders
+        // For HPOS (High-Performance Order Storage), we need to query the order meta table
+        $meta_keys = [];
+        
+        // Check if HPOS is enabled using the same method as the main plugin
+        $is_hpos_enabled = false;
+        if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+            $is_hpos_enabled = \Automattic\WooCommerce\Utilities\FeaturesUtil::feature_is_enabled('custom_order_tables');
+        } elseif (class_exists('\Automattic\WooCommerce\Utilities\OrderUtil')) {
+            $is_hpos_enabled = \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+        }
+        
+        if ($is_hpos_enabled) {
+            // HPOS: Query from wc_orders_meta table
+            $table_name = $wpdb->prefix . 'wc_orders_meta';
+            $query = $wpdb->prepare(
+                "SELECT DISTINCT meta_key 
+                FROM {$table_name} 
+                WHERE meta_key NOT LIKE %s 
+                AND meta_key NOT LIKE %s
+                ORDER BY meta_key ASC
+                LIMIT 500",
+                $wpdb->esc_like('_wp_') . '%',
+                $wpdb->esc_like('_edit_') . '%'
+            );
+        } else {
+            // Legacy: Query from postmeta table
+            $query = $wpdb->prepare(
+                "SELECT DISTINCT pm.meta_key 
+                FROM {$wpdb->postmeta} pm
+                INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+                WHERE p.post_type = 'shop_order'
+                AND pm.meta_key NOT LIKE %s 
+                AND pm.meta_key NOT LIKE %s
+                ORDER BY pm.meta_key ASC
+                LIMIT 500",
+                $wpdb->esc_like('_wp_') . '%',
+                $wpdb->esc_like('_edit_') . '%'
+            );
+        }
+        
+        $results = $wpdb->get_col($query);
+        
+        if ($results) {
+            $meta_keys = array_values(array_filter($results));
+        }
+        
+        wp_send_json_success([
+            'meta_fields' => $meta_keys
+        ]);
     }
 }
 

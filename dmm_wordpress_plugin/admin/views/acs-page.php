@@ -132,9 +132,70 @@ if (!defined('ABSPATH')) {
                     <p class="description"><?php _e('Your ACS Courier user password', 'dmm-delivery-bridge'); ?></p>
                 </td>
             </tr>
+            
+            <tr>
+                <th scope="row">
+                    <label for="acs_voucher_meta_field"><?php _e('Voucher Meta Field', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <select 
+                           id="acs_voucher_meta_field"
+                           name="dmm_delivery_bridge_options[acs_voucher_meta_field]" 
+                           class="regular-text">
+                        <option value=""><?php _e('-- Select Meta Field --', 'dmm-delivery-bridge'); ?></option>
+                    </select>
+                    <p class="description"><?php _e('Select which order meta field contains the voucher number', 'dmm-delivery-bridge'); ?></p>
+                </td>
+            </tr>
         </table>
         
         <?php submit_button(__('Save Changes', 'dmm-delivery-bridge')); ?>
     </form>
 </div>
+
+<script>
+jQuery(document).ready(function($) {
+    // Load meta fields for voucher dropdown
+    function loadMetaFields() {
+        var $select = $('#acs_voucher_meta_field');
+        var savedValue = '<?php echo esc_js(isset($options['acs_voucher_meta_field']) ? $options['acs_voucher_meta_field'] : ''); ?>';
+        
+        $.ajax({
+            url: dmmAdminData.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'dmm_get_order_meta_fields',
+                nonce: dmmAdminData.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data.meta_fields) {
+                    $select.empty();
+                    $select.append('<option value=""><?php echo esc_js(__('-- Select Meta Field --', 'dmm-delivery-bridge')); ?></option>');
+                    
+                    $.each(response.data.meta_fields, function(index, metaField) {
+                        var selected = (metaField === savedValue) ? 'selected' : '';
+                        $select.append('<option value="' + escapeHtml(metaField) + '" ' + selected + '>' + escapeHtml(metaField) + '</option>');
+                    });
+                }
+            },
+            error: function() {
+                console.error('Failed to load meta fields');
+            }
+        });
+    }
+    
+    function escapeHtml(text) {
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    
+    loadMetaFields();
+});
+</script>
 
