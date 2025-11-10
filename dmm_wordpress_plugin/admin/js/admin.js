@@ -215,6 +215,45 @@
                     }
                 };
                 
+                const processNextBatch = async (jobId, action) => {
+                    try {
+                        const formData = new FormData();
+                        formData.append('action', 'dmm_process_bulk_batch');
+                        formData.append('nonce', window.dmmAdminNonce);
+                        formData.append('job_id', jobId);
+                        formData.append('type', action === 'resend' ? 'send' : action);
+                        
+                        const response = await fetch(ajaxurl, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success && data.data) {
+                            const batchData = data.data;
+                            setProgress({
+                                current: batchData.current || 0,
+                                total: batchData.total || 0,
+                                label: __('Processing...', 'dmm-delivery-bridge')
+                            });
+                            
+                            if (batchData.status === 'completed') {
+                                clearInterval(intervalRef.current);
+                                setIsRunning(false);
+                                setSuccess(__('Bulk operation completed successfully!', 'dmm-delivery-bridge'));
+                                setProgress(null);
+                                setCurrentJobId(null);
+                            } else if (batchData.has_more) {
+                                // Schedule next batch after a short delay
+                                setTimeout(() => processNextBatch(jobId, action), 500);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Batch processing error:', err);
+                    }
+                };
+                
                 const startProgressPolling = (jobId, action) => {
                     if (intervalRef.current) {
                         clearInterval(intervalRef.current);
@@ -241,6 +280,12 @@
                                     total: progressData.total || 0,
                                     label: progressData.label || __('Processing...', 'dmm-delivery-bridge')
                                 });
+                                
+                                // If using immediate processing and not completed, trigger next batch
+                                if (progressData.use_immediate && progressData.status === 'running') {
+                                    // Process next batch via AJAX
+                                    processNextBatch(jobId, action);
+                                }
                                 
                                 if (progressData.status === 'completed') {
                                     clearInterval(intervalRef.current);

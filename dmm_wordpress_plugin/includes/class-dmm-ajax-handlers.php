@@ -90,6 +90,7 @@ class DMM_AJAX_Handlers {
         add_action('wp_ajax_dmm_bulk_sync_orders', [$this, 'ajax_bulk_sync_orders']);
         add_action('wp_ajax_dmm_get_bulk_progress', [$this, 'ajax_get_bulk_progress']);
         add_action('wp_ajax_dmm_cancel_bulk_send', [$this, 'ajax_cancel_bulk_send']);
+        add_action('wp_ajax_dmm_process_bulk_batch', [$this, 'ajax_process_bulk_batch']);
         add_action('wp_ajax_dmm_diagnose_orders', [$this, 'ajax_diagnose_orders']);
         add_action('wp_ajax_dmm_force_resend_all', [$this, 'ajax_force_resend_all']);
         add_action('wp_ajax_dmm_test_force_resend', [$this, 'ajax_test_force_resend']);
@@ -240,25 +241,34 @@ class DMM_AJAX_Handlers {
                 'order_ids' => array_map(function($order) { return $order->get_id(); }, $orders)
             ], HOUR_IN_SECONDS);
             
-            // Schedule background processing
+            // Always process first batch immediately, then schedule rest
+            // This ensures progress starts immediately
+            $first_batch = array_slice($orders, 0, 5);
+            if (!empty($first_batch)) {
+                $this->process_bulk_orders_batch($job_id, 'send', $first_batch, 0);
+            }
+            
+            // Schedule remaining orders
             if (function_exists('as_schedule_single_action')) {
                 $scheduled = as_schedule_single_action(
-                    time(),
+                    time() + 2, // Start 2 seconds after first batch
                     'dmm_bulk_process_orders',
                     [$job_id, 'send'],
                     'dmm_bulk_operations'
                 );
                 
                 if (!$scheduled) {
-                    // Action Scheduler failed, use immediate processing
+                    // Action Scheduler failed, continue with immediate processing in background
                     if ($this->plugin && $this->plugin->logger) {
-                        $this->plugin->logger->log("Bulk send: Action Scheduler failed to schedule, using immediate processing for job {$job_id}", 'warning');
+                        $this->plugin->logger->log("Bulk send: Action Scheduler failed to schedule, will process remaining orders via AJAX polling for job {$job_id}", 'warning');
                     }
-                    $this->process_bulk_orders_immediate($job_id, 'send', $orders);
+                    // Mark job to use immediate processing
+                    $job_data = get_transient('dmm_bulk_job_' . $job_id);
+                    $job_data['use_immediate'] = true;
+                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
                 } else {
                     // Trigger Action Scheduler to run immediately if possible
                     if (function_exists('as_run_queue')) {
-                        // Try to process queued actions immediately
                         add_action('shutdown', function() {
                             if (function_exists('as_run_queue')) {
                                 as_run_queue();
@@ -267,11 +277,13 @@ class DMM_AJAX_Handlers {
                     }
                 }
             } else {
-                // No Action Scheduler, process immediately
+                // No Action Scheduler, mark for immediate processing
                 if ($this->plugin && $this->plugin->logger) {
-                    $this->plugin->logger->log("Bulk send: Action Scheduler not available, using immediate processing for job {$job_id}", 'info');
+                    $this->plugin->logger->log("Bulk send: Action Scheduler not available, will process via AJAX polling for job {$job_id}", 'info');
                 }
-                $this->process_bulk_orders_immediate($job_id, 'send', $orders);
+                $job_data = get_transient('dmm_bulk_job_' . $job_id);
+                $job_data['use_immediate'] = true;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
             }
             
             wp_send_json_success([
@@ -329,9 +341,16 @@ class DMM_AJAX_Handlers {
                 'order_ids' => array_map(function($order) { return $order->get_id(); }, $orders)
             ], HOUR_IN_SECONDS);
             
+            // Always process first batch immediately, then schedule rest
+            $first_batch = array_slice($orders, 0, 5);
+            if (!empty($first_batch)) {
+                $this->process_bulk_orders_batch($job_id, 'sync', $first_batch, 0);
+            }
+            
+            // Schedule remaining orders
             if (function_exists('as_schedule_single_action')) {
                 $scheduled = as_schedule_single_action(
-                    time(),
+                    time() + 2,
                     'dmm_bulk_process_orders',
                     [$job_id, 'sync'],
                     'dmm_bulk_operations'
@@ -339,9 +358,11 @@ class DMM_AJAX_Handlers {
                 
                 if (!$scheduled) {
                     if ($this->plugin && $this->plugin->logger) {
-                        $this->plugin->logger->log("Bulk sync: Action Scheduler failed to schedule, using immediate processing for job {$job_id}", 'warning');
+                        $this->plugin->logger->log("Bulk sync: Action Scheduler failed to schedule, will process via AJAX polling for job {$job_id}", 'warning');
                     }
-                    $this->process_bulk_orders_immediate($job_id, 'sync', $orders);
+                    $job_data = get_transient('dmm_bulk_job_' . $job_id);
+                    $job_data['use_immediate'] = true;
+                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
                 } else {
                     if (function_exists('as_run_queue')) {
                         add_action('shutdown', function() {
@@ -353,9 +374,11 @@ class DMM_AJAX_Handlers {
                 }
             } else {
                 if ($this->plugin && $this->plugin->logger) {
-                    $this->plugin->logger->log("Bulk sync: Action Scheduler not available, using immediate processing for job {$job_id}", 'info');
+                    $this->plugin->logger->log("Bulk sync: Action Scheduler not available, will process via AJAX polling for job {$job_id}", 'info');
                 }
-                $this->process_bulk_orders_immediate($job_id, 'sync', $orders);
+                $job_data = get_transient('dmm_bulk_job_' . $job_id);
+                $job_data['use_immediate'] = true;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
             }
             
             wp_send_json_success([
@@ -404,12 +427,15 @@ class DMM_AJAX_Handlers {
             $label = __('Resending orders...', 'dmm-delivery-bridge');
         }
         
+        $use_immediate = isset($job_data['use_immediate']) && $job_data['use_immediate'];
+        
         wp_send_json_success([
             'current' => $job_data['current'],
             'total' => $job_data['total'],
             'status' => $job_data['status'],
             'label' => $label,
-            'error' => isset($job_data['error']) ? $job_data['error'] : null
+            'error' => isset($job_data['error']) ? $job_data['error'] : null,
+            'use_immediate' => $use_immediate
         ]);
     }
     
@@ -435,53 +461,110 @@ class DMM_AJAX_Handlers {
     }
     
     /**
-     * Process bulk orders immediately (fallback when Action Scheduler not available)
+     * Process a batch of orders and update progress
      * 
      * @param string $job_id Job ID
      * @param string $type Operation type (send, sync, resend)
      * @param array $orders Array of WC_Order objects
+     * @param int $start_index Starting index for progress tracking
      */
-    private function process_bulk_orders_immediate($job_id, $type, $orders) {
+    private function process_bulk_orders_batch($job_id, $type, $orders, $start_index) {
         $job_data = get_transient('dmm_bulk_job_' . $job_id);
         if (!$job_data) {
             return;
         }
         
-        $processed = 0;
-        $batch_size = 5; // Process 5 at a time to avoid timeouts
+        $current = $start_index;
         
-        foreach (array_chunk($orders, $batch_size) as $batch) {
-            foreach ($batch as $order) {
-                try {
-                    if ($type === 'send' || $type === 'resend') {
-                        if ($this->plugin && $this->plugin->order_processor) {
-                            // Process order directly using robust method
-                            $this->plugin->order_processor->process_order_robust($order);
-                        }
-                    } elseif ($type === 'sync') {
-                        // Sync order status
-                        if ($this->plugin && $order->get_meta('_dmm_delivery_sent') === 'yes') {
-                            $this->plugin->process_order_update(['order_id' => $order->get_id()]);
-                        }
+        foreach ($orders as $order) {
+            try {
+                if ($type === 'send' || $type === 'resend') {
+                    if ($this->plugin && $this->plugin->order_processor) {
+                        // Process order directly using robust method
+                        $this->plugin->order_processor->process_order_robust($order);
                     }
-                    
-                    $processed++;
-                    $job_data['current'] = $processed;
-                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
-                } catch (Exception $e) {
-                    // Log error but continue
-                    if ($this->plugin && $this->plugin->logger) {
-                        $this->plugin->logger->log('Bulk operation error for order ' . $order->get_id() . ': ' . $e->getMessage(), 'error');
+                } elseif ($type === 'sync') {
+                    // Sync order status
+                    if ($this->plugin && $order->get_meta('_dmm_delivery_sent') === 'yes') {
+                        $this->plugin->process_order_update(['order_id' => $order->get_id()]);
                     }
                 }
+                
+                $current++;
+                $job_data['current'] = $current;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+            } catch (Exception $e) {
+                // Log error but continue
+                if ($this->plugin && $this->plugin->logger) {
+                    $this->plugin->logger->log('Bulk operation error for order ' . $order->get_id() . ': ' . $e->getMessage(), 'error');
+                }
+                $current++;
+                $job_data['current'] = $current;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
             }
-            
-            // Small delay to prevent timeout
-            usleep(200000); // 0.2 second delay between batches
+        }
+    }
+    
+    /**
+     * AJAX handler to process next batch (for immediate processing mode)
+     */
+    public function ajax_process_bulk_batch() {
+        $this->verify_ajax_request('dmm_process_bulk_batch');
+        
+        $job_id = isset($_POST['job_id']) ? sanitize_text_field($_POST['job_id']) : '';
+        $type = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : 'send';
+        
+        if (empty($job_id)) {
+            wp_send_json_error(['message' => __('Job ID is required.', 'dmm-delivery-bridge')]);
         }
         
-        $job_data['status'] = 'completed';
-        set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+        $job_data = get_transient('dmm_bulk_job_' . $job_id);
+        if (!$job_data || $job_data['status'] !== 'running') {
+            wp_send_json_error(['message' => __('Job not found or not running.', 'dmm-delivery-bridge')]);
+        }
+        
+        $order_ids = isset($job_data['order_ids']) ? $job_data['order_ids'] : [];
+        $current = isset($job_data['current']) ? intval($job_data['current']) : 0;
+        $total = isset($job_data['total']) ? intval($job_data['total']) : 0;
+        $batch_size = 5;
+        
+        // Get next batch
+        $remaining_ids = array_slice($order_ids, $current, $batch_size);
+        
+        if (empty($remaining_ids)) {
+            // All done
+            $job_data['status'] = 'completed';
+            $job_data['current'] = $total;
+            set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+            wp_send_json_success([
+                'current' => $total,
+                'total' => $total,
+                'status' => 'completed'
+            ]);
+        }
+        
+        // Get orders
+        $orders = [];
+        foreach ($remaining_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $orders[] = $order;
+            }
+        }
+        
+        // Process batch
+        $this->process_bulk_orders_batch($job_id, $type, $orders, $current);
+        
+        // Update job data
+        $job_data = get_transient('dmm_bulk_job_' . $job_id);
+        $new_current = isset($job_data['current']) ? intval($job_data['current']) : $current + count($orders);
+        
+        wp_send_json_success([
+            'current' => $new_current,
+            'total' => $total,
+            'status' => $new_current >= $total ? 'completed' : 'running',
+            'has_more' => $new_current < $total
+        ]);
     }
     
     public function ajax_diagnose_orders() {
@@ -624,8 +707,79 @@ class DMM_AJAX_Handlers {
         // Use standardized verification (allows both manage_options and manage_woocommerce)
         $this->verify_ajax_request('dmm_get_logs_table', 'both');
         
-        // TODO: Extract implementation from original file
-        wp_send_json_error(['message' => 'Method not yet extracted from original file']);
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $table_name
+        )) === $table_name;
+        
+        if (!$table_exists) {
+            wp_send_json_success([
+                'logs' => [],
+                'message' => __('Log table does not exist yet. Logs will appear here after operations are performed.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Get filter parameters
+        $limit = isset($_POST['limit']) ? absint($_POST['limit']) : 50;
+        $offset = isset($_POST['offset']) ? absint($_POST['offset']) : 0;
+        $status_filter = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+        $order_id_filter = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        // Build query
+        $where = ['1=1'];
+        $where_values = [];
+        
+        if (!empty($status_filter)) {
+            $where[] = 'status = %s';
+            $where_values[] = $status_filter;
+        }
+        
+        if ($order_id_filter > 0) {
+            $where[] = 'order_id = %d';
+            $where_values[] = $order_id_filter;
+        }
+        
+        $where_clause = implode(' AND ', $where);
+        
+        // Get total count
+        $count_query = "SELECT COUNT(*) FROM {$table_name} WHERE {$where_clause}";
+        if (!empty($where_values)) {
+            $count_query = $wpdb->prepare($count_query, $where_values);
+        }
+        $total = $wpdb->get_var($count_query);
+        
+        // Get logs
+        $query = "SELECT * FROM {$table_name} WHERE {$where_clause} ORDER BY created_at DESC LIMIT %d OFFSET %d";
+        $query_values = array_merge($where_values, [$limit, $offset]);
+        $query = $wpdb->prepare($query, $query_values);
+        
+        $logs = $wpdb->get_results($query, ARRAY_A);
+        
+        // Format logs for display
+        $formatted_logs = [];
+        foreach ($logs as $log) {
+            $formatted_logs[] = [
+                'id' => $log['id'],
+                'order_id' => $log['order_id'],
+                'status' => $log['status'],
+                'error_message' => $log['error_message'],
+                'context' => $log['context'] ?? 'api',
+                'created_at' => $log['created_at'],
+                'request_data' => !empty($log['request_data']) ? json_decode($log['request_data'], true) : null,
+                'response_data' => !empty($log['response_data']) ? json_decode($log['response_data'], true) : null,
+            ];
+        }
+        
+        wp_send_json_success([
+            'logs' => $formatted_logs,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset
+        ]);
     }
     
     public function ajax_clear_logs() {

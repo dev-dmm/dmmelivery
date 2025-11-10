@@ -31,6 +31,22 @@ class DMM_Logger {
     }
     
     /**
+     * General logging method - always logs (unlike debug_log)
+     *
+     * @param string $message Log message
+     * @param string $level Log level: 'info', 'warning', 'error', 'debug' (default: 'info')
+     */
+    public function log($message, $level = 'info') {
+        $prefix = "DMM Delivery Bridge [{$level}]:";
+        error_log("{$prefix} {$message}");
+        
+        // Also log to database if it's an error
+        if ($level === 'error') {
+            $this->log_to_database($message, $level);
+        }
+    }
+    
+    /**
      * Debug logging helper - only logs if debug mode is enabled
      *
      * @param string $message Log message
@@ -531,6 +547,43 @@ class DMM_Logger {
         }
         
         return $stats;
+    }
+    
+    /**
+     * Log message to database
+     *
+     * @param string $message Log message
+     * @param string $level Log level
+     */
+    private function log_to_database($message, $level = 'error') {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        // Ensure table exists
+        $this->ensure_log_table_exists();
+        
+        // Extract order ID from message if present
+        $order_id = 0;
+        if (preg_match('/order[_\s]+(\d+)/i', $message, $matches)) {
+            $order_id = absint($matches[1]);
+        }
+        
+        $log_data = [
+            'order_id' => $order_id,
+            'status' => $level,
+            'request_data' => null,
+            'response_data' => null,
+            'error_message' => $message,
+            'context' => 'bulk_operation',
+            'created_at' => current_time('mysql')
+        ];
+        
+        $wpdb->insert(
+            $table_name,
+            $log_data,
+            ['%d', '%s', '%s', '%s', '%s', '%s', '%s']
+        );
     }
 }
 
