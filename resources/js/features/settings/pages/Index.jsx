@@ -125,6 +125,23 @@ const useRateLimit = (limit = 10, windowMs = 60000) => {
   return { canMakeCall, recordCall };
 };
 
+/* ---------------------- Secret Generator ---------------------- */
+const generateSecureSecret = (length = 32) => {
+  // Generate a secure random secret using crypto API
+  // 32 bytes = 64 hex characters (well above the 16 minimum)
+  const array = new Uint8Array(length);
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(array);
+  } else {
+    // Fallback for older browsers (less secure but better than nothing)
+    for (let i = 0; i < length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  // Convert to hex string
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+};
+
 /* ---------------------- Sanitizer ---------------------- */
 const sanitizeInput = (input) =>
   String(input ?? '')
@@ -880,6 +897,18 @@ export default function SettingsIndex({
                                     minLength={16}
                                     maxLength={255}
                                   />
+                                  <SecondaryButton
+                                    onClick={() => {
+                                      const generatedSecret = generateSecureSecret(32); // 64 hex characters
+                                      setApiSecretInput(generatedSecret);
+                                      showMessage('api_secret', 'Νέο API Secret δημιουργήθηκε. Κάντε κλικ στο "Αποθήκευση" για να το αποθηκεύσετε.', 'success');
+                                    }}
+                                    className="whitespace-nowrap"
+                                    title="Δημιουργία ασφαλούς API Secret"
+                                  >
+                                    <ArrowPathIcon className="-ml-1 mr-2 h-4 w-4" />
+                                    Δημιουργία
+                                  </SecondaryButton>
                                 </div>
                                 {apiSecretInput && (
                                   <p className="text-xs text-gray-500">
