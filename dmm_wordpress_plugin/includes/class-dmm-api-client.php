@@ -169,6 +169,7 @@ class DMM_API_Client {
         // Add idempotency key if present
         $headers = [
             'Content-Type' => 'application/json',
+            'Accept' => 'application/json', // Ensure Laravel returns JSON errors
             'X-Api-Key' => $api_key,
             'X-Tenant-Id' => $tenant_id,
         ];

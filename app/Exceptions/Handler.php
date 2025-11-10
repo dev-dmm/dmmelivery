@@ -79,7 +79,13 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $exception): Response
     {
         // Handle API requests differently
-        if ($request->expectsJson() || $request->is('api/*')) {
+        // Check for API routes by path, Accept header, or Content-Type header
+        $isApiRequest = $request->expectsJson() 
+            || $request->is('api/*') 
+            || $request->header('Accept') === 'application/json'
+            || $request->header('Content-Type') === 'application/json';
+        
+        if ($isApiRequest) {
             return $this->handleApiException($request, $exception);
         }
 
