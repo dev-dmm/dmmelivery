@@ -4,14 +4,17 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Throwable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -55,6 +58,19 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+
+        // Guarantee JSON 429 responses for WooCommerce routes
+        $this->renderable(function (TooManyRequestsHttpException $e, Request $request) {
+            if ($request->is('api/woocommerce/*')) {
+                $headers = $e->getHeaders() ?? [];
+                
+                return new JsonResponse([
+                    'success'    => false,
+                    'error_code' => 'RATE_LIMIT_EXCEEDED',
+                    'message'    => 'Too many requests. Please slow down.',
+                ], 429, $headers);
+            }
+        });
     }
 
     /**
@@ -93,6 +109,14 @@ class Handler extends ExceptionHandler
                 'message' => 'Authentication required',
                 'error_code' => 'UNAUTHENTICATED'
             ], 401);
+        }
+
+        if ($exception instanceof ThrottleRequestsException) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Rate limit exceeded. Please retry later.',
+                'error_code' => 'RATE_LIMIT_EXCEEDED'
+            ], 429);
         }
 
         if ($exception instanceof ModelNotFoundException) {

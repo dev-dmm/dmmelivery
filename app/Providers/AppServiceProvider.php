@@ -85,5 +85,23 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api:unauthenticated', function (Request $request) {
             return Limit::perMinute(60)->by($request->ip());
         });
+        
+        // WooCommerce-specific rate limiter (per tenant + IP)
+        RateLimiter::for('woocommerce', function (Request $request) {
+            $ip = $request->ip() ?? 'noip';
+            $tenant = $request->header('X-Tenant-Id') 
+                ?? $request->input('tenant_id') 
+                ?? (function_exists('tenant_id') ? (tenant_id() ?? 'notenant') : 'notenant');
+            
+            // Normalize tenant ID to avoid bucket fragmentation (uppercase/trimmed variants)
+            $tenant = strtolower(trim($tenant));
+            
+            $max = (int) config('rate.woocommerce_per_minute', 60);
+            
+            // Per (tenant+ip) rate limit
+            return [
+                Limit::perMinute($max)->by("woo:{$tenant}:{$ip}")
+            ];
+        });
     }
 }

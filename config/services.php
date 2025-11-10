@@ -37,6 +37,7 @@ return [
 
     'dm_bridge' => [
         'key' => env('DM_BRIDGE_API_KEY', ''),
+        'secret' => env('DM_BRIDGE_API_SECRET', ''),
     ],
 
     'openweather' => [

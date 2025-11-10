@@ -13,9 +13,11 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Shipment;
 use App\Models\Courier;
+use App\Support\HmacVerifier;
 
 class WooCommerceOrderController extends Controller
 {
+    public function __construct(private HmacVerifier $verifier) {}
     /**
      * Map WordPress/WooCommerce statuses to our internal statuses
      */
@@ -60,8 +62,8 @@ class WooCommerceOrderController extends Controller
         $normalizedStatus = strtolower(trim($wooStatus));
         $mappedStatus = $statusMapping[$normalizedStatus] ?? $statusMapping['default'];
         
-        // Log status mapping for debugging
-        if ($normalizedStatus !== $mappedStatus) {
+        // Log status mapping for debugging (only when status changes and not default)
+        if ($normalizedStatus !== $mappedStatus && $mappedStatus !== 'pending') {
             \Log::info('Order status mapped', [
                 'original_status' => $wooStatus,
                 'normalized_status' => $normalizedStatus,
@@ -87,16 +89,21 @@ class WooCommerceOrderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        // Log incoming request
+        // Sanitize headers for logging (don't log secrets)
+        $sanitizedHeaders = collect($request->headers->all())
+            ->except(['x-api-key', 'authorization', 'x-payload-signature', 'x-timestamp', 'x-nonce'])
+            ->all();
+        
+        // Log incoming request (without sensitive data)
         \Log::info('WooCommerce order received', [
-            'headers' => $request->headers->all(),
-            'payload' => $request->all()
+            'headers' => $sanitizedHeaders,
+            'has_payload' => !empty($request->all())
         ]);
         
         // Normalize external order ID
         $externalId = trim((string) data_get($request, 'order.external_order_id'));
         if ($externalId === '') {
-            \Log::warning('Rejected: empty external_order_id after normalization', ['payload' => $request->all()]);
+            \Log::warning('Rejected: empty external_order_id after normalization');
             return response()->json(['success'=>false, 'message'=>'Invalid external_order_id'], 422);
         }
         $tenantId = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
@@ -108,6 +115,13 @@ class WooCommerceOrderController extends Controller
         ]);
         
         // Use Redis lock to prevent race conditions
+        // Validate that cache driver supports atomic locks
+        $store = \Cache::getStore();
+        if (! $store instanceof \Illuminate\Contracts\Cache\LockProvider) {
+            \Log::error('Atomic locks unsupported by current cache driver. Use Redis/Memcached/Database.');
+            return response()->json(['success' => false, 'message' => 'Server misconfigured'], 500);
+        }
+        
         $lockKey = "orders:create:{$tenantId}:{$externalId}";
         
         try {
@@ -128,33 +142,15 @@ class WooCommerceOrderController extends Controller
             'timestamp' => now()->toDateTimeString()
         ]);
 
-        // Read headers
-        $headerKey = $request->header('X-Api-Key');
-
-        if (!$headerKey) {
-            \Log::warning('WooCommerce order rejected: No API key provided');
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-
-        $tenant = Tenant::find($tenantId);
+        // Get tenant from middleware (already validated)
+        $tenant = $request->attributes->get('tenant');
         if (!$tenant) {
-            \Log::warning('WooCommerce order rejected: Invalid tenant ID', ['tenant_id' => $tenantId]);
-            return response()->json(['success' => false, 'message' => 'Invalid tenant'], 422);
-        }
-
-        // Accept global bridge key OR tenant-specific token
-        $globalKey = (string) config('services.dm_bridge.key');
-        $isGlobalKeyValid = $globalKey && hash_equals($globalKey, (string) $headerKey);
-        $isTenantTokenValid = $tenant->isApiTokenValid((string) $headerKey);
-
-        if (!$isGlobalKeyValid && !$isTenantTokenValid) {
-            \Log::warning('WooCommerce order rejected: Invalid API key', [
-                'tenant_id' => $tenantId,
-                'api_key_provided' => !empty($headerKey),
-                'global_key_valid' => $isGlobalKeyValid,
-                'tenant_token_valid' => $isTenantTokenValid
-            ]);
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            // Fallback: find tenant if middleware didn't set it (shouldn't happen)
+            $tenant = Tenant::find($tenantId);
+            if (!$tenant) {
+                \Log::error('Tenant not found in request attributes or by ID', ['tenant_id' => $tenantId]);
+                return response()->json(['success' => false, 'message' => 'Invalid tenant'], 422);
+            }
         }
 
         // Validate payload
@@ -169,9 +165,14 @@ class WooCommerceOrderController extends Controller
         ]);
 
         if ($v->fails()) {
+            // Mask PII in logs
+            $clean = $request->all();
+            data_set($clean, 'customer.email', '[redacted]');
+            data_set($clean, 'customer.phone', '[redacted]');
+            
             \Log::error('WooCommerce order validation failed', [
                 'errors' => $v->errors()->toArray(),
-                'request_data' => $request->all(),
+                'request_data' => $clean,
                 'tenant_id' => $tenantId
             ]);
             return response()->json(['success'=>false, 'message'=>'Validation failed', 'errors'=>$v->errors()], 422);
@@ -195,8 +196,15 @@ class WooCommerceOrderController extends Controller
             'preferred_courier' => data_get($request, 'preferred_courier')
         ]);
         
-        // Set READ COMMITTED isolation level before transaction starts
-        \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        // Set READ COMMITTED isolation level before transaction starts (MySQL-specific)
+        try {
+            \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        } catch (\Throwable $e) {
+            \Log::notice('Skipping isolation level set (driver not supported)', [
+                'driver' => \DB::getDriverName(),
+                'error' => $e->getMessage()
+            ]);
+        }
         
         // Use a single transaction for the entire process to prevent race conditions
         try {
@@ -246,7 +254,7 @@ class WooCommerceOrderController extends Controller
                                 data_get($request, 'customer.first_name'),
                                 data_get($request, 'customer.last_name'),
                             ]))),
-                            'customer_email' => data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local',
+                            'customer_email' => data_get($request, 'customer.email') ?: ('order-'.$externalId.'@no-email.local'),
                             'customer_phone' => data_get($request, 'customer.phone'),
                             'shipping_address' => data_get($request, 'shipping.address.address_1'),
                             'shipping_city' => data_get($request, 'shipping.address.city'),
@@ -275,7 +283,7 @@ class WooCommerceOrderController extends Controller
 
 
                 // Find or create customer by email OR phone
-                $customerEmail = data_get($request, 'customer.email') ?: Str::uuid().'@no-email.local';
+                $customerEmail = data_get($request, 'customer.email') ?: ('order-'.$externalId.'@no-email.local');
                 $customerPhone = data_get($request, 'customer.phone');
                 $customerName = trim(implode(' ', array_filter([
                     data_get($request, 'customer.first_name'),
@@ -559,26 +567,32 @@ class WooCommerceOrderController extends Controller
             ]);
 
             // Check if this is a duplicate key error
-            if ($e->getCode() == '23000' && str_contains($e->getMessage(), 'Duplicate entry')) {
-                \Log::info('Order already exists (duplicate key constraint)', [
-                    'external_order_id' => $externalId,
-                    'tenant_id' => $tenant->id,
-                    'error' => $e->getMessage()
-                ]);
+            // Safer duplicate-key detection using SQLSTATE and constraint name
+            if ($e instanceof \Illuminate\Database\QueryException) {
+                $isUnique = $e->getCode() === '23000' 
+                    && str_contains($e->getMessage(), 'orders_tenant_extid_unique');
 
-                // Try to find the existing order
-                $existing = Order::withoutGlobalScopes()
-                    ->where('tenant_id', $tenant->id)
-                    ->where('external_order_id', $externalId)
-                    ->first();
+                if ($isUnique) {
+                    \Log::info('Order already exists (unique constraint violation)', [
+                        'external_order_id' => $externalId,
+                        'tenant_id' => $tenant->id,
+                        'error' => $e->getMessage()
+                    ]);
 
-                if ($existing) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Order already exists',
-                        'order_id' => $existing->id,
-                        'shipment_id' => Shipment::where('order_id', $existing->id)->value('id'),
-                    ], 200);
+                    // Try to find the existing order
+                    $existing = Order::withoutGlobalScopes()
+                        ->where('tenant_id', $tenant->id)
+                        ->where('external_order_id', $externalId)
+                        ->first();
+
+                    if ($existing) {
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Order already exists',
+                            'order_id' => $existing->id,
+                            'shipment_id' => Shipment::where('order_id', $existing->id)->value('id'),
+                        ], 200);
+                    }
                 }
             }
 
@@ -593,9 +607,13 @@ class WooCommerceOrderController extends Controller
                 'tenant_id'   => $tenant->id ?? null,
             ]);
             throw $e;
-        }finally {
+        } finally {
             // Reset to default isolation level (MySQL default: REPEATABLE READ)
-            \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            try {
+                \DB::statement('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            } catch (\Throwable $e) {
+                // Ignore - driver may not support this
+            }
         }
 
         \Log::info('WooCommerce order processed successfully', [
@@ -611,6 +629,21 @@ class WooCommerceOrderController extends Controller
             'order_id'    => $order->id,
             'shipment_id' => $shipment?->id,
         ], 201);
+    }
+
+    /**
+     * Verify HMAC payload signature with replay protection
+     * 
+     * Delegates to HmacVerifier service
+     *
+     * @param Request $request
+     * @param Tenant $tenant
+     * @param bool $isGlobalKey Whether the request used global bridge key
+     * @return bool
+     */
+    public function verifyPayloadSignature(Request $request, Tenant $tenant, bool $isGlobalKey): bool
+    {
+        return $this->verifier->verify($request, $tenant, $isGlobalKey);
     }
 
     private function formatAddress($a): string
@@ -709,24 +742,26 @@ class WooCommerceOrderController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        // Log incoming sync request
+        // Sanitize headers for logging (don't log secrets)
+        $sanitizedHeaders = collect($request->headers->all())
+            ->except(['x-api-key', 'authorization', 'x-payload-signature', 'x-timestamp', 'x-nonce'])
+            ->all();
+        
         \Log::info('WooCommerce order sync received', [
-            'headers' => $request->headers->all(),
-            'payload' => $request->all()
+            'headers' => $sanitizedHeaders,
+            'has_payload' => !empty($request->all())
         ]);
 
-        // Read headers
-        $headerKey = $request->header('X-Api-Key');
-        $tenantId  = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
-
-        if (!$headerKey) {
-            return response()->json(['success' => false, 'message' => 'API key required'], 401);
-        }
-
-        // Validate tenant
-        $tenant = Tenant::where('api_key', $headerKey)->first();
+        // Get tenant from middleware (already validated)
+        $tenant = $request->attributes->get('tenant');
         if (!$tenant) {
-            return response()->json(['success' => false, 'message' => 'Invalid API key'], 401);
+            // Fallback: find tenant if middleware didn't set it (shouldn't happen)
+            $tenantId = $request->header('X-Tenant-Id') ?? $request->input('tenant_id');
+            $tenant = Tenant::find($tenantId);
+            if (!$tenant) {
+                \Log::error('Tenant not found in request attributes or by ID', ['tenant_id' => $tenantId]);
+                return response()->json(['success' => false, 'message' => 'Invalid tenant'], 422);
+            }
         }
 
         // Get the DMM order ID from the request
@@ -765,6 +800,9 @@ class WooCommerceOrderController extends Controller
             'external_order_id' => $order->external_order_id
         ]);
 
+        // Fetch shipment ID consistently
+        $shipmentId = Shipment::where('order_id', $order->id)->value('id');
+
         return response()->json([
             'success' => true,
             'message' => 'Order synced successfully',
@@ -772,7 +810,7 @@ class WooCommerceOrderController extends Controller
                 'success' => true,
                 'message' => 'Order synced successfully',
                 'order_id' => $order->id,
-                'shipment_id' => $order->shipment_id
+                'shipment_id' => $shipmentId,
             ]
         ], 200);
     }

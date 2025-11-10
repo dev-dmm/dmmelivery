@@ -19,7 +19,12 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     
-    // Temporary: API token generation for local development (no tenant middleware)
-    Route::post('/settings/api/generate', [SettingsController::class, 'generateApiToken'])->name('settings.api.generate');
+    // API token and secret management (rate limited for security)
+    Route::post('/settings/api/generate', [SettingsController::class, 'generateApiToken'])
+        ->middleware('throttle:6,1')
+        ->name('settings.api.generate');
+    Route::post('/settings/api/set-secret', [SettingsController::class, 'setApiSecret'])
+        ->middleware('throttle:6,1')
+        ->name('settings.api.set-secret');
 });
 

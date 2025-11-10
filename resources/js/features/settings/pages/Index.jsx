@@ -62,8 +62,11 @@ class ApiService {
         ...additionalHeaders,
       };
       
-      console.log('API Post Headers:', headers);
-      console.log('CSRF Token:', this.csrfToken);
+      // Only log in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('API Post Headers:', headers);
+        console.log('CSRF Token:', this.csrfToken);
+      }
       
       const response = await fetch(this.resolveUrl(endpoint), {
         method: 'POST',
@@ -131,8 +134,11 @@ export default function SettingsIndex({
   const couriers = courier_options || {};
   const tenantId = tenant?.id || '';
   const apiToken = tenant?.api_token || '';
+  const apiSecret = tenant?.api_secret || '';
   // holds the FULL token only when we just generated one
   const [unmaskedApiToken, setUnmaskedApiToken] = useState('');
+  // holds the FULL secret only when we just set one
+  const [unmaskedApiSecret, setUnmaskedApiSecret] = useState('');
 
   // 👇 local token used ONLY by the Quick Test (must be plain ASCII, no •)
   const [testApiKey, setTestApiKey] = useState(() => {
@@ -160,6 +166,9 @@ export default function SettingsIndex({
     webhook_url: tenant?.webhook_url || '',
     webhook_secret: '',
   });
+
+  const [showApiSecretInput, setShowApiSecretInput] = useState(false);
+  const [apiSecretInput, setApiSecretInput] = useState('');
 
   const apiService = useMemo(() => new ApiService(), []);
   const { canMakeCall, recordCall } = useRateLimit(20, 60000);
@@ -348,14 +357,47 @@ export default function SettingsIndex({
     };
 
     try {
+      const body = JSON.stringify(testPayload);
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Api-Key': testApiKey,
+        'X-Tenant-Id': tenantId,
+      };
+
+      // If we have the (freshly set) secret in-memory, sign the request
+      if (unmaskedApiSecret) {
+        const ts = Math.floor(Date.now() / 1000).toString();
+        const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+        const signed = [ts, nonce, body].join('.');
+
+        // HMAC-SHA256 hex using Web Crypto API
+        const enc = new TextEncoder();
+        const keyData = enc.encode(unmaskedApiSecret);
+        
+        const key = await crypto.subtle.importKey(
+          'raw',
+          keyData,
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign']
+        );
+        
+        const mac = await crypto.subtle.sign('HMAC', key, enc.encode(signed));
+        const hex = Array.from(new Uint8Array(mac))
+          .map(b => b.toString(16).padStart(2, '0'))
+          .join('');
+
+        headers['X-Timestamp'] = ts;
+        headers['X-Nonce'] = nonce;
+        headers['X-Payload-Signature'] = `sha256=${hex}`;
+      }
+
       const response = await fetch(wooEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': testApiKey,
-          'X-Tenant-Id': tenantId,
-        },
-        body: JSON.stringify(testPayload),
+        headers,
+        body,
       });
 
       const data = await response.json().catch(() => ({}));
@@ -375,7 +417,7 @@ export default function SettingsIndex({
     } finally {
       setLoading('woo_test', false);
     }
-  }, [testApiKey, tenantId, wooEndpoint, canMakeCall, recordCall, setLoading, showMessage]);
+  }, [testApiKey, tenantId, wooEndpoint, unmaskedApiSecret, canMakeCall, recordCall, setLoading, showMessage]);
 
   const downloadPlugin = useCallback(async () => {
     if (!canMakeCall()) {
@@ -771,6 +813,119 @@ export default function SettingsIndex({
                       </div>
                     </div>
 
+                    {/* API Secret */}
+                    <div className="border-t pt-4 lg:pt-6">
+                      <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">API Secret (HMAC Signing)</h3>
+
+                      <div className="bg-gray-50 rounded-lg p-3 lg:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 lg:gap-4">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-xs lg:text-sm font-medium text-gray-900">API Secret</h4>
+                            <p className="text-xs lg:text-sm text-gray-500">
+                              {apiSecret ? 'Το API secret είναι διαμορφωμένο' : 'Δεν έχει διαμορφωθεί API secret'}
+                            </p>
+                            {apiSecret && (
+                              <code className="text-xs bg-white px-2 py-1 rounded border break-all block mt-2">
+                                Secret: ••••••••••••••••
+                              </code>
+                            )}
+                            <p className="text-xs text-gray-500 mt-2">
+                              Χρησιμοποιείται για υπογραφή HMAC-SHA256 των αιτημάτων από το plugin WordPress. Απαιτείται για ασφαλή επικοινωνία.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                            {apiSecret && unmaskedApiSecret && (
+                              <SecondaryButton
+                                onClick={() => copyToClipboard(unmaskedApiSecret, 'api_secret')}
+                                aria-label="Copy API secret to clipboard"
+                                className="w-full sm:w-auto"
+                              >
+                                <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                Αντιγραφή secret
+                              </SecondaryButton>
+                            )}
+                            {!showApiSecretInput ? (
+                              <SecondaryButton
+                                onClick={() => setShowApiSecretInput(true)}
+                                className="w-full sm:w-auto"
+                              >
+                                <KeyIcon className="-ml-1 mr-2 h-4 w-4" />
+                                {apiSecret ? 'Ενημέρωση Secret' : 'Ορισμός Secret'}
+                              </SecondaryButton>
+                            ) : (
+                              <div className="flex flex-col gap-2 w-full">
+                                <div className="flex gap-2">
+                                  <input
+                                    type="password"
+                                    value={apiSecretInput}
+                                    onChange={(e) => setApiSecretInput(e.target.value)}
+                                    placeholder="Εισάγετε το API Secret"
+                                    className="flex-1 rounded border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2"
+                                    autoComplete="new-password"
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <PrimaryButton
+                                    onClick={async () => {
+                                      if (!apiSecretInput || !apiSecretInput.trim()) {
+                                        showMessage('api_secret', 'Παρακαλώ εισάγετε ένα API Secret', 'error');
+                                        return;
+                                      }
+
+                                      setLoading('api_secret', true);
+                                      try {
+                                        const result = await apiService.post(route('settings.api.set-secret'), {
+                                          api_secret: apiSecretInput.trim(),
+                                        });
+
+                                        if (result?.success) {
+                                          setUnmaskedApiSecret(apiSecretInput.trim());
+                                          await copyToClipboard(apiSecretInput.trim(), 'api_secret');
+                                          showMessage('api_secret', 'API secret ενημερώθηκε και αντιγράφηκε στο clipboard', 'success');
+                                          setShowApiSecretInput(false);
+                                          setApiSecretInput('');
+                                        } else {
+                                          showMessage('api_secret', result?.message || 'Αποτυχία ενημέρωσης', 'error');
+                                        }
+                                      } catch (error) {
+                                        console.error('API secret update error:', error);
+                                        showMessage('api_secret', error instanceof Error ? error.message : 'Αποτυχία ενημέρωσης', 'error');
+                                      } finally {
+                                        setLoading('api_secret', false);
+                                      }
+                                    }}
+                                    disabled={loading.api_secret || !apiSecretInput.trim()}
+                                    className="flex-1"
+                                  >
+                                    {loading.api_secret ? (
+                                      <>
+                                        <ArrowPathIcon className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                        Ενημέρωση...
+                                      </>
+                                    ) : (
+                                      'Αποθήκευση'
+                                    )}
+                                  </PrimaryButton>
+                                  <SecondaryButton
+                                    onClick={() => {
+                                      setShowApiSecretInput(false);
+                                      setApiSecretInput('');
+                                    }}
+                                    disabled={loading.api_secret}
+                                  >
+                                    Ακύρωση
+                                  </SecondaryButton>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {getMessageAlert('api_secret')}
+                      </div>
+                    </div>
+
                     {/* WooCommerce Bridge */}
                     <div className="border-t pt-4 lg:pt-6">
                       <h3 className="text-base lg:text-lg font-medium text-gray-900 mb-3 lg:mb-4">Γέφυρα WooCommerce</h3>
@@ -820,6 +975,23 @@ export default function SettingsIndex({
                                   </SecondaryButton>
                                 )}
                               </div>
+
+                              {apiSecret && (
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs bg-gray-50 px-2 py-1 rounded break-all flex-1">
+                                    API Secret: {apiSecret ? '••••••••••••••••' : '—'}
+                                  </code>
+                                  {unmaskedApiSecret && (
+                                    <SecondaryButton
+                                      onClick={() => copyToClipboard(unmaskedApiSecret, 'woo')}
+                                      aria-label="Copy API secret"
+                                    >
+                                      <ClipboardDocumentIcon className="-ml-1 mr-2 h-4 w-4" />
+                                      Αντιγραφή
+                                    </SecondaryButton>
+                                  )}
+                                </div>
+                              )}
                             </div>
 
                             {/* NEW: Quick Test token input (unmasked, ASCII only) */}
@@ -850,6 +1022,11 @@ export default function SettingsIndex({
                           <p className="text-xs text-gray-600 mb-3">
                             Στέλνει ένα ελάχιστο payload στυλ WooCommerce από τον browser σας για να επαληθεύσει ότι το endpoint λειτουργεί σωστά.
                           </p>
+                          {unmaskedApiSecret && (
+                            <p className="text-xs text-blue-600 mb-2">
+                              ℹ️ Αν το tenant σας έχει ενεργοποιημένο το <strong>Require signed webhooks</strong>, το test θα υπογραφεί αυτόματα με το API Secret που μόλις ορίσατε.
+                            </p>
+                          )}
                           <PrimaryButton onClick={testWooBridge} disabled={loading.woo_test || !testApiKey || !tenantId}>
                             {loading.woo_test ? (
                               <>
@@ -1047,6 +1224,22 @@ export default function SettingsIndex({
                             </SecondaryButton>
                           )}
                         </div>
+                        {apiSecret && (
+                          <div className="flex items-center gap-2">
+                            <code className="text-xs bg-white px-2 py-1 rounded border break-all flex-1">
+                              API Secret: {apiSecret ? '••••••••••••••••' : '—'}
+                            </code>
+                            {unmaskedApiSecret && (
+                              <SecondaryButton
+                                onClick={() => copyToClipboard(unmaskedApiSecret, 'download')}
+                                size="sm"
+                                disabled={!unmaskedApiSecret}
+                              >
+                                <ClipboardDocumentIcon className="h-3 w-3" />
+                              </SecondaryButton>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

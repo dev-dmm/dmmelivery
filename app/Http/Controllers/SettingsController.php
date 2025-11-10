@@ -43,6 +43,7 @@ class SettingsController extends Controller
                 
                 // API & Integration Settings
                 'api_token' => $tenant->api_token ? 'configured' : null,
+                'api_secret' => $tenant->api_secret ? 'configured' : null,
                 'webhook_url' => $tenant->webhook_url,
                 'webhook_secret' => $tenant->webhook_secret ? '••••••••' : null,
                 
@@ -169,10 +170,55 @@ class SettingsController extends Controller
         
         $newToken = $tenant->generateApiToken();
 
+        // Log for audit
+        \Log::info('API token generated', [
+            'tenant_id' => $tenant->id,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'New API token generated successfully',
             'api_token' => $newToken,
+        ]);
+    }
+
+    /**
+     * Set API secret for HMAC signing
+     */
+    public function setApiSecret(Request $request): JsonResponse
+    {
+        $tenant = Auth::user()->currentTenant();
+        
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tenant found. Please ensure you are properly authenticated.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'api_secret' => 'required|string|min:16|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Use the setApiSecret method (it handles encryption automatically via encrypted cast)
+        $tenant->setApiSecret($request->input('api_secret'));
+
+        // Log for audit (never log the actual secret)
+        \Log::info('API secret updated', [
+            'tenant_id' => $tenant->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'API secret updated successfully',
         ]);
     }
 
@@ -217,6 +263,12 @@ class SettingsController extends Controller
         try {
             $tenant = Auth::user()->currentTenant();
             
+            // Ensure zip directory exists
+            $zipDir = storage_path('app/temp');
+            if (!File::exists($zipDir)) {
+                File::makeDirectory($zipDir, 0755, true);
+            }
+            
             // Create a temporary directory for the plugin files
             $tempDir = storage_path('app/temp/plugin-' . uniqid());
             File::makeDirectory($tempDir, 0755, true);
@@ -238,9 +290,10 @@ class SettingsController extends Controller
             $readmeContent = $this->generatePluginReadme($tenant);
             File::put($tempDir . '/README.txt', $readmeContent);
             
-            // Create zip file
-            $zipFileName = 'dmm-delivery-bridge-' . date('Y-m-d') . '.zip';
-            $zipPath = storage_path('app/temp/' . $zipFileName);
+            // Create zip file with secure filename (tenant ID + random token)
+            $token = bin2hex(random_bytes(8));
+            $zipFileName = "dmm-delivery-bridge-{$tenant->id}-{$token}-" . date('Y-m-d') . ".zip";
+            $zipPath = $zipDir . '/' . $zipFileName;
             
             $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE) !== TRUE) {
@@ -259,6 +312,12 @@ class SettingsController extends Controller
             // Clean up temp directory
             File::deleteDirectory($tempDir);
             
+            // Log for audit
+            \Log::info('Plugin zip generated', [
+                'tenant_id' => $tenant->id,
+                'filename' => $zipFileName,
+            ]);
+            
             // Generate a temporary download URL
             $downloadUrl = route('settings.download.plugin.file', ['filename' => $zipFileName]);
             
@@ -274,6 +333,11 @@ class SettingsController extends Controller
             if (isset($tempDir) && File::exists($tempDir)) {
                 File::deleteDirectory($tempDir);
             }
+            
+            \Log::error('Plugin zip generation failed', [
+                'tenant_id' => Auth::user()->currentTenant()?->id,
+                'error' => $e->getMessage(),
+            ]);
             
             return response()->json([
                 'success' => false,
@@ -323,9 +387,27 @@ Generated on: " . date('Y-m-d H:i:s');
     {
         $tenant = Auth::user()->currentTenant();
         
-        // Validate filename to prevent directory traversal
-        if (!preg_match('/^dmm-delivery-bridge-\d{4}-\d{2}-\d{2}\.zip$/', $filename)) {
+        // Validate filename format: dmm-delivery-bridge-{uuid}-{16-char-hex}-{date}.zip
+        // UUID is 36 chars (with dashes), token is 16 hex chars, date is YYYY-MM-DD
+        if (!preg_match('/^dmm-delivery-bridge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9a-f]{16}-\d{4}-\d{2}-\d{2}\.zip$/', $filename)) {
+            \Log::warning('Invalid plugin download filename attempted', [
+                'filename' => $filename,
+                'tenant_id' => $tenant->id,
+            ]);
             abort(400, 'Invalid filename');
+        }
+        
+        // Extract tenant ID from filename
+        if (preg_match('/^dmm-delivery-bridge-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/', $filename, $matches)) {
+            $fileTenantId = $matches[1];
+            // Verify the file belongs to the current tenant
+            if ($fileTenantId !== $tenant->id) {
+                \Log::warning('Tenant attempted to download another tenant\'s plugin', [
+                    'requested_tenant_id' => $fileTenantId,
+                    'current_tenant_id' => $tenant->id,
+                ]);
+                abort(403, 'Access denied');
+            }
         }
         
         $filePath = storage_path('app/temp/' . $filename);
@@ -334,7 +416,13 @@ Generated on: " . date('Y-m-d H:i:s');
             abort(404, 'File not found');
         }
         
-        // Clean up the file after serving (optional - you might want to keep it for a while)
+        // Log download for audit
+        \Log::info('Plugin zip downloaded', [
+            'tenant_id' => $tenant->id,
+            'filename' => $filename,
+        ]);
+        
+        // Clean up the file after serving
         $response = response()->download($filePath, 'dmm-delivery-bridge.zip');
         
         // Schedule cleanup after response is sent

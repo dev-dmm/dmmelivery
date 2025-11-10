@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.scope'    => \App\Http\Middleware\EnforceTenant::class, // Legacy alias for backward compatibility
             'identify.tenant' => \App\Http\Middleware\IdentifyTenant::class,
             'super.admin'     => \App\Http\Middleware\SuperAdminMiddleware::class,
+            'woo.hmac'        => \App\Http\Middleware\VerifyWooHmac::class,
+            'woo.ratelimit.headers' => \App\Http\Middleware\AddWooRateLimitHeaders::class,
         ]);
 
         // CSRF exceptions (keep your own)
@@ -34,6 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Tenant middleware is applied per-route, not globally
 
+        // Trust proxies for accurate client IP (required for rate limiting behind Cloudflare/CDN)
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
@@ -42,6 +47,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->job(new \App\Jobs\FetchCourierStatuses)->everyTenMinutes();
         $schedule->job(new \App\Jobs\UpdatePredictiveEtas)->hourly();
+        
+        // Reset monthly shipment counters (runs daily, command handles the logic)
+        $schedule->command('tenants:reset-monthly-shipments')
+            ->dailyAt('03:00')
+            ->timezone('Europe/Athens'); // Adjust to your timezone
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

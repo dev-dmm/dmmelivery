@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Http\Controllers\WooCommerceOrderController;
 use App\Http\Controllers\Api\DocumentationController;
 
@@ -40,8 +41,41 @@ Route::prefix('v1')->group(function () {
 // Legacy WooCommerce endpoints
 Route::prefix('woocommerce')
     ->name('api.woocommerce.')
-    ->middleware('throttle:300,1') // Increased to 300 requests per minute for bulk processing
+    ->middleware(['throttle:woocommerce', 'woo.ratelimit.headers', 'woo.hmac']) // Named rate limiter + headers + HMAC verification
     ->group(function () {
+        Route::match(['GET', 'HEAD'], '/ping', function (\Illuminate\Http\Request $request) {
+            $ip     = $request->ip() ?? 'noip';
+            $tenant = $request->header('X-Tenant-Id') ?? $request->input('tenant_id') ?? 'notenant';
+            
+            // Normalize tenant ID to match rate limiter key (avoid bucket fragmentation)
+            $tenant = strtolower(trim($tenant));
+            
+            $bucket = "woo:{$tenant}:{$ip}";
+
+            // Keep this in sync with AppServiceProvider 'woocommerce' limiter
+            $limitPerMinute = (int) config('rate.woocommerce_per_minute', 60);
+
+            // Remaining after this hit (throttle middleware has already "hit" the key)
+            $remaining  = max(0, RateLimiter::remaining($bucket, $limitPerMinute));
+            $retryAfter = RateLimiter::availableIn($bucket); // seconds until bucket resets (when empty)
+
+            return response()->json([
+                'success'       => true,
+                'message'       => 'WooCommerce bridge OK',
+                'tenant_id'     => $tenant,
+                'ip'            => $ip,
+                'limiter_key'   => $bucket,
+                'hmac_verified' => (bool) $request->attributes->get('hmac_verified', false),
+                'time'          => now()->toIso8601String(),
+                'ratelimit'     => [
+                    'limit'       => $limitPerMinute,
+                    'remaining'   => $remaining,
+                    'retry_after' => $retryAfter > 0 ? $retryAfter : null,
+                    'reset'       => $retryAfter > 0 ? now()->addSeconds($retryAfter)->toIso8601String() : null,
+                ],
+            ]);
+        })->name('ping');
+
         Route::post('/order', [WooCommerceOrderController::class, 'store'])
             ->name('order');
         Route::put('/order', [WooCommerceOrderController::class, 'update'])
@@ -51,3 +85,7 @@ Route::prefix('woocommerce')
         Route::post('/acs-shipment', [App\Http\Controllers\ACSShipmentController::class, 'store'])
             ->name('acs-shipment');
     });
+
+// OPTIONS handler for CORS preflight (if not handled elsewhere)
+Route::options('/{any}', fn () => response()->noContent())
+    ->where('any', '.*');

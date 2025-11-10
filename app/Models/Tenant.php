@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Cache\TaggableStore;
 
 class Tenant extends Model
 {
@@ -71,8 +72,11 @@ class Tenant extends Model
         
         // API & Integration
         'webhook_urls',
+        'webhook_url',
+        'webhook_secret',
         'api_token',
         'api_token_expires_at',
+        'require_signed_webhooks',
         'integration_settings',
         
         // Admin
@@ -80,11 +84,17 @@ class Tenant extends Model
         'onboarding_data',
     ];
 
+    protected $guarded = [
+        'api_secret', // Prevent mass assignment
+    ];
+
     protected $hidden = [
         // API Credentials - never expose these
         'courier_api_keys',
         'api_token',
+        'api_secret',
         'webhook_urls',
+        'webhook_secret',
         'integration_settings',
         
         // Internal/sensitive data
@@ -96,10 +106,11 @@ class Tenant extends Model
     protected $casts = [
         'branding_config' => 'array',
         'notification_settings' => 'array',
-        'courier_api_keys' => 'array',
+        'courier_api_keys' => 'encrypted:array', // Encrypted array cast
         'enabled_features' => 'array',
         'theme_config' => 'array',
         'webhook_urls' => 'array',
+        'webhook_secret' => 'encrypted',
         'integration_settings' => 'array',
         'onboarding_data' => 'array',
         'is_active' => 'boolean',
@@ -112,11 +123,8 @@ class Tenant extends Model
         'email_verified_at' => 'datetime',
         'billing_cycle_start' => 'date',
         'api_token_expires_at' => 'datetime',
-    ];
-
-    // Encrypted fields
-    protected $encrypted = [
-        'courier_api_keys',
+        'api_secret' => 'encrypted', // Laravel native encrypted cast
+        'require_signed_webhooks' => 'boolean',
     ];
 
     public function users(): HasMany
@@ -181,24 +189,16 @@ class Tenant extends Model
      */
     protected static function clearTenantCache(): void
     {
-        // Try to use cache tags if supported (only Redis and Memcached support tags)
-        try {
-            $cache = \Cache::store();
-            if (method_exists($cache, 'supportsTags') && $cache->supportsTags()) {
-                $tags = config('tenancy.cache_tags', ['tenants']);
-                \Cache::tags($tags)->flush();
-                return;
-            }
-        } catch (\BadMethodCallException $e) {
-            // Cache driver doesn't support tags, fall through to fallback
+        $store = \Cache::getStore();
+        
+        if ($store instanceof TaggableStore) {
+            $tags = config('tenancy.cache_tags', ['tenants']);
+            \Cache::tags($tags)->flush();
+            return;
         }
         
-        // For non-tagged stores (file, database, array), we can't selectively
-        // clear tenant cache. Log a warning and optionally flush entire cache.
-        \Log::warning('Tenant cache cannot be selectively cleared - cache driver does not support tags. Consider using Redis or Memcached for production.');
+        \Log::warning('Tenant cache cannot be selectively cleared (no tag support).');
         
-        // Only flush entire cache if explicitly allowed in config
-        // This is a safety measure - in production you should use Redis/Memcached
         if (config('tenancy.allow_cache_flush', false)) {
             try {
                 \Cache::flush();
@@ -207,7 +207,7 @@ class Tenant extends Model
                 \Log::error('Failed to flush cache', ['error' => $e->getMessage()]);
             }
         } else {
-            \Log::info('Tenant cache not cleared - tags not supported and allow_cache_flush is false. Set TENANCY_ALLOW_CACHE_FLUSH=true to enable full cache flush, or use Redis/Memcached for tag support.');
+            \Log::info('Cache not cleared; enable TENANCY_ALLOW_CACHE_FLUSH=true or use Redis/Memcached.');
         }
     }
 
@@ -255,6 +255,11 @@ class Tenant extends Model
     {
         if ($this->onboarding_status !== 'active') {
             return false;
+        }
+
+        // Unlimited plan if limit is null or <= 0
+        if (is_null($this->monthly_shipment_limit) || $this->monthly_shipment_limit <= 0) {
+            return true; // unlimited
         }
 
         return $this->current_month_shipments < $this->monthly_shipment_limit;
@@ -362,48 +367,39 @@ class Tenant extends Model
         $this->update(['enabled_features' => $features]);
     }
 
-    // Security methods for encrypted fields
-    public function setEncryptedAttribute(string $key, string $value): void
+    /**
+     * Set API secret (encrypted automatically by cast)
+     *
+     * @param string $plainSecret
+     * @return void
+     */
+    public function setApiSecret(string $plainSecret): void
     {
-        if (in_array($key, $this->encrypted)) {
-            $this->attributes[$key] = encrypt($value);
-        } else {
-            $this->attributes[$key] = $value;
-        }
-    }
-
-    public function getEncryptedAttribute(string $key): ?string
-    {
-        if (in_array($key, $this->encrypted) && !empty($this->attributes[$key])) {
-            try {
-                return decrypt($this->attributes[$key]);
-            } catch (\Exception $e) {
-                \Log::error('Failed to decrypt tenant field', [
-                    'tenant_id' => $this->id,
-                    'field' => $key,
-                    'error' => $e->getMessage()
-                ]);
-                return null;
-            }
-        }
+        $this->api_secret = $plainSecret; // Cast handles encryption
+        $this->save();
+        // Cache invalidation is handled by booted() saved event listener
         
-        return $this->attributes[$key] ?? null;
+        \Log::info('API secret updated', [
+            'tenant_id' => $this->id
+        ]);
     }
 
-    // Secure credential management
+    /**
+     * Get decrypted API secret for HMAC signature verification
+     * The encrypted cast automatically decrypts on access
+     *
+     * @return string|null
+     */
+    public function getApiSecret(): ?string
+    {
+        return $this->api_secret; // Automatically decrypted by encrypted cast
+    }
+
+    // Secure credential management (backward compatibility)
+    // With encrypted casts, we can just set values directly
     public function updateCredentials(array $credentials): void
     {
-        $updates = [];
-        
-        foreach ($credentials as $key => $value) {
-            if (in_array($key, $this->encrypted)) {
-                $updates[$key] = encrypt($value);
-            } else {
-                $updates[$key] = $value;
-            }
-        }
-        
-        $this->update($updates);
+        $this->update($credentials); // Casts handle encryption automatically
         
         \Log::info('Tenant credentials updated', [
             'tenant_id' => $this->id,
@@ -411,21 +407,18 @@ class Tenant extends Model
         ]);
     }
 
+    /**
+     * Get decrypted credentials (backward compatibility)
+     * With encrypted casts, values are automatically decrypted on access
+     */
     public function getDecryptedCredentials(): array
     {
+        $encryptedFields = ['courier_api_keys', 'api_secret'];
         $credentials = [];
         
-        foreach ($this->encrypted as $field) {
-            if (!empty($this->attributes[$field])) {
-                try {
-                    $credentials[$field] = decrypt($this->attributes[$field]);
-                } catch (\Exception $e) {
-                    \Log::warning('Failed to decrypt credential', [
-                        'tenant_id' => $this->id,
-                        'field' => $field
-                    ]);
-                    $credentials[$field] = null;
-                }
+        foreach ($encryptedFields as $field) {
+            if (!empty($this->$field)) {
+                $credentials[$field] = $this->$field; // Automatically decrypted by cast
             }
         }
         
