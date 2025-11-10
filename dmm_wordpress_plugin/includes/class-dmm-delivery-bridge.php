@@ -580,6 +580,17 @@ class DMM_Delivery_Bridge {
                     if ($this->order_processor) {
                         $order = wc_get_order($order_id);
                         if ($order) {
+                            // Skip refunds - they don't have address methods
+                            if ($order instanceof \WC_Order_Refund) {
+                                if ($this->logger) {
+                                    $this->logger->log("Bulk operation: Order {$order_id} is a refund, skipping", 'warning');
+                                }
+                                $current++;
+                                $job_data['current'] = $current;
+                                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+                                continue;
+                            }
+                            
                             // Use the robust processing method directly
                             $this->order_processor->process_order_robust($order);
                         } else {
@@ -681,6 +692,13 @@ class DMM_Delivery_Bridge {
                         if ($this->order_processor) {
                             $order = wc_get_order($order_id);
                             if ($order) {
+                                // Skip refunds
+                                if ($order instanceof \WC_Order_Refund) {
+                                    $current++;
+                                    $job_data['current'] = $current;
+                                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+                                    continue;
+                                }
                                 $this->order_processor->process_order_robust($order);
                             }
                         }

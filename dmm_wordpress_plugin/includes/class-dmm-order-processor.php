@@ -518,6 +518,16 @@ class DMM_Order_Processor {
      */
     public function prepare_order_data($order) {
         try {
+            // Skip refunds - they don't have address methods
+            if ($order instanceof \WC_Order_Refund) {
+                throw new \Exception('Cannot process refund orders');
+            }
+            
+            // Ensure it's a valid order object with address methods
+            if (!method_exists($order, 'get_address')) {
+                throw new \Exception('Order object does not support get_address() method');
+            }
+            
             $shipping_address = $order->get_address('shipping');
             if (empty($shipping_address['address_1'])) {
                 $shipping_address = $order->get_address('billing');

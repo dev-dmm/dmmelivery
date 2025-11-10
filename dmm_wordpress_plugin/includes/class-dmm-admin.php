@@ -98,8 +98,12 @@ class DMM_Admin {
             ]
         ]);
         
-        // Make nonce available globally for AJAX handlers
-        wp_add_inline_script('dmm-admin-js', 'window.dmmAdminNonce = "' . wp_create_nonce('dmm_admin_nonce') . '";', 'before');
+        // Make nonce available globally for AJAX handlers (for both admin.js and inline scripts)
+        $nonce = wp_create_nonce('dmm_admin_nonce');
+        wp_add_inline_script('dmm-admin-js', 'window.dmmAdminNonce = "' . $nonce . '";', 'before');
+        
+        // Also add nonce as a global variable for inline scripts (like logs page)
+        wp_add_inline_script('jquery', 'window.dmmAdminNonce = window.dmmAdminNonce || "' . $nonce . '";', 'before');
     }
     
     /**

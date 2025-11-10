@@ -208,10 +208,11 @@ class DMM_AJAX_Handlers {
             // Get parameters
             $params = isset($_POST['params']) ? json_decode(stripslashes($_POST['params']), true) : [];
             
-            // Get pending orders
+            // Get pending orders - exclude refunds
             $args = [
                 'status' => ['processing', 'completed'],
                 'limit' => isset($params['limit']) ? absint($params['limit']) : -1,
+                'type' => 'shop_order', // Exclude refunds and other order types
                 'meta_query' => [
                     [
                         'key' => '_dmm_sent_to_api',
@@ -221,6 +222,11 @@ class DMM_AJAX_Handlers {
             ];
             
             $orders = wc_get_orders($args);
+            
+            // Filter out any refunds that might slip through
+            $orders = array_filter($orders, function($order) {
+                return !($order instanceof \WC_Order_Refund);
+            });
             
             if (empty($orders)) {
                 wp_send_json_error([
@@ -309,10 +315,11 @@ class DMM_AJAX_Handlers {
         try {
             $params = isset($_POST['params']) ? json_decode(stripslashes($_POST['params']), true) : [];
             
-            // Get orders that have been sent
+            // Get orders that have been sent - exclude refunds
             $args = [
                 'status' => ['processing', 'completed'],
                 'limit' => isset($params['limit']) ? absint($params['limit']) : -1,
+                'type' => 'shop_order', // Exclude refunds
                 'meta_query' => [
                     [
                         'key' => '_dmm_sent_to_api',
@@ -323,6 +330,11 @@ class DMM_AJAX_Handlers {
             ];
             
             $orders = wc_get_orders($args);
+            
+            // Filter out any refunds that might slip through
+            $orders = array_filter($orders, function($order) {
+                return !($order instanceof \WC_Order_Refund);
+            });
             
             if (empty($orders)) {
                 wp_send_json_error([
@@ -478,11 +490,18 @@ class DMM_AJAX_Handlers {
         
         foreach ($orders as $order) {
             try {
-                if ($type === 'send' || $type === 'resend') {
-                    if ($this->plugin && $this->plugin->order_processor) {
-                        // Process order directly using robust method
-                        $this->plugin->order_processor->process_order_robust($order);
-                    }
+                    if ($type === 'send' || $type === 'resend') {
+                        if ($this->plugin && $this->plugin->order_processor) {
+                            // Skip refunds
+                            if ($order instanceof \WC_Order_Refund) {
+                                $processed++;
+                                $job_data['current'] = $processed;
+                                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+                                continue;
+                            }
+                            // Process order directly using robust method
+                            $this->plugin->order_processor->process_order_robust($order);
+                        }
                 } elseif ($type === 'sync') {
                     // Sync order status
                     if ($this->plugin && $order->get_meta('_dmm_delivery_sent') === 'yes') {
@@ -543,11 +562,11 @@ class DMM_AJAX_Handlers {
             ]);
         }
         
-        // Get orders
+        // Get orders - filter out refunds
         $orders = [];
         foreach ($remaining_ids as $order_id) {
             $order = wc_get_order($order_id);
-            if ($order) {
+            if ($order && !($order instanceof \WC_Order_Refund)) {
                 $orders[] = $order;
             }
         }

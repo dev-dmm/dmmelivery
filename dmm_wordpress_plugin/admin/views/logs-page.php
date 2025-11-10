@@ -96,6 +96,9 @@ if (!defined('ABSPATH')) {
     
     <script>
     (function() {
+        // Get nonce from localized script or create it
+        const nonce = window.dmmAdminNonce || '<?php echo wp_create_nonce('dmm_admin_nonce'); ?>';
+        
         let currentPage = 0;
         const pageSize = 50;
         let currentFilters = { status: '', order_id: 0 };
@@ -113,7 +116,7 @@ if (!defined('ABSPATH')) {
             
             const formData = new FormData();
             formData.append('action', 'dmm_get_logs_table');
-            formData.append('nonce', window.dmmAdminNonce);
+            formData.append('nonce', nonce);
             formData.append('limit', pageSize);
             formData.append('offset', page * pageSize);
             if (currentFilters.status) {
