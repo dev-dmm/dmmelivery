@@ -142,6 +142,22 @@ if ($log_data) {
                     <h2 class="dmm-card-title"><?php _e('Response Data', 'dmm-delivery-bridge'); ?></h2>
                 </div>
                 <div class="dmm-card-content">
+                    <?php if (isset($response_data['http_code']) && $response_data['http_code'] >= 500): ?>
+                        <div class="dmm-message dmm-message-error" style="margin-bottom: 1rem;">
+                            <p class="dmm-message-text">
+                                <strong><?php _e('Server Error:', 'dmm-delivery-bridge'); ?></strong> 
+                                <?php _e('The API server returned an HTTP 500 error. This indicates a problem on the server side, not with the request data. Check the API server logs for more details.', 'dmm-delivery-bridge'); ?>
+                            </p>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if (isset($response_data['response_body']) && !empty($response_data['response_body'])): ?>
+                        <div style="margin-bottom: 1rem;">
+                            <strong><?php _e('Raw Response Body:', 'dmm-delivery-bridge'); ?></strong>
+                            <pre style="background: #f6f7f7; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; margin-top: 0.5rem;"><?php echo esc_html($response_data['response_body']); ?></pre>
+                        </div>
+                    <?php endif; ?>
+                    
                     <details open>
                         <summary style="cursor: pointer; font-weight: 600; margin-bottom: 1rem; color: #2271b1;">
                             <?php _e('View Response Data', 'dmm-delivery-bridge'); ?>

@@ -573,12 +573,26 @@ class DMM_Order_Processor {
                         }
                     }
                     
+                    // Calculate price per unit (avoid division by zero)
+                    $quantity = max(1, $item->get_quantity());
+                    $item_total = (float) $item->get_total();
+                    $price_per_unit = $quantity > 0 ? $item_total / $quantity : 0;
+                    
+                    // Get item name - use product name if item name is empty
+                    $item_name = strip_tags($item->get_name());
+                    if (empty($item_name) && $product) {
+                        $item_name = strip_tags($product->get_name());
+                    }
+                    if (empty($item_name)) {
+                        $item_name = __('Product', 'dmm-delivery-bridge') . ' #' . ($product ? $product->get_id() : $item->get_id());
+                    }
+                    
                     $order_items[] = [
                         'sku' => $product ? $product->get_sku() : '',
-                        'name' => strip_tags($item->get_name()),
-                        'quantity' => $item->get_quantity(),
-                        'price' => (float) $item->get_total() / $item->get_quantity(),
-                        'total' => (float) $item->get_total(),
+                        'name' => $item_name,
+                        'quantity' => $quantity,
+                        'price' => $price_per_unit,
+                        'total' => $item_total,
                         'weight' => $product && $product->has_weight() ? (float) $product->get_weight() : 0,
                         'product_id' => $product ? $product->get_id() : 0,
                         'variation_id' => $item->get_variation_id(),

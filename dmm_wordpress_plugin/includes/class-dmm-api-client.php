@@ -370,11 +370,50 @@ class DMM_API_Client {
             
             return $result;
         } else {
+            // For server errors (500+), try to extract more detailed error information
+            $error_message = sprintf(__('HTTP Error: %d', 'dmm-delivery-bridge'), $response_code);
+            
+            if ($response_code >= 500) {
+                // Try to get detailed error from response body
+                if (is_array($response_data)) {
+                    if (isset($response_data['error'])) {
+                        $error_message = $response_data['error'];
+                    } elseif (isset($response_data['message'])) {
+                        $error_message = $response_data['message'];
+                    } elseif (isset($response_data['errors'])) {
+                        // Laravel-style validation errors
+                        if (is_array($response_data['errors'])) {
+                            $error_message = __('Server Error: ', 'dmm-delivery-bridge') . wp_json_encode($response_data['errors'], JSON_UNESCAPED_UNICODE);
+                        } else {
+                            $error_message = $response_data['errors'];
+                        }
+                    }
+                } elseif (!empty($response_body) && !is_array($response_data)) {
+                    // If response body is not JSON, include it in the error
+                    $error_message = sprintf(__('HTTP Error: %d - %s', 'dmm-delivery-bridge'), $response_code, substr(strip_tags($response_body), 0, 200));
+                }
+                
+                // Log full response for debugging
+                if ($this->logger) {
+                    $this->logger->log("API Server Error {$response_code}: " . (is_array($response_data) ? wp_json_encode($response_data) : $response_body), 'error');
+                }
+            } elseif ($response_code >= 400 && $response_code < 500) {
+                // Client errors - try to get validation errors
+                if (is_array($response_data)) {
+                    if (isset($response_data['message'])) {
+                        $error_message = $response_data['message'];
+                    } elseif (isset($response_data['error'])) {
+                        $error_message = $response_data['error'];
+                    }
+                }
+            }
+            
             return [
                 'success' => false,
-                'message' => $response_data['message'] ?? sprintf(__('HTTP Error: %d', 'dmm-delivery-bridge'), $response_code),
+                'message' => $error_message,
                 'data' => $response_data,
-                'http_code' => $response_code
+                'http_code' => $response_code,
+                'response_body' => $response_body // Include raw response body for debugging
             ];
         }
     }

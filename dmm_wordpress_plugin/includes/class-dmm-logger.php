@@ -160,11 +160,17 @@ class DMM_Logger {
         $this->ensure_log_table_exists();
         
         // Prepare data for logging
+        // Include response body in error logs for better debugging
+        $response_to_log = $response;
+        if (!$response['success'] && isset($response['response_body'])) {
+            $response_to_log['raw_response_body'] = $response['response_body'];
+        }
+        
         $log_data = [
             'order_id' => $order_id,
             'status' => $response['success'] ? 'success' : 'error',
             'request_data' => json_encode($request_data, JSON_PRETTY_PRINT),
-            'response_data' => json_encode($response, JSON_PRETTY_PRINT),
+            'response_data' => json_encode($response_to_log, JSON_PRETTY_PRINT),
             'error_message' => $response['success'] ? null : $response['message'],
             'created_at' => current_time('mysql')
         ];
