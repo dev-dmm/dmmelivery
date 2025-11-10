@@ -61,8 +61,6 @@ class TenantRegistrationController extends Controller
             'admin_email' => 'required|email|max:255|unique:users,email',
             'admin_password' => 'required|string|min:8|confirmed',
             
-            // Note: ACS credentials are now managed through WordPress plugin
-            
             // Subscription Plan
             'subscription_plan' => 'required|in:free,starter,business,enterprise',
             
@@ -106,8 +104,6 @@ class TenantRegistrationController extends Controller
                 // Tax Information
                 'vat_number' => $request->vat_number,
                 'tax_office' => $request->tax_office,
-                
-                // Note: ACS credentials are now managed through WordPress plugin
                 
                 // Subscription & Status
                 'subscription_plan' => $request->subscription_plan,

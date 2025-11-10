@@ -50,7 +50,7 @@ class Tenant extends Model
         'auto_create_shipments',
         'send_notifications',
         
-        // Other API Keys (legacy - now handled by WordPress plugin)
+        // Courier API Keys (managed through WordPress plugin)
         'courier_api_keys',
         
         // Onboarding & Status
@@ -246,9 +246,6 @@ class Tenant extends Model
 
         return $steps[$this->onboarding_status] ?? null;
     }
-
-    // API Configuration Methods
-    // Note: Courier credentials are now managed through the WordPress plugin
 
     // Subscription & Billing Methods
     public function canCreateShipments(): bool

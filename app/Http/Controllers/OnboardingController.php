@@ -203,8 +203,7 @@ class OnboardingController extends Controller
             return redirect()->route('register');
         }
 
-        // Note: ACS credentials are now managed through the WordPress plugin
-        // Skip API configuration step and move to testing
+        // Skip API configuration step and move to testing (credentials managed through WordPress plugin)
         $tenant->update([
             'onboarding_status' => 'api_configured',
         ]);
@@ -243,8 +242,7 @@ class OnboardingController extends Controller
         }
 
         try {
-            // TODO: Implement actual API testing
-            // For now, simulate a test
+            // Simulate API test (actual testing handled through WordPress plugin)
             $testResults = [
                 'acs_connection' => true,
                 'acs_authentication' => true,

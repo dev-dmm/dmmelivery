@@ -70,13 +70,13 @@ class IdentifyTenant
             return $next($request);
         }
 
-        // Legacy: auto-allow super-admin for super-admin routes
+        // Auto-allow super-admin for super-admin routes
         if ($user->isSuperAdmin() && $request->routeIs('super-admin.*')) {
             $this->clearTenant();
             return $next($request);
         }
 
-        // Legacy: auto-allow tenantless for profile routes
+        // Auto-allow tenantless for profile routes
         $isProfile = $request->routeIs('profile.*');
 
         // Validate tenant

@@ -148,12 +148,6 @@ class SettingsController extends Controller
         ]);
     }
 
-    // Note: ACS Courier credentials are now managed through the WordPress plugin
-
-    // Note: Courier credentials are now managed through the WordPress plugin
-
-    // Note: Courier API testing is now handled through the WordPress plugin
-
     /**
      * Generate new API token
      */
@@ -252,8 +246,6 @@ class SettingsController extends Controller
             'message' => 'Webhook settings updated successfully',
         ]);
     }
-
-    // Note: Courier credential management is now handled through the WordPress plugin
 
     /**
      * Download WordPress plugin as zip file
