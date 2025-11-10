@@ -588,6 +588,78 @@ class DMM_API_Client {
     }
     
     /**
+     * Get circuit breaker status
+     * 
+     * Returns the current status of the circuit breaker, including whether it's open,
+     * when it will automatically reset, and the reason it was opened.
+     *
+     * @return array Circuit breaker status with keys:
+     *               - 'is_open' (bool): Whether circuit breaker is currently open
+     *               - 'message' (string|null): Reason the circuit breaker was opened
+     *               - 'until' (int|null): Unix timestamp when circuit breaker will auto-reset
+     *               - 'time_remaining' (int|null): Seconds remaining until auto-reset
+     * @since 1.0.0
+     */
+    public function get_circuit_breaker_status() {
+        $circuit_breaker = get_transient('dmm_circuit_breaker');
+        
+        if (!$circuit_breaker || !isset($circuit_breaker['until'])) {
+            return [
+                'is_open' => false,
+                'message' => null,
+                'until' => null,
+                'time_remaining' => null
+            ];
+        }
+        
+        $now = time();
+        $until = (int) $circuit_breaker['until'];
+        
+        if ($now >= $until) {
+            // Circuit breaker expired, clean it up
+            delete_transient('dmm_circuit_breaker');
+            return [
+                'is_open' => false,
+                'message' => null,
+                'until' => null,
+                'time_remaining' => null
+            ];
+        }
+        
+        return [
+            'is_open' => true,
+            'message' => isset($circuit_breaker['message']) ? $circuit_breaker['message'] : __('High error rate detected', 'dmm-delivery-bridge'),
+            'until' => $until,
+            'time_remaining' => $until - $now
+        ];
+    }
+    
+    /**
+     * Reset circuit breaker manually
+     * 
+     * Manually closes the circuit breaker, allowing API calls to proceed.
+     * Use with caution - only reset if you've resolved the underlying issue.
+     *
+     * @return bool True if circuit breaker was reset, false if it wasn't open
+     * @since 1.0.0
+     */
+    public function reset_circuit_breaker() {
+        $circuit_breaker = get_transient('dmm_circuit_breaker');
+        
+        if (!$circuit_breaker) {
+            return false; // Circuit breaker wasn't open
+        }
+        
+        delete_transient('dmm_circuit_breaker');
+        
+        if ($this->logger) {
+            $this->logger->log('Circuit breaker manually reset by administrator', 'info');
+        }
+        
+        return true;
+    }
+    
+    /**
      * Open circuit breaker
      *
      * @param string $message Error message
