@@ -33,23 +33,47 @@ Route::prefix('public')->group(function () {
 Route::middleware(['auth:sanctum', 'enforce.tenant'])->group(function () {
     
     // Shipments
-    Route::apiResource('shipments', ShipmentController::class);
+    Route::apiResource('shipments', ShipmentController::class)->names([
+        'index' => 'api.shipments.index',
+        'show' => 'api.shipments.show',
+        'store' => 'api.shipments.store',
+        'update' => 'api.shipments.update',
+        'destroy' => 'api.shipments.destroy',
+    ]);
     Route::get('shipments/{shipment}/tracking', [ShipmentController::class, 'getTrackingDetails']);
     Route::post('shipments/{shipment}/update-status', [ShipmentController::class, 'updateStatus']);
     Route::get('shipments/{shipment}/history', [ShipmentController::class, 'getStatusHistory']);
     
     // Orders
-    Route::apiResource('orders', OrderController::class);
+    Route::apiResource('orders', OrderController::class)->names([
+        'index' => 'api.orders.index',
+        'show' => 'api.orders.show',
+        'store' => 'api.orders.store',
+        'update' => 'api.orders.update',
+        'destroy' => 'api.orders.destroy',
+    ]);
     Route::post('orders/{order}/create-shipment', [OrderController::class, 'createShipment']);
     Route::get('orders/{order}/shipments', [OrderController::class, 'getShipments']);
     
     // Customers
-    Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('customers', CustomerController::class)->names([
+        'index' => 'api.customers.index',
+        'show' => 'api.customers.show',
+        'store' => 'api.customers.store',
+        'update' => 'api.customers.update',
+        'destroy' => 'api.customers.destroy',
+    ]);
     Route::get('customers/{customer}/shipments', [CustomerController::class, 'getShipments']);
     Route::get('customers/{customer}/orders', [CustomerController::class, 'getOrders']);
     
     // Couriers
-    Route::apiResource('couriers', CourierController::class);
+    Route::apiResource('couriers', CourierController::class)->names([
+        'index' => 'api.couriers.index',
+        'show' => 'api.couriers.show',
+        'store' => 'api.couriers.store',
+        'update' => 'api.couriers.update',
+        'destroy' => 'api.couriers.destroy',
+    ]);
     Route::get('couriers/{courier}/shipments', [CourierController::class, 'getShipments']);
     Route::post('couriers/{courier}/test-connection', [CourierController::class, 'testConnection']);
     
