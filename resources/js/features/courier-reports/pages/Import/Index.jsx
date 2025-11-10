@@ -270,7 +270,7 @@ export default function CourierReportImportIndex({ auth, recentImports, stats, s
       <Head title="Εισαγωγή Αναφορών Courier" />
 
       <div className="py-12">
-        <div className="mx-auto max-w-7xl space-y-6">
+        <div className="space-y-6">
           
           {/* Statistics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

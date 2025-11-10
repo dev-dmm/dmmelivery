@@ -116,7 +116,7 @@ export default function AlertBanner({
       )}
 
       {/* Alerts */}
-      <div className="max-w-7xl mx-auto px-4 py-3">
+      <div>
         <div className="space-y-3">
           {visibleAlerts.map((alert) => (
             <div
