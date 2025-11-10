@@ -415,6 +415,7 @@ class WooCommerceOrderController extends Controller
                 
                 // Create shipment (default true)
                 $shipment = null;
+                $shipmentWarning = null;
                 if ($request->boolean('create_shipment', true)) {
                     \Log::info('Looking for courier', [
                         'tenant_id' => $tenant->id,
@@ -448,90 +449,97 @@ class WooCommerceOrderController extends Controller
                     $courier = $defaultCourier ?? Courier::where('tenant_id', $tenant->id)->first();
 
                     if (!$courier) {
-                        \Log::error('WooCommerce order failed: No courier configured for tenant', [
+                        \Log::warning('No courier configured for tenant - order created but shipment skipped', [
                             'tenant_id' => $tenant->id,
                             'order_id' => $order->id,
                             'available_couriers' => Courier::where('tenant_id', $tenant->id)->get(['id', 'name', 'is_default'])
                         ]);
-                        throw new \Exception('No courier configured for tenant');
+                        // Don't throw exception - create order without shipment
+                        // Shipment can be created later when courier is configured
+                        $shipmentWarning = 'Order created successfully, but shipment was not created because no courier is configured for this tenant. Please configure a courier and create the shipment manually.';
                     }
                     
-                    \Log::info('Found courier', [
-                        'courier_id' => $courier->id,
-                        'courier_name' => $courier->name
-                    ]);
+                    // Only create shipment if courier was found
+                    if ($courier) {
+                        \Log::info('Found courier', [
+                            'courier_id' => $courier->id,
+                            'courier_name' => $courier->name
+                        ]);
 
-                    $addr = $request->input('shipping.address');
+                        $addr = $request->input('shipping.address');
                     
-                    \Log::info('Preparing shipment creation', [
-                        'tenant_id' => $tenant->id,
-                        'order_id' => $order->id,
-                        'customer_id' => $customer->id,
-                        'courier_id' => $courier->id,
-                        'shipping_address' => $this->formatAddress($addr),
-                        'shipping_city' => $addr['city'] ?? '',
-                        'weight' => (float) data_get($request, 'shipping.weight', 0.5),
-                        'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0)
-                    ]);
+                        \Log::info('Preparing shipment creation', [
+                            'tenant_id' => $tenant->id,
+                            'order_id' => $order->id,
+                            'customer_id' => $customer->id,
+                            'courier_id' => $courier->id,
+                            'shipping_address' => $this->formatAddress($addr),
+                            'shipping_city' => $addr['city'] ?? '',
+                            'weight' => (float) data_get($request, 'shipping.weight', 0.5),
+                            'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0)
+                        ]);
 
-                    // collision-safe tracking number generation
-                    $tracking = null;
-                    $attempts = 0;
-                    do {
-                        $tracking = strtoupper(Str::random(12));
-                        $attempts++;
-                        \Log::info('Generating tracking number', [
-                            'attempt' => $attempts,
-                            'tracking_number' => $tracking,
-                            'exists' => Shipment::where('tenant_id', $tenant->id)
+                        // collision-safe tracking number generation
+                        $tracking = null;
+                        $attempts = 0;
+                        do {
+                            $tracking = strtoupper(Str::random(12));
+                            $attempts++;
+                            \Log::info('Generating tracking number', [
+                                'attempt' => $attempts,
+                                'tracking_number' => $tracking,
+                                'exists' => Shipment::where('tenant_id', $tenant->id)
+                                    ->where('tracking_number', $tracking)
+                                    ->exists()
+                            ]);
+                        } while (
+                            Shipment::where('tenant_id', $tenant->id)
                                 ->where('tracking_number', $tracking)
                                 ->exists()
+                        );
+                        
+                        \Log::info('Generated unique tracking number', [
+                            'tracking_number' => $tracking,
+                            'attempts' => $attempts
                         ]);
-                    } while (
-                        Shipment::where('tenant_id', $tenant->id)
-                            ->where('tracking_number', $tracking)
-                            ->exists()
-                    );
-                    
-                    \Log::info('Generated unique tracking number', [
-                        'tracking_number' => $tracking,
-                        'attempts' => $attempts
-                    ]);
 
-                    $shipment = Shipment::create([
-                        'tenant_id'         => $tenant->id,
-                        'order_id'          => $order->id,
-                        'customer_id'       => $customer->id,
-                        'courier_id'        => $courier->id,
-                        'tracking_number'   => $tracking,
-                        'courier_tracking_id' => $tracking, // Set same as tracking_number
-                        'status'            => 'pending',
-                        'shipping_address'  => $this->formatAddress($addr),
-                        'shipping_city'     => $addr['city'] ?? '',
-                        'billing_address'   => $this->formatAddress($addr),
-                        'weight'            => (float) data_get($request, 'shipping.weight', 0.5),
-                        'shipping_cost'     => (float) data_get($request, 'order.shipping_cost', 0),
-                        'dimensions'        => null,
-                        'created_at'        => now(),
-                        'updated_at'        => now(),
-                    ]);
-                    
-                    \Log::info('Shipment created successfully', [
-                        'shipment_id' => $shipment->id,
-                        'tracking_number' => $tracking
-                    ]);
+                        $shipment = Shipment::create([
+                            'tenant_id'         => $tenant->id,
+                            'order_id'          => $order->id,
+                            'customer_id'       => $customer->id,
+                            'courier_id'        => $courier->id,
+                            'tracking_number'   => $tracking,
+                            'courier_tracking_id' => $tracking, // Set same as tracking_number
+                            'status'            => 'pending',
+                            'shipping_address'  => $this->formatAddress($addr),
+                            'shipping_city'     => $addr['city'] ?? '',
+                            'billing_address'   => $this->formatAddress($addr),
+                            'weight'            => (float) data_get($request, 'shipping.weight', 0.5),
+                            'shipping_cost'     => (float) data_get($request, 'order.shipping_cost', 0),
+                            'dimensions'        => null,
+                            'created_at'        => now(),
+                            'updated_at'        => now(),
+                        ]);
+                        
+                        \Log::info('Shipment created successfully', [
+                            'shipment_id' => $shipment->id,
+                            'tracking_number' => $tracking
+                        ]);
+                    }
                 }
                 
                 \Log::info('Transaction completed successfully', [
                     'order_id' => $order->id,
-                    'shipment_id' => $shipment?->id
+                    'shipment_id' => $shipment?->id,
+                    'has_warning' => !empty($shipmentWarning)
                 ]);
                 
-                return ['order' => $order, 'shipment' => $shipment];
+                return ['order' => $order, 'shipment' => $shipment, 'warning' => $shipmentWarning];
             });
             
             $order = $result['order'];
             $shipment = $result['shipment'];
+            $warning = $result['warning'] ?? null;
             
             \Log::info('Transaction completed successfully', [
                 'external_order_id' => $externalId,
@@ -539,7 +547,8 @@ class WooCommerceOrderController extends Controller
                 'order_id' => $order->id,
                 'shipment_id' => $shipment?->id,
                 'tracking_number' => $shipment?->tracking_number,
-                'is_existing_order' => isset($result['existing']) && $result['existing']
+                'is_existing_order' => isset($result['existing']) && $result['existing'],
+                'has_warning' => !empty($warning)
             ]);
             
             // Check if this was an existing order
@@ -620,15 +629,23 @@ class WooCommerceOrderController extends Controller
             'tenant_id' => $tenant->id,
             'order_id' => $order->id,
             'shipment_id' => $shipment?->id,
-            'external_order_id' => $externalId
+            'external_order_id' => $externalId,
+            'has_warning' => !empty($warning)
         ]);
 
-        return response()->json([
+        $response = [
             'success'     => true,
-            'message'     => 'Received',
+            'message'     => $warning ?: 'Received',
             'order_id'    => $order->id,
             'shipment_id' => $shipment?->id,
-        ], 201);
+        ];
+        
+        // Include warning if present
+        if ($warning) {
+            $response['warning'] = $warning;
+        }
+
+        return response()->json($response, 201);
     }
 
     /**

@@ -139,6 +139,10 @@ if (!defined('ABSPATH')) {
                     data.data.logs.forEach(log => {
                         const row = document.createElement('tr');
                         const statusClass = 'dmm-status-badge-' + (log.status === 'error' ? 'error' : log.status === 'warning' ? 'warning' : log.status === 'success' ? 'success' : 'info');
+                        
+                        // Escape JSON for HTML attribute
+                        const logDataJson = JSON.stringify(log).replace(/"/g, '&quot;');
+                        
                         row.innerHTML = `
                             <td>${log.id}</td>
                             <td>${log.order_id || '-'}</td>
@@ -150,10 +154,16 @@ if (!defined('ABSPATH')) {
                                 <a href="${ajaxurl.replace('admin-ajax.php', 'admin.php')}?page=dmm-delivery-bridge-log-details&log_id=${log.id}" class="button button-small">
                                     <?php _e('View', 'dmm-delivery-bridge'); ?>
                                 </a>
+                                <button type="button" class="button button-small dmm-copy-log" data-log-id="${log.id}" data-log-data="${logDataJson}" title="<?php _e('Copy full log data to clipboard', 'dmm-delivery-bridge'); ?>">
+                                    📋 <?php _e('Copy', 'dmm-delivery-bridge'); ?>
+                                </button>
                             </td>
                         `;
                         tbodyEl.appendChild(row);
                     });
+                    
+                    // Attach copy log event listeners
+                    attachCopyLogListeners();
                     tableEl.style.display = 'table';
                     
                     // Update pagination
@@ -174,6 +184,98 @@ if (!defined('ABSPATH')) {
                 emptyEl.innerHTML = '<p style="color: #d63638;"><?php _e('Error loading logs. Please try again.', 'dmm-delivery-bridge'); ?></p>';
                 emptyEl.style.display = 'block';
             });
+        }
+        
+        function attachCopyLogListeners() {
+            document.querySelectorAll('.dmm-copy-log').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const logId = this.getAttribute('data-log-id');
+                    let logDataJson = this.getAttribute('data-log-data');
+                    
+                    if (!logDataJson) {
+                        alert('<?php _e('Log data not available. Please refresh the page.', 'dmm-delivery-bridge'); ?>');
+                        return;
+                    }
+                    
+                    // Unescape HTML entities
+                    logDataJson = logDataJson.replace(/&quot;/g, '"');
+                    
+                    try {
+                        const logData = JSON.parse(logDataJson);
+                        const logText = formatLogForCopy(logData);
+                        
+                        // Copy to clipboard
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(logText).then(() => {
+                                showCopySuccess(this);
+                            }).catch(err => {
+                                console.error('Failed to copy:', err);
+                                fallbackCopyToClipboard(logText, this);
+                            });
+                        } else {
+                            fallbackCopyToClipboard(logText, this);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing log data:', error);
+                        alert('<?php _e('Error processing log data. Please try again.', 'dmm-delivery-bridge'); ?>');
+                    }
+                });
+            });
+        }
+        
+        function formatLogForCopy(log) {
+            const logObject = {
+                'Log ID': log.id,
+                'Order ID': log.order_id || 'N/A',
+                'Status': log.status,
+                'Context': log.context || 'api',
+                'Timestamp': log.created_at,
+                'Error Message': log.error_message || 'N/A',
+                'Request Data': log.request_data || null,
+                'Response Data': log.response_data || null
+            };
+            
+            return JSON.stringify(logObject, null, 2);
+        }
+        
+        function fallbackCopyToClipboard(text, button) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(button);
+                } else {
+                    alert('<?php _e('Failed to copy. Please select and copy manually.', 'dmm-delivery-bridge'); ?>');
+                }
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+                alert('<?php _e('Failed to copy. Please select and copy manually.', 'dmm-delivery-bridge'); ?>');
+            } finally {
+                document.body.removeChild(textArea);
+            }
+        }
+        
+        function showCopySuccess(button) {
+            const originalText = button.innerHTML;
+            button.innerHTML = '✓ <?php _e('Copied!', 'dmm-delivery-bridge'); ?>';
+            button.style.backgroundColor = '#00a32a';
+            button.style.color = '#fff';
+            button.disabled = true;
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.backgroundColor = '';
+                button.style.color = '';
+                button.disabled = false;
+            }, 2000);
         }
         
         document.getElementById('dmm-refresh-logs').addEventListener('click', () => loadLogs(currentPage));
