@@ -384,7 +384,7 @@ export default function SettingsIndex({
           email: 'test@example.com',
         },
       },
-      create_shipment: true,
+      create_shipment: false, // Set to false for test - doesn't require courier configuration
     };
 
     try {
@@ -453,8 +453,8 @@ export default function SettingsIndex({
       const data = await response.json().catch(() => ({}));
 
       if (response.ok && data?.success) {
-        const message = `Bridge test successful: order_id ${data.order_id}${
-          data.shipment_id ? `, shipment_id ${data.shipment_id}` : ''
+        const message = `Bridge test successful! Order created: ${data.order_id}${
+          data.shipment_id ? `, shipment_id: ${data.shipment_id}` : ' (no shipment created - courier not required for test)'
         }`;
         showMessage('woo', message, 'success');
       } else {
@@ -1125,7 +1125,7 @@ export default function SettingsIndex({
                         <div className="bg-white border rounded-lg p-4">
                           <h4 className="text-sm font-medium text-gray-900 mb-2">Γρήγορο Test</h4>
                           <p className="text-xs text-gray-600 mb-3">
-                            Στέλνει ένα ελάχιστο payload στυλ WooCommerce από τον browser σας για να επαληθεύσει ότι το endpoint λειτουργεί σωστά.
+                            Στέλνει ένα ελάχιστο payload στυλ WooCommerce από τον browser σας για να επαληθεύσει ότι το endpoint λειτουργεί σωστά. Το test δημιουργεί μια παραγγελία χωρίς αποστολή (δεν απαιτείται courier).
                           </p>
                           {unmaskedApiSecret && (
                             <p className="text-xs text-blue-600 mb-2">
