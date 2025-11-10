@@ -79,8 +79,22 @@ class ApiService {
       const maybeJson = await response.clone().json().catch(() => null);
 
       if (!response.ok) {
-        const errText = maybeJson?.message || (await response.text().catch(() => 'Unknown error'));
-        throw new Error(`HTTP ${response.status}: ${errText}`);
+        // Extract validation errors if present
+        let errorMessage = maybeJson?.message || 'Unknown error';
+        if (maybeJson?.errors) {
+          // Format validation errors
+          const errorFields = Object.keys(maybeJson.errors);
+          const errorMessages = errorFields.map(field => {
+            const fieldErrors = Array.isArray(maybeJson.errors[field]) 
+              ? maybeJson.errors[field] 
+              : [maybeJson.errors[field]];
+            return `${field}: ${fieldErrors.join(', ')}`;
+          });
+          errorMessage = errorMessages.join('; ') || errorMessage;
+        }
+        const error = new Error(`HTTP ${response.status}: ${errorMessage}`);
+        error.response = maybeJson;
+        throw error;
       }
 
       return maybeJson ?? (await response.json());
@@ -860,28 +874,49 @@ export default function SettingsIndex({
                                     type="password"
                                     value={apiSecretInput}
                                     onChange={(e) => setApiSecretInput(e.target.value)}
-                                    placeholder="Εισάγετε το API Secret"
+                                    placeholder="Εισάγετε το API Secret (ελάχιστο 16 χαρακτήρες)"
                                     className="flex-1 rounded border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm px-3 py-2"
                                     autoComplete="new-password"
+                                    minLength={16}
+                                    maxLength={255}
                                   />
                                 </div>
+                                {apiSecretInput && (
+                                  <p className="text-xs text-gray-500">
+                                    {apiSecretInput.length < 16 
+                                      ? `Χρειάζονται ${16 - apiSecretInput.length} ακόμη χαρακτήρες (ελάχιστο 16)` 
+                                      : `${apiSecretInput.length}/255 χαρακτήρες`}
+                                  </p>
+                                )}
                                 <div className="flex gap-2">
                                   <PrimaryButton
                                     onClick={async () => {
-                                      if (!apiSecretInput || !apiSecretInput.trim()) {
+                                      const trimmedSecret = apiSecretInput?.trim() || '';
+                                      
+                                      if (!trimmedSecret) {
                                         showMessage('api_secret', 'Παρακαλώ εισάγετε ένα API Secret', 'error');
+                                        return;
+                                      }
+
+                                      if (trimmedSecret.length < 16) {
+                                        showMessage('api_secret', 'Το API Secret πρέπει να έχει τουλάχιστον 16 χαρακτήρες', 'error');
+                                        return;
+                                      }
+
+                                      if (trimmedSecret.length > 255) {
+                                        showMessage('api_secret', 'Το API Secret δεν μπορεί να υπερβαίνει τους 255 χαρακτήρες', 'error');
                                         return;
                                       }
 
                                       setLoading('api_secret', true);
                                       try {
                                         const result = await apiService.post(route('settings.api.set-secret'), {
-                                          api_secret: apiSecretInput.trim(),
+                                          api_secret: trimmedSecret,
                                         });
 
                                         if (result?.success) {
-                                          setUnmaskedApiSecret(apiSecretInput.trim());
-                                          await copyToClipboard(apiSecretInput.trim(), 'api_secret');
+                                          setUnmaskedApiSecret(trimmedSecret);
+                                          await copyToClipboard(trimmedSecret, 'api_secret');
                                           showMessage('api_secret', 'API secret ενημερώθηκε και αντιγράφηκε στο clipboard', 'success');
                                           setShowApiSecretInput(false);
                                           setApiSecretInput('');
@@ -890,7 +925,17 @@ export default function SettingsIndex({
                                         }
                                       } catch (error) {
                                         console.error('API secret update error:', error);
-                                        showMessage('api_secret', error instanceof Error ? error.message : 'Αποτυχία ενημέρωσης', 'error');
+                                        // Extract validation errors if available
+                                        let errorMsg = error instanceof Error ? error.message : 'Αποτυχία ενημέρωσης';
+                                        if (error.response?.errors) {
+                                          const errorFields = Object.keys(error.response.errors);
+                                          const firstError = errorFields[0];
+                                          const firstErrorMsg = Array.isArray(error.response.errors[firstError])
+                                            ? error.response.errors[firstError][0]
+                                            : error.response.errors[firstError];
+                                          errorMsg = firstErrorMsg || errorMsg;
+                                        }
+                                        showMessage('api_secret', errorMsg, 'error');
                                       } finally {
                                         setLoading('api_secret', false);
                                       }
