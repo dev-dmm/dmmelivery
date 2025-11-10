@@ -389,10 +389,15 @@ export default function SettingsIndex({
 
     try {
       const body = JSON.stringify(testPayload);
+      // Trim the API key to remove any accidental whitespace
+      const trimmedApiKey = testApiKey.trim();
+      const trimmedTenantId = String(tenantId).trim();
+      
       const headers = {
         'Content-Type': 'application/json',
-        'X-Api-Key': testApiKey,
-        'X-Tenant-Id': tenantId,
+        'Accept': 'application/json',
+        'X-Api-Key': trimmedApiKey,
+        'X-Tenant-Id': trimmedTenantId,
       };
 
       // If we have the (freshly set) secret in-memory, sign the request
@@ -425,10 +430,24 @@ export default function SettingsIndex({
         headers['X-Payload-Signature'] = `sha256=${hex}`;
       }
 
+      // Log request details in development for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('WooCommerce Test Request:', {
+          endpoint: wooEndpoint,
+          headers: {
+            ...headers,
+            'X-Api-Key': trimmedApiKey ? `${trimmedApiKey.slice(0, 4)}...${trimmedApiKey.slice(-4)}` : 'empty',
+            'X-Tenant-Id': trimmedTenantId,
+          },
+          hasSignature: !!headers['X-Payload-Signature'],
+        });
+      }
+
       const response = await fetch(wooEndpoint, {
         method: 'POST',
         headers,
         body,
+        credentials: 'same-origin', // Include cookies for same-origin requests
       });
 
       const data = await response.json().catch(() => ({}));
@@ -439,12 +458,24 @@ export default function SettingsIndex({
         }`;
         showMessage('woo', message, 'success');
       } else {
-        const errorMessage = data?.message || `HTTP ${response.status}`;
+        // Provide more detailed error message
+        let errorMessage = data?.message || `HTTP ${response.status}`;
+        if (response.status === 401) {
+          errorMessage = `Unauthorized: ${data?.message || 'Invalid API key or tenant ID. Please verify your API token and tenant ID are correct.'}`;
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Authentication failed. Check:', {
+              apiKeyLength: trimmedApiKey.length,
+              tenantId: trimmedTenantId,
+              responseData: data,
+            });
+          }
+        }
         showMessage('woo', `Bridge test failed: ${errorMessage}`, 'error');
       }
     } catch (error) {
       console.error('WooCommerce test error:', error);
-      showMessage('woo', 'Network error during bridge test', 'error');
+      const errorMsg = error instanceof Error ? error.message : 'Network error during bridge test';
+      showMessage('woo', `Network error: ${errorMsg}`, 'error');
     } finally {
       setLoading('woo_test', false);
     }
