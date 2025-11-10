@@ -582,6 +582,11 @@ class DMM_Delivery_Bridge {
                         if ($order) {
                             // Use the robust processing method directly
                             $this->order_processor->process_order_robust($order);
+                        } else {
+                            // Order not found, skip it
+                            if ($this->logger) {
+                                $this->logger->log("Bulk operation: Order {$order_id} not found, skipping", 'warning');
+                            }
                         }
                     }
                 } elseif ($type === 'sync') {
@@ -600,22 +605,113 @@ class DMM_Delivery_Bridge {
                 if ($this->logger) {
                     $this->logger->log('Bulk operation error for order ' . $order_id . ': ' . $e->getMessage(), 'error');
                 }
+                // Still increment counter to avoid getting stuck
+                $current++;
+                $job_data['current'] = $current;
+                set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
             }
         }
         
+        // Check if Action Scheduler is available and working
+        $has_action_scheduler = function_exists('as_schedule_single_action');
+        
         // Schedule next batch if there are more orders
-        if ($current < $total && function_exists('as_schedule_single_action')) {
-            as_schedule_single_action(
-                time() + 1, // Schedule 1 second later
-                'dmm_bulk_process_orders',
-                [$job_id, $type],
-                'dmm_bulk_operations'
-            );
-        } elseif ($current >= $total) {
+        if ($current < $total) {
+            if ($has_action_scheduler) {
+                // Use Action Scheduler
+                $scheduled = as_schedule_single_action(
+                    time() + 1, // Schedule 1 second later
+                    'dmm_bulk_process_orders',
+                    [$job_id, $type],
+                    'dmm_bulk_operations'
+                );
+                
+                if (!$scheduled) {
+                    // Action Scheduler failed, log and fall back to immediate processing
+                    if ($this->logger) {
+                        $this->logger->log("Bulk operation: Action Scheduler failed to schedule next batch for job {$job_id}, falling back to immediate processing", 'warning');
+                    }
+                    // Process remaining orders immediately
+                    $remaining_orders = array_slice($order_ids, $current);
+                    if (!empty($remaining_orders)) {
+                        $this->process_bulk_orders_immediate_fallback($job_id, $type, $remaining_orders, $current);
+                    }
+                }
+            } else {
+                // No Action Scheduler, process remaining immediately
+                $remaining_orders = array_slice($order_ids, $current);
+                if (!empty($remaining_orders)) {
+                    $this->process_bulk_orders_immediate_fallback($job_id, $type, $remaining_orders, $current);
+                }
+            }
+        } else {
             // All done
             $job_data['status'] = 'completed';
+            $job_data['current'] = $total;
             set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+            
+            if ($this->logger) {
+                $this->logger->log("Bulk operation completed: Job {$job_id} processed {$total} orders", 'info');
+            }
         }
+    }
+    
+    /**
+     * Fallback method to process bulk orders immediately when Action Scheduler is not available
+     * 
+     * @param string $job_id Job ID
+     * @param string $type Operation type
+     * @param array $order_ids Array of order IDs to process
+     * @param int $start_from Starting index
+     */
+    private function process_bulk_orders_immediate_fallback($job_id, $type, $order_ids, $start_from) {
+        $job_data = get_transient('dmm_bulk_job_' . $job_id);
+        if (!$job_data) {
+            return;
+        }
+        
+        $current = $start_from;
+        $total = isset($job_data['total']) ? intval($job_data['total']) : 0;
+        $batch_size = 5;
+        
+        foreach (array_chunk($order_ids, $batch_size) as $batch) {
+            foreach ($batch as $order_id) {
+                try {
+                    if ($type === 'send' || $type === 'resend') {
+                        if ($this->order_processor) {
+                            $order = wc_get_order($order_id);
+                            if ($order) {
+                                $this->order_processor->process_order_robust($order);
+                            }
+                        }
+                    } elseif ($type === 'sync') {
+                        $order = wc_get_order($order_id);
+                        if ($order && $order->get_meta('_dmm_delivery_sent') === 'yes') {
+                            $this->process_order_update(['order_id' => $order_id]);
+                        }
+                    }
+                    
+                    $current++;
+                    $job_data['current'] = $current;
+                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+                } catch (Exception $e) {
+                    if ($this->logger) {
+                        $this->logger->log('Bulk operation error for order ' . $order_id . ': ' . $e->getMessage(), 'error');
+                    }
+                    $current++;
+                    $job_data['current'] = $current;
+                    set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
+                }
+            }
+            
+            // Small delay between batches
+            usleep(200000); // 0.2 seconds
+        }
+        
+        // Mark as completed
+        $job_data['status'] = 'completed';
+        $job_data['current'] = $total;
+        set_transient('dmm_bulk_job_' . $job_id, $job_data, HOUR_IN_SECONDS);
     }
 }
 

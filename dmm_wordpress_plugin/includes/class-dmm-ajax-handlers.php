@@ -242,14 +242,35 @@ class DMM_AJAX_Handlers {
             
             // Schedule background processing
             if (function_exists('as_schedule_single_action')) {
-                as_schedule_single_action(
+                $scheduled = as_schedule_single_action(
                     time(),
                     'dmm_bulk_process_orders',
                     [$job_id, 'send'],
                     'dmm_bulk_operations'
                 );
+                
+                if (!$scheduled) {
+                    // Action Scheduler failed, use immediate processing
+                    if ($this->plugin && $this->plugin->logger) {
+                        $this->plugin->logger->log("Bulk send: Action Scheduler failed to schedule, using immediate processing for job {$job_id}", 'warning');
+                    }
+                    $this->process_bulk_orders_immediate($job_id, 'send', $orders);
+                } else {
+                    // Trigger Action Scheduler to run immediately if possible
+                    if (function_exists('as_run_queue')) {
+                        // Try to process queued actions immediately
+                        add_action('shutdown', function() {
+                            if (function_exists('as_run_queue')) {
+                                as_run_queue();
+                            }
+                        }, 999);
+                    }
+                }
             } else {
-                // Fallback: process immediately in smaller batches
+                // No Action Scheduler, process immediately
+                if ($this->plugin && $this->plugin->logger) {
+                    $this->plugin->logger->log("Bulk send: Action Scheduler not available, using immediate processing for job {$job_id}", 'info');
+                }
                 $this->process_bulk_orders_immediate($job_id, 'send', $orders);
             }
             
@@ -309,13 +330,31 @@ class DMM_AJAX_Handlers {
             ], HOUR_IN_SECONDS);
             
             if (function_exists('as_schedule_single_action')) {
-                as_schedule_single_action(
+                $scheduled = as_schedule_single_action(
                     time(),
                     'dmm_bulk_process_orders',
                     [$job_id, 'sync'],
                     'dmm_bulk_operations'
                 );
+                
+                if (!$scheduled) {
+                    if ($this->plugin && $this->plugin->logger) {
+                        $this->plugin->logger->log("Bulk sync: Action Scheduler failed to schedule, using immediate processing for job {$job_id}", 'warning');
+                    }
+                    $this->process_bulk_orders_immediate($job_id, 'sync', $orders);
+                } else {
+                    if (function_exists('as_run_queue')) {
+                        add_action('shutdown', function() {
+                            if (function_exists('as_run_queue')) {
+                                as_run_queue();
+                            }
+                        }, 999);
+                    }
+                }
             } else {
+                if ($this->plugin && $this->plugin->logger) {
+                    $this->plugin->logger->log("Bulk sync: Action Scheduler not available, using immediate processing for job {$job_id}", 'info');
+                }
                 $this->process_bulk_orders_immediate($job_id, 'sync', $orders);
             }
             
