@@ -144,6 +144,26 @@ class Handler extends ExceptionHandler
         }
 
         if ($exception instanceof QueryException) {
+            // For WooCommerce routes, provide more detailed error information
+            if ($request->is('api/woocommerce/*')) {
+                Log::error('Database error on WooCommerce route', [
+                    'exception' => $exception->getMessage(),
+                    'sql_state' => $exception->errorInfo[0] ?? null,
+                    'driver_code' => $exception->errorInfo[1] ?? null,
+                    'url' => $request->fullUrl(),
+                    'tenant_id' => $request->header('X-Tenant-Id'),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => app()->environment('production') 
+                        ? 'Database error occurred. Please try again later.' 
+                        : 'Database error: ' . $exception->getMessage(),
+                    'error_code' => 'DATABASE_ERROR',
+                    'trace_id' => $this->generateTraceId()
+                ], 500);
+            }
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Database error occurred',
@@ -161,6 +181,29 @@ class Handler extends ExceptionHandler
         }
 
         // Generic error response
+        // For WooCommerce routes, provide more context
+        if ($request->is('api/woocommerce/*')) {
+            Log::error('Unhandled exception on WooCommerce route', [
+                'exception' => get_class($exception),
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'url' => $request->fullUrl(),
+                'tenant_id' => $request->header('X-Tenant-Id'),
+                'trace' => $exception->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => app()->environment('production') 
+                    ? 'An error occurred while processing your request. Please check the logs or try again later.' 
+                    : $exception->getMessage(),
+                'error_code' => 'INTERNAL_ERROR',
+                'trace_id' => $this->generateTraceId(),
+                'http_code' => 500
+            ], 500);
+        }
+        
         return response()->json([
             'success' => false,
             'message' => app()->environment('production') 

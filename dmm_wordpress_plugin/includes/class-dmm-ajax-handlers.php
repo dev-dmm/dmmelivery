@@ -98,6 +98,7 @@ class DMM_AJAX_Handlers {
         add_action('wp_ajax_dmm_clear_failed_orders', [$this, 'ajax_clear_failed_orders']);
         add_action('wp_ajax_dmm_reset_circuit_breaker', [$this, 'ajax_reset_circuit_breaker']);
         add_action('wp_ajax_dmm_get_circuit_breaker_status', [$this, 'ajax_get_circuit_breaker_status']);
+        add_action('wp_ajax_dmm_get_orders_list', [$this, 'ajax_get_orders_list']);
         
         // ACS Courier AJAX handlers
         add_action('wp_ajax_dmm_acs_track_shipment', [$this, 'ajax_acs_track_shipment']);
@@ -171,14 +172,76 @@ class DMM_AJAX_Handlers {
     
     public function ajax_resend_order() {
         $this->verify_ajax_request('dmm_resend_order');
-        // TODO: Extract implementation from original file
-        wp_send_json_error(['message' => 'Method not yet extracted from original file']);
+        
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        if (!$order_id) {
+            wp_send_json_error(['message' => __('Invalid order ID', 'dmm-delivery-bridge')]);
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(['message' => __('Order not found', 'dmm-delivery-bridge')]);
+        }
+        
+        // Skip refunds
+        if ($order instanceof \WC_Order_Refund) {
+            wp_send_json_error(['message' => __('Cannot process refund orders', 'dmm-delivery-bridge')]);
+        }
+        
+        // Process order
+        if ($this->plugin && $this->plugin->order_processor) {
+            try {
+                $this->plugin->order_processor->process_order_robust($order);
+                
+                wp_send_json_success([
+                    'message' => __('Order sent to DMM Delivery successfully', 'dmm-delivery-bridge')
+                ]);
+            } catch (Exception $e) {
+                wp_send_json_error([
+                    'message' => __('Failed to send order: ', 'dmm-delivery-bridge') . $e->getMessage()
+                ]);
+            }
+        } else {
+            wp_send_json_error(['message' => __('Order processor not available', 'dmm-delivery-bridge')]);
+        }
     }
     
     public function ajax_sync_order() {
         $this->verify_ajax_request('dmm_sync_order');
-        // TODO: Extract implementation from original file
-        wp_send_json_error(['message' => 'Method not yet extracted from original file']);
+        
+        $order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        if (!$order_id) {
+            wp_send_json_error(['message' => __('Invalid order ID', 'dmm-delivery-bridge')]);
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(['message' => __('Order not found', 'dmm-delivery-bridge')]);
+        }
+        
+        // Check if order was sent
+        if ($order->get_meta('_dmm_delivery_sent') !== 'yes') {
+            wp_send_json_error(['message' => __('Order has not been sent to DMM Delivery yet', 'dmm-delivery-bridge')]);
+        }
+        
+        // Sync order status
+        if ($this->plugin) {
+            try {
+                $this->plugin->process_order_update(['order_id' => $order_id]);
+                
+                wp_send_json_success([
+                    'message' => __('Order status synced successfully', 'dmm-delivery-bridge')
+                ]);
+            } catch (Exception $e) {
+                wp_send_json_error([
+                    'message' => __('Failed to sync order: ', 'dmm-delivery-bridge') . $e->getMessage()
+                ]);
+            }
+        } else {
+            wp_send_json_error(['message' => __('Plugin instance not available', 'dmm-delivery-bridge')]);
+        }
     }
     
     public function ajax_refresh_meta_fields() {
@@ -661,6 +724,111 @@ class DMM_AJAX_Handlers {
                 'message' => __('Circuit breaker was not open, so no reset was needed.', 'dmm-delivery-bridge')
             ]);
         }
+    }
+    
+    public function ajax_get_orders_list() {
+        $this->verify_ajax_request('dmm_get_orders_list', 'both');
+        
+        // Get filter parameters
+        $limit = isset($_POST['limit']) ? absint($_POST['limit']) : 50;
+        $offset = isset($_POST['offset']) ? absint($_POST['offset']) : 0;
+        $status_filter = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+        $sent_filter = isset($_POST['sent']) ? sanitize_text_field($_POST['sent']) : '';
+        $order_id_filter = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+        
+        // Build query arguments
+        $args = [
+            'limit' => $limit,
+            'offset' => $offset,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'type' => 'shop_order', // Exclude refunds
+        ];
+        
+        // Filter by WooCommerce order status
+        if (!empty($status_filter)) {
+            $args['status'] = $status_filter;
+        }
+        
+        // Filter by order ID
+        if ($order_id_filter > 0) {
+            $args['include'] = [$order_id_filter];
+        }
+        
+        // Get orders
+        $orders = wc_get_orders($args);
+        
+        // Filter out refunds
+        $orders = array_filter($orders, function($order) {
+            return !($order instanceof \WC_Order_Refund);
+        });
+        
+        // Filter by DMM sent status
+        if ($sent_filter !== '') {
+            $orders = array_filter($orders, function($order) use ($sent_filter) {
+                $is_sent = $order->get_meta('_dmm_delivery_sent') === 'yes';
+                if ($sent_filter === 'sent') {
+                    return $is_sent;
+                } elseif ($sent_filter === 'not_sent') {
+                    return !$is_sent;
+                }
+                return true;
+            });
+        }
+        
+        // Get total count (approximate, for pagination)
+        $total_args = $args;
+        $total_args['limit'] = -1;
+        $total_orders = wc_get_orders($total_args);
+        $total_orders = array_filter($total_orders, function($order) {
+            return !($order instanceof \WC_Order_Refund);
+        });
+        
+        if ($sent_filter !== '') {
+            $total_orders = array_filter($total_orders, function($order) use ($sent_filter) {
+                $is_sent = $order->get_meta('_dmm_delivery_sent') === 'yes';
+                if ($sent_filter === 'sent') {
+                    return $is_sent;
+                } elseif ($sent_filter === 'not_sent') {
+                    return !$is_sent;
+                }
+                return true;
+            });
+        }
+        
+        $total = count($total_orders);
+        
+        // Format orders for display
+        $formatted_orders = [];
+        foreach ($orders as $order) {
+            $is_sent = $order->get_meta('_dmm_delivery_sent') === 'yes';
+            $dmm_order_id = $order->get_meta('_dmm_delivery_order_id');
+            $dmm_shipment_id = $order->get_meta('_dmm_delivery_shipment_id');
+            $sent_at = $order->get_meta('_dmm_delivery_sent_at');
+            
+            $formatted_orders[] = [
+                'id' => $order->get_id(),
+                'order_number' => $order->get_order_number(),
+                'status' => $order->get_status(),
+                'date' => $order->get_date_created()->date('Y-m-d H:i:s'),
+                'total' => $order->get_total(),
+                'currency' => $order->get_currency(),
+                'customer_name' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()),
+                'customer_email' => $order->get_billing_email(),
+                'dmm_sent' => $is_sent,
+                'dmm_order_id' => $dmm_order_id ?: null,
+                'dmm_shipment_id' => $dmm_shipment_id ?: null,
+                'dmm_sent_at' => $sent_at ?: null,
+                'edit_url' => admin_url('post.php?post=' . $order->get_id() . '&action=edit'),
+            ];
+        }
+        
+        wp_send_json_success([
+            'orders' => $formatted_orders,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset
+        ]);
     }
     
     // ACS Courier methods
