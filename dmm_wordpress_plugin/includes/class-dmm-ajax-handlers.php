@@ -1042,7 +1042,7 @@ class DMM_AJAX_Handlers {
     }
     
     /**
-     * Get all unique meta field keys from orders
+     * Get all unique meta field keys from WooCommerce orders
      * Used to populate dropdown for voucher field selection
      */
     public function ajax_get_order_meta_fields() {
@@ -1050,8 +1050,7 @@ class DMM_AJAX_Handlers {
         
         global $wpdb;
         
-        // Get all unique meta keys from orders
-        // For HPOS (High-Performance Order Storage), we need to query the order meta table
+        // Get all unique meta keys from WooCommerce orders
         $meta_keys = [];
         
         // Check if HPOS is enabled using the same method as the main plugin
@@ -1063,7 +1062,7 @@ class DMM_AJAX_Handlers {
         }
         
         if ($is_hpos_enabled) {
-            // HPOS: Query from wc_orders_meta table
+            // HPOS: Query from wc_orders_meta table (WooCommerce orders only)
             $table_name = $wpdb->prefix . 'wc_orders_meta';
             $query = $wpdb->prepare(
                 "SELECT DISTINCT meta_key 
@@ -1076,16 +1075,17 @@ class DMM_AJAX_Handlers {
                 $wpdb->esc_like('_edit_') . '%'
             );
         } else {
-            // Legacy: Query from postmeta table
+            // Legacy: Query from postmeta table for WooCommerce shop_order post type
             $query = $wpdb->prepare(
                 "SELECT DISTINCT pm.meta_key 
                 FROM {$wpdb->postmeta} pm
                 INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
-                WHERE p.post_type = 'shop_order'
+                WHERE p.post_type = %s
                 AND pm.meta_key NOT LIKE %s 
                 AND pm.meta_key NOT LIKE %s
                 ORDER BY pm.meta_key ASC
                 LIMIT 500",
+                'shop_order',
                 $wpdb->esc_like('_wp_') . '%',
                 $wpdb->esc_like('_edit_') . '%'
             );
@@ -1094,7 +1094,12 @@ class DMM_AJAX_Handlers {
         $results = $wpdb->get_col($query);
         
         if ($results) {
-            $meta_keys = array_values(array_filter($results));
+            // Filter out empty values and ensure we only have WooCommerce order meta fields
+            $meta_keys = array_values(array_filter($results, function($key) {
+                return !empty($key) && 
+                       strpos($key, '_wp_') !== 0 && 
+                       strpos($key, '_edit_') !== 0;
+            }));
         }
         
         wp_send_json_success([
