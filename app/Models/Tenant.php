@@ -67,6 +67,7 @@ class Tenant extends Model
         
         // Features & Customization
         'enabled_features',
+        'can_view_global_scores',
         'theme_config',
         'favicon_url',
         
@@ -116,6 +117,7 @@ class Tenant extends Model
         'is_active' => 'boolean',
         'auto_create_shipments' => 'boolean',
         'send_notifications' => 'boolean',
+        'can_view_global_scores' => 'boolean',
         'tax_rate' => 'decimal:2',
         'shipping_cost' => 'decimal:2',
         'onboarding_started_at' => 'datetime',

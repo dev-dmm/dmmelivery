@@ -32,6 +32,19 @@ Route::bind('shipment', function ($id) {
         ->firstOrFail();
 });
 
+// Bind {customer} safely to current tenant to prevent IDOR
+Route::bind('customer', function ($id) {
+    $user = auth()->user();
+    if (!$user || !$user->tenant_id) {
+        abort(403, 'Tenant not identified');
+    }
+
+    return \App\Models\Customer::query()
+        ->where('id', $id)
+        ->where('tenant_id', $user->tenant_id)
+        ->firstOrFail();
+});
+
 // -----------------------------
 // Feature-based Route Files
 // -----------------------------
@@ -56,6 +69,9 @@ require __DIR__.'/web/analytics.php';
 
 // Shipment routes
 require __DIR__.'/web/shipments.php';
+
+// Customer routes
+require __DIR__.'/web/customers.php';
 
 // Order routes
 require __DIR__.'/web/orders.php';

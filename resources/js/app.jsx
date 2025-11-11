@@ -25,6 +25,9 @@ const featureMap = {
     'Shipments/Show': './features/shipments/pages/Show.jsx',
     'Shipments/Search': './features/shipments/pages/Search.jsx',
     
+    // Customers
+    'Customers/Show': './features/customers/pages/Show.jsx',
+    
     // Analytics
     'Analytics/Index': './features/analytics/pages/Index.jsx',
     'Analytics/AdvancedDashboard': './features/analytics/pages/AdvancedDashboard.jsx',

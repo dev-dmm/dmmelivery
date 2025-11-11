@@ -1,6 +1,7 @@
 import { useForm, Link, Head } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { route } from 'ziggy-js';
+import DeliveryScoreBadge from '@/Components/DeliveryScoreBadge';
 
 export default function Index({
   shipments = { data: [], links: [], total: 0, from: 0, to: 0 },
@@ -224,7 +225,27 @@ export default function Index({
                         </span>
                       </td>
                       <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
-                        <div className="text-xs lg:text-sm font-medium text-gray-900 truncate">{shipmentData?.customer?.name || '-'}</div>
+                        <div className="flex items-center gap-2">
+                          {shipmentData?.customer?.id ? (
+                            <Link
+                              href={route('customers.show', shipmentData.customer.id)}
+                              className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline truncate"
+                            >
+                              {shipmentData.customer.name || '-'}
+                            </Link>
+                          ) : (
+                            <div className="text-xs lg:text-sm font-medium text-gray-900 truncate">{shipmentData?.customer?.name || '-'}</div>
+                          )}
+                          {shipmentData?.customer?.delivery_score !== undefined && (
+                            <DeliveryScoreBadge 
+                              score={shipmentData.customer.delivery_score} 
+                              size="sm"
+                              showLabel={false}
+                              successRateRange={shipmentData.customer.success_rate_range}
+                              showSuccessRate={false}
+                            />
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500 truncate">{shipmentData?.customer?.email || ''}</div>
                       </td>
                       <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
@@ -312,7 +333,16 @@ export default function Index({
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Customer</p>
-                        <p className="font-medium text-gray-900 truncate">{shipmentData?.customer?.name || '-'}</p>
+                        {shipmentData?.customer?.id ? (
+                          <Link
+                            href={route('customers.show', shipmentData.customer.id)}
+                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline truncate"
+                          >
+                            {shipmentData.customer.name || '-'}
+                          </Link>
+                        ) : (
+                          <p className="font-medium text-gray-900 truncate">{shipmentData?.customer?.name || '-'}</p>
+                        )}
                         <p className="text-xs text-gray-500 truncate">{shipmentData?.customer?.email || ''}</p>
                       </div>
                       <div>

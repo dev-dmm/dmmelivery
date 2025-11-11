@@ -26,6 +26,10 @@ use App\Services\SecurityService;
 use App\Services\DMMDeliveryService;
 use App\Services\ACSCourierService;
 use App\Models\Courier;
+use App\Models\Customer;
+use App\Models\Shipment;
+use App\Observers\CustomerObserver;
+use Illuminate\Support\Facades\Route;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -102,6 +106,26 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute($max)->by("woo:{$tenant}:{$ip}")
             ];
+        });
+        
+        // Register observers
+        Customer::observe(CustomerObserver::class);
+        
+        // Route model binding with tenant scoping for API routes
+        // This ensures ShipmentPolicy is automatically applied via implicit binding
+        Route::bind('shipment', function ($value) {
+            $user = auth()->user();
+            
+            // For API routes, use policy-based authorization
+            if ($user && $user->tenant_id) {
+                return Shipment::query()
+                    ->where('id', $value)
+                    ->where('tenant_id', $user->tenant_id)
+                    ->firstOrFail();
+            }
+            
+            // Fallback for non-authenticated routes (should not happen for API)
+            return Shipment::findOrFail($value);
         });
     }
 }

@@ -182,10 +182,12 @@ class OrderController extends Controller
             ], 422);
         }
 
+        $customer = $order->customer;
         $shipment = Shipment::create([
             'tenant_id' => Auth::user()->tenant_id,
             'order_id' => $order->id,
             'customer_id' => $order->customer_id,
+            'global_customer_id' => $customer?->global_customer_id ?? null,
             'courier_id' => $request->courier_id,
             'tracking_number' => $request->tracking_number,
             'shipping_address' => $request->shipping_address,

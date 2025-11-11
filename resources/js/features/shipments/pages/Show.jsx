@@ -1,6 +1,7 @@
 import { Link, Head } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import DeliveryScoreBadge from '@/Components/DeliveryScoreBadge';
 
 export default function Show({ shipment, statusHistory }) {
   // Extract the actual shipment data from the data property
@@ -150,7 +151,23 @@ export default function Show({ shipment, statusHistory }) {
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-500">Όνομα</label>
-                  <p className="font-medium">{shipmentData?.customer?.name || 'N/A'}</p>
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <Link
+                      href={route('customers.show', shipmentData?.customer?.id)}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {shipmentData?.customer?.name || 'N/A'}
+                    </Link>
+                    {shipmentData?.customer?.delivery_score !== undefined && (
+                      <DeliveryScoreBadge 
+                        score={shipmentData.customer.delivery_score} 
+                        size="sm"
+                        showLabel={false}
+                        successRateRange={shipmentData.customer.success_rate_range}
+                        showSuccessRate={true}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-500">Email</label>

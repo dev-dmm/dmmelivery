@@ -315,16 +315,22 @@ class WooCommerceOrderController extends Controller
                 ]);
 
                 if (!$customer) {
+                    // Find or create global customer
+                    $globalCustomerService = app(\App\Services\GlobalCustomerService::class);
+                    $globalCustomer = $globalCustomerService->findOrCreateGlobalCustomer($customerEmail, $customerPhone);
+                    
                     // Create new customer
                     \Log::info('Creating new customer', [
                         'tenant_id' => $tenant->id,
                         'customer_name' => $customerName,
                         'customer_email' => $customerEmail,
-                        'customer_phone' => $customerPhone
+                        'customer_phone' => $customerPhone,
+                        'global_customer_id' => $globalCustomer->id
                     ]);
                     
                     $customer = Customer::create([
                         'tenant_id' => $tenant->id,
+                        'global_customer_id' => $globalCustomer->id,
                         'name' => $customerName,
                         'email' => $customerEmail,
                         'phone' => $customerPhone,
@@ -337,6 +343,13 @@ class WooCommerceOrderController extends Controller
                         'customer_phone' => $customerPhone
                     ]);
                 } else {
+                    // Ensure global customer is linked
+                    if (!$customer->global_customer_id) {
+                        $globalCustomerService = app(\App\Services\GlobalCustomerService::class);
+                        $globalCustomer = $globalCustomerService->findOrCreateGlobalCustomer($customerEmail, $customerPhone);
+                        $customer->update(['global_customer_id' => $globalCustomer->id]);
+                    }
+                    
                     // Update existing customer with new information if provided
                     $updateData = [];
                     if ($customerName && $customerName !== $customer->name) {
@@ -507,6 +520,7 @@ class WooCommerceOrderController extends Controller
                             'tenant_id'         => $tenant->id,
                             'order_id'          => $order->id,
                             'customer_id'       => $customer->id,
+                            'global_customer_id' => $customer->global_customer_id ?? null,
                             'courier_id'        => $courier->id,
                             'tracking_number'   => $tracking,
                             'courier_tracking_id' => $tracking, // Set same as tracking_number

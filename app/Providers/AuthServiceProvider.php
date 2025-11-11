@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\Shipment;
+use App\Models\Tenant;
 use App\Policies\ShipmentPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -23,6 +24,17 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerPolicies();
+
+        // Global bypass for super admins (defense in depth)
+        // This works in conjunction with Policy::before() methods
+        Gate::before(function ($user, $ability) {
+            if ($user->isSuperAdmin()) {
+                return true;
+            }
+            return null; // Continue to policy checks
+        });
+
         // Define Gates for frontend abilities
         Gate::define('manage-users', function ($user) {
             return $user->isAdmin();
@@ -42,6 +54,11 @@ class AuthServiceProvider extends ServiceProvider
         
         Gate::define('manage-settings', function ($user) {
             return $user->isAdmin();
+        });
+        
+        // Gate for viewing global customer scores (defense in depth)
+        Gate::define('view-global-scores', function ($user, Tenant $tenant) {
+            return (bool) $tenant->can_view_global_scores;
         });
     }
 }

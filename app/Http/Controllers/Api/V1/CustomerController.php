@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Shipment;
 use App\Models\Order;
+use App\Services\GlobalCustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -78,6 +79,13 @@ class CustomerController extends Controller
             ->first();
 
         if ($existingCustomer) {
+            // Ensure global customer is linked
+            if (!$existingCustomer->global_customer_id) {
+                $globalCustomerService = app(GlobalCustomerService::class);
+                $globalCustomer = $globalCustomerService->findOrCreateGlobalCustomer($request->email, $request->phone);
+                $existingCustomer->update(['global_customer_id' => $globalCustomer->id]);
+            }
+            
             // Update existing customer with new information if provided
             $updateData = [];
             if ($request->name && $request->name !== $existingCustomer->name) {
@@ -101,8 +109,13 @@ class CustomerController extends Controller
             ], 200);
         }
 
+        // Find or create global customer
+        $globalCustomerService = app(GlobalCustomerService::class);
+        $globalCustomer = $globalCustomerService->findOrCreateGlobalCustomer($request->email, $request->phone);
+
         $customer = Customer::create([
             'tenant_id' => Auth::user()->tenant_id,
+            'global_customer_id' => $globalCustomer->id,
             'name' => $request->name,
             'email' => $request->email,
             'phone' => $request->phone,

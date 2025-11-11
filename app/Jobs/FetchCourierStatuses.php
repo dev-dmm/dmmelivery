@@ -182,17 +182,22 @@ class FetchCourierStatuses implements ShouldQueue
             ->first();
 
         if ($latestEvent && $latestEvent->status !== $shipment->status) {
+            $oldStatus = $shipment->status;
+            $newStatus = $latestEvent->status;
+            
             $shipment->update([
-                'status' => $latestEvent->status,
+                'status' => $newStatus,
                 'courier_response' => $event['raw_data'] ?? $event,
             ]);
 
             // Set actual delivery date if delivered
-            if ($latestEvent->status === 'delivered') {
+            if ($newStatus === 'delivered') {
                 $shipment->update(['actual_delivery' => $latestEvent->happened_at]);
             }
 
-            Log::info("📋 Updated shipment {$shipment->tracking_number} status to: {$latestEvent->status}");
+            Log::info("📋 Updated shipment {$shipment->tracking_number} status to: {$newStatus}");
+            
+            // Note: Customer score is automatically updated via Shipment model's updated event
         }
     }
 

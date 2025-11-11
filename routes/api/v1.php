@@ -25,8 +25,11 @@ Route::get('/health', [HealthController::class, 'check']);
 
 // Public endpoints (no authentication required)
 Route::prefix('public')->group(function () {
-    Route::get('/shipments/{trackingNumber}/status', [ShipmentController::class, 'getPublicStatus']);
-    Route::post('/webhooks/shipment-update', [ShipmentController::class, 'handleWebhook']);
+    // Rate limited to prevent enumeration attacks
+    Route::get('/shipments/{trackingNumber}/status', [ShipmentController::class, 'getPublicStatus'])
+        ->middleware('throttle:60,1');
+    Route::post('/webhooks/shipment-update', [ShipmentController::class, 'handleWebhook'])
+        ->middleware('throttle:120,1'); // Higher limit for webhooks
 });
 
 // Authenticated endpoints

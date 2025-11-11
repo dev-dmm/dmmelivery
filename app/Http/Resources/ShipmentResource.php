@@ -35,6 +35,10 @@ class ShipmentResource extends JsonResource
                     'name'  => $this->customer->name,
                     'email' => $this->customer->email,
                     'phone' => $this->customer->phone,
+                    'delivery_score' => $this->customer->delivery_score ?? 0,
+                    'has_enough_data' => $this->customer->hasEnoughData(),
+                    'success_rate_range' => $this->customer->getSuccessRangeString(),
+                    'success_percentage' => $this->customer->getSuccessPercentage(),
                 ];
             }),
 

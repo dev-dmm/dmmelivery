@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreShipmentRequest;
+use App\Http\Requests\UpdateShipmentRequest;
+use App\Http\Requests\UpdateStatusRequest;
+use App\Http\Requests\WebhookRequest;
 use App\Models\Shipment;
 use App\Services\Contracts\WebSocketServiceInterface;
 use App\Services\Contracts\CacheServiceInterface;
@@ -10,7 +14,10 @@ use App\Exceptions\ShipmentNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ShipmentController extends Controller
 {
@@ -24,10 +31,20 @@ class ShipmentController extends Controller
     }
 
     /**
+     * Get correlation ID from request header or generate new one
+     */
+    private function getCorrelationId(Request $request): string
+    {
+        return $request->header('X-Correlation-ID') ?? (string) Str::ulid();
+    }
+
+    /**
      * Display a listing of shipments
      */
     public function index(Request $request): JsonResponse
     {
+        $correlationId = $this->getCorrelationId($request);
+        
         $query = Shipment::withRelations()
             ->forTenant(Auth::user()->tenant_id);
 
@@ -52,11 +69,33 @@ class ShipmentController extends Controller
             $query->where('created_at', '<=', $request->date_to);
         }
 
-        // Pagination
-        $perPage = min($request->get('per_page', 15), 100);
-        $shipments = $query->orderBy('created_at', 'desc')->paginate($perPage);
+        // Build cache key from filters
+        $filters = $request->only(['status', 'courier_id', 'customer_id', 'date_from', 'date_to', 'per_page']);
+        $filterHash = md5(json_encode($filters));
+        $cacheKey = "tenant:{$request->user()->tenant_id}:shipments:list:{$filterHash}";
 
-        return response()->json([
+        // Try cache first (5 minutes)
+        $cached = Cache::get($cacheKey);
+        if ($cached) {
+            Log::debug("DeliveryScore:cache_hit", [
+                'correlation_id' => $correlationId,
+                'cache_key' => $cacheKey,
+            ]);
+            return response()->json($cached);
+        }
+
+        // Cursor pagination for better performance on large datasets
+        $perPage = min($request->get('per_page', 15), 100);
+        $useCursor = $request->boolean('use_cursor', false);
+        
+        if ($useCursor && $request->has('cursor')) {
+            $shipments = $query->orderBy('created_at', 'desc')
+                ->cursorPaginate($perPage, ['*'], 'cursor', $request->cursor);
+        } else {
+            $shipments = $query->orderBy('created_at', 'desc')->paginate($perPage);
+        }
+
+        $response = [
             'success' => true,
             'data' => $shipments->items(),
             'pagination' => [
@@ -67,39 +106,33 @@ class ShipmentController extends Controller
                 'has_more' => $shipments->hasMorePages(),
             ],
             'meta' => [
-                'filters_applied' => $request->only(['status', 'courier_id', 'customer_id', 'date_from', 'date_to']),
+                'filters_applied' => $filters,
                 'generated_at' => now()->toISOString(),
+                'correlation_id' => $correlationId,
             ]
-        ]);
+        ];
+
+        // Cache for 5 minutes
+        Cache::put($cacheKey, $response, 300);
+
+        return response()->json($response);
     }
 
     /**
      * Store a newly created shipment
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreShipmentRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'order_id' => 'required|exists:orders,id',
-            'courier_id' => 'nullable|exists:couriers,id',
-            'tracking_number' => 'nullable|string|max:255|unique:shipments,tracking_number',
-            'weight' => 'nullable|numeric|min:0',
-            'shipping_address' => 'required|string',
-            'billing_address' => 'nullable|string',
-            'shipping_cost' => 'nullable|numeric|min:0',
-            'estimated_delivery' => 'nullable|date|after:now',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
+        $correlationId = $this->getCorrelationId($request);
+        
+        $order = \App\Models\Order::find($request->order_id);
+        $customer = $order?->customer;
+        
         $shipment = Shipment::create([
             'tenant_id' => Auth::user()->tenant_id,
             'order_id' => $request->order_id,
+            'customer_id' => $order?->customer_id,
+            'global_customer_id' => $customer?->global_customer_id ?? null,
             'courier_id' => $request->courier_id,
             'tracking_number' => $request->tracking_number,
             'weight' => $request->weight,
@@ -113,22 +146,29 @@ class ShipmentController extends Controller
         // Clear cache
         $this->cacheService->invalidateTenantCaches(Auth::user()->tenant_id);
 
+        Log::info("DeliveryScore:shipment_created", [
+            'correlation_id' => $correlationId,
+            'tenant_id' => Auth::user()->tenant_id,
+            'shipment_id' => $shipment->id,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Shipment created successfully',
             'data' => $shipment->load(['customer', 'courier', 'order']),
+            'meta' => [
+                'correlation_id' => $correlationId,
+            ],
         ], 201);
     }
 
     /**
      * Display the specified shipment
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
     public function show(Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
+        $this->authorize('view', $shipment);
 
         $shipment->load(['customer', 'courier', 'order', 'statusHistory', 'predictiveEta', 'alerts']);
 
@@ -143,33 +183,11 @@ class ShipmentController extends Controller
 
     /**
      * Update the specified shipment
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
-    public function update(Request $request, Shipment $shipment): JsonResponse
+    public function update(UpdateShipmentRequest $request, Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
-
-        $validator = Validator::make($request->all(), [
-            'status' => 'nullable|string|in:pending,picked_up,in_transit,out_for_delivery,delivered,failed,returned',
-            'tracking_number' => 'nullable|string|max:255|unique:shipments,tracking_number,' . $shipment->id,
-            'courier_tracking_id' => 'nullable|string|max:255',
-            'weight' => 'nullable|numeric|min:0',
-            'shipping_address' => 'nullable|string',
-            'billing_address' => 'nullable|string',
-            'shipping_cost' => 'nullable|numeric|min:0',
-            'estimated_delivery' => 'nullable|date',
-            'actual_delivery' => 'nullable|date',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
+        $this->authorize('update', $shipment);
 
         $oldStatus = $shipment->status;
         $shipment->update($request->only([
@@ -198,13 +216,11 @@ class ShipmentController extends Controller
 
     /**
      * Remove the specified shipment
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
     public function destroy(Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
+        $this->authorize('delete', $shipment);
 
         $shipment->delete();
 
@@ -219,16 +235,16 @@ class ShipmentController extends Controller
 
     /**
      * Get tracking details for a shipment
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
     public function getTrackingDetails(Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
+        $this->authorize('view', $shipment);
 
+        $cacheKey = "tenant:{$shipment->tenant_id}:shipment:{$shipment->id}:tracking";
+        
         // Try to get cached tracking data
-        $cachedData = $this->cacheService->getCachedShipmentData($shipment->id);
+        $cachedData = Cache::get($cacheKey);
         if ($cachedData) {
             return response()->json([
                 'success' => true,
@@ -237,17 +253,17 @@ class ShipmentController extends Controller
             ]);
         }
 
-        // Fetch fresh tracking data
+        // Fetch fresh tracking data (statusHistory already ordered desc by default)
         $trackingData = [
             'shipment' => $shipment->load(['customer', 'courier', 'statusHistory']),
             'current_status' => $shipment->currentStatus,
-            'status_history' => $shipment->statusHistory()->orderBy('happened_at', 'desc')->get(),
+            'status_history' => $shipment->statusHistory,
             'predictive_eta' => $shipment->predictiveEta,
             'alerts' => $shipment->alerts()->where('status', 'active')->get(),
         ];
 
-        // Cache the data
-        $this->cacheService->cacheShipmentData($shipment->id, $trackingData);
+        // Cache the data (5 minutes)
+        Cache::put($cacheKey, $trackingData, 300);
 
         return response()->json([
             'success' => true,
@@ -257,39 +273,52 @@ class ShipmentController extends Controller
     }
 
     /**
-     * Update shipment status
+     * Update shipment status with double-write safety
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
-    public function updateStatus(Request $request, Shipment $shipment): JsonResponse
+    public function updateStatus(UpdateStatusRequest $request, Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
+        $this->authorize('update', $shipment);
 
-        $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:pending,picked_up,in_transit,out_for_delivery,delivered,failed,returned',
-            'description' => 'nullable|string|max:500',
-            'location' => 'nullable|string|max:255',
-            'happened_at' => 'nullable|date',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
+        $correlationId = $this->getCorrelationId($request);
+        $newStatus = $request->status;
         $oldStatus = $shipment->status;
-        $shipment->update(['status' => $request->status]);
+
+        // Double-write safety: early return if same status and recent duplicate
+        if ($oldStatus === $newStatus) {
+            $lastHistory = $shipment->statusHistory()->first(); // Already ordered desc
+            if ($lastHistory && 
+                $lastHistory->status === $newStatus && 
+                $lastHistory->happened_at >= now()->subSeconds(5)) {
+                
+                Log::debug("DeliveryScore:duplicate_status_skipped", [
+                    'correlation_id' => $correlationId,
+                    'tenant_id' => $shipment->tenant_id,
+                    'shipment_id' => $shipment->id,
+                    'status' => $newStatus,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No-op (duplicate status within 5s)',
+                    'data' => $shipment->fresh(['statusHistory']),
+                    'meta' => [
+                        'correlation_id' => $correlationId,
+                    ],
+                ]);
+            }
+        }
+
+        // Update status (model hook will handle scoring)
+        $shipment->update(['status' => $newStatus]);
 
         // Create status history entry
+        $happenedAt = $request->happened_at ? \Carbon\CarbonImmutable::parse($request->happened_at) : now();
         $shipment->statusHistory()->create([
-            'status' => $request->status,
+            'status' => $newStatus,
             'description' => $request->description,
             'location' => $request->location,
-            'happened_at' => $request->happened_at ?? now(),
+            'happened_at' => $happenedAt,
         ]);
 
         // Broadcast update
@@ -301,28 +330,37 @@ class ShipmentController extends Controller
         ]);
 
         // Clear cache
+        Cache::forget("shipment:{$shipment->id}:current_status");
         $this->cacheService->invalidateShipmentCaches($shipment->id, $shipment->tenant_id);
+
+        Log::info("DeliveryScore:status_updated", [
+            'correlation_id' => $correlationId,
+            'tenant_id' => $shipment->tenant_id,
+            'shipment_id' => $shipment->id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Shipment status updated successfully',
             'data' => $shipment->fresh(['customer', 'courier', 'statusHistory']),
+            'meta' => [
+                'correlation_id' => $correlationId,
+            ],
         ]);
     }
 
     /**
      * Get status history for a shipment
+     * Tenant scoping handled by ShipmentPolicy via route model binding
      */
     public function getStatusHistory(Shipment $shipment): JsonResponse
     {
-        // Check if shipment belongs to user's tenant
-        if ($shipment->tenant_id !== Auth::user()->tenant_id) {
-            throw new ShipmentNotFoundException();
-        }
+        $this->authorize('view', $shipment);
 
-        $history = $shipment->statusHistory()
-            ->orderBy('happened_at', 'desc')
-            ->get();
+        // statusHistory already ordered desc by default
+        $history = $shipment->statusHistory;
 
         return response()->json([
             'success' => true,
@@ -336,14 +374,34 @@ class ShipmentController extends Controller
 
     /**
      * Get public shipment status (no authentication required)
+     * Rate limited to prevent enumeration attacks
      */
-    public function getPublicStatus(string $trackingNumber): JsonResponse
+    public function getPublicStatus(Request $request, string $trackingNumber): JsonResponse
     {
-        $shipment = Shipment::byTrackingNumber($trackingNumber)
-            ->where('status', '!=', 'cancelled')
-            ->first();
+        $correlationId = $this->getCorrelationId($request);
+        
+        // Optional tenant slug hash for additional security
+        $tenantSlug = $request->query('tenant');
+        
+        $query = Shipment::byTrackingNumber($trackingNumber)
+            ->where('status', '!=', 'cancelled');
+
+        // If tenant slug provided, scope to that tenant
+        if ($tenantSlug) {
+            $tenant = \App\Models\Tenant::where('subdomain', $tenantSlug)->first();
+            if ($tenant) {
+                $query->where('tenant_id', $tenant->id);
+            }
+        }
+
+        $shipment = $query->first();
 
         if (!$shipment) {
+            Log::warning("DeliveryScore:public_status_not_found", [
+                'correlation_id' => $correlationId,
+                'tracking_number' => substr($trackingNumber, 0, 8) . '...', // Log partial only
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Shipment not found',
@@ -364,51 +422,112 @@ class ShipmentController extends Controller
             ],
             'meta' => [
                 'generated_at' => now()->toISOString(),
+                'correlation_id' => $correlationId,
             ]
         ]);
     }
 
     /**
      * Handle webhook for shipment updates
+     * Includes HMAC signature validation and idempotency handling
      */
-    public function handleWebhook(Request $request): JsonResponse
+    public function handleWebhook(WebhookRequest $request): JsonResponse
     {
-        // Validate webhook signature if needed
-        $validator = Validator::make($request->all(), [
-            'tracking_number' => 'required|string',
-            'status' => 'required|string',
-            'description' => 'nullable|string',
-            'location' => 'nullable|string',
-            'happened_at' => 'nullable|date',
-        ]);
+        $correlationId = $this->getCorrelationId($request);
+        
+        // HMAC signature validation (if configured)
+        $signatureHeader = $request->header('X-Payload-Signature');
+        if ($signatureHeader) {
+            // Get tenant from shipment or request
+            $shipment = Shipment::byTrackingNumber($request->tracking_number)->first();
+            if ($shipment) {
+                $tenant = $shipment->tenant;
+                if ($tenant && $tenant->require_signed_webhooks) {
+                    $verifier = app(\App\Support\HmacVerifier::class);
+                    $isGlobalKey = false; // Webhook-specific logic
+                    if (!$verifier->verify($request, $tenant, $isGlobalKey)) {
+                        Log::warning("DeliveryScore:webhook_signature_invalid", [
+                            'correlation_id' => $correlationId,
+                            'tenant_id' => $tenant->id,
+                            'tracking_number' => substr($request->tracking_number, 0, 8) . '...',
+                        ]);
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Invalid signature',
+                        ], 401);
+                    }
+                }
+            }
+        }
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid webhook data',
-                'errors' => $validator->errors(),
-            ], 422);
+        // Idempotency check: deduplicate by event_id
+        $eventId = $request->event_id;
+        if ($eventId) {
+            $dedupKey = "once:events:{$eventId}";
+            if (Cache::has($dedupKey)) {
+                Log::debug("DeliveryScore:webhook_duplicate_skipped", [
+                    'correlation_id' => $correlationId,
+                    'event_id' => $eventId,
+                ]);
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Webhook already processed (idempotent)',
+                ]);
+            }
+            // Mark as processed (10 minute TTL)
+            Cache::put($dedupKey, true, 600);
         }
 
         $shipment = Shipment::byTrackingNumber($request->tracking_number)->first();
 
         if (!$shipment) {
+            Log::warning("DeliveryScore:webhook_shipment_not_found", [
+                'correlation_id' => $correlationId,
+                'tracking_number' => substr($request->tracking_number, 0, 8) . '...',
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Shipment not found',
             ], 404);
         }
 
-        // Update shipment status
         $oldStatus = $shipment->status;
-        $shipment->update(['status' => $request->status]);
+        $newStatus = $request->status;
+
+        // Double-write safety: early return if same status and recent duplicate
+        if ($oldStatus === $newStatus) {
+            $lastHistory = $shipment->statusHistory()->first();
+            if ($lastHistory && 
+                $lastHistory->status === $newStatus && 
+                $lastHistory->happened_at >= now()->subSeconds(5)) {
+                
+                Log::debug("DeliveryScore:webhook_duplicate_status_skipped", [
+                    'correlation_id' => $correlationId,
+                    'tenant_id' => $shipment->tenant_id,
+                    'shipment_id' => $shipment->id,
+                    'status' => $newStatus,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No-op (duplicate status within 5s)',
+                ]);
+            }
+        }
+
+        // Update shipment status (model hook will handle scoring)
+        $shipment->update(['status' => $newStatus]);
 
         // Create status history entry
+        $happenedAt = $request->happened_at 
+            ? \Carbon\CarbonImmutable::parse($request->happened_at) 
+            : now();
+        
         $shipment->statusHistory()->create([
-            'status' => $request->status,
+            'status' => $newStatus,
             'description' => $request->description,
             'location' => $request->location,
-            'happened_at' => $request->happened_at ?? now(),
+            'happened_at' => $happenedAt,
         ]);
 
         // Broadcast update
@@ -418,9 +537,25 @@ class ShipmentController extends Controller
             'source' => 'webhook',
         ]);
 
+        // Clear cache
+        Cache::forget("shipment:{$shipment->id}:current_status");
+        $this->cacheService->invalidateShipmentCaches($shipment->id, $shipment->tenant_id);
+
+        Log::info("DeliveryScore:webhook_processed", [
+            'correlation_id' => $correlationId,
+            'tenant_id' => $shipment->tenant_id,
+            'shipment_id' => $shipment->id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+            'event_id' => $eventId,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Webhook processed successfully',
+            'meta' => [
+                'correlation_id' => $correlationId,
+            ],
         ]);
     }
 }

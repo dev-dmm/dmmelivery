@@ -317,10 +317,12 @@ class Order extends Model
             return $this->primaryShipment;
         }
 
+        $customer = $this->customer;
         $shipment = Shipment::create([
             'tenant_id' => $this->tenant_id,
             'order_id' => $this->id,
             'customer_id' => $this->customer_id,
+            'global_customer_id' => $customer?->global_customer_id ?? null,
             'courier_id' => null, // Will be set when courier is assigned
             'tracking_number' => $this->generateTrackingNumber(),
             'courier_tracking_id' => $this->generateTrackingNumber(), // Temp, will be updated by courier

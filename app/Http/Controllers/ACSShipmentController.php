@@ -7,6 +7,7 @@ use App\Models\Shipment;
 use App\Models\Customer;
 use App\Models\Courier;
 use App\Models\ShipmentStatusHistory;
+use App\Services\GlobalCustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -40,8 +41,8 @@ class ACSShipmentController extends Controller
             // Find or create courier
             $courierModel = $this->findOrCreateCourier($courier);
 
-            // Create or update shipment
-            $shipment = $this->createOrUpdateShipment($order, $shipmentData, $courierModel);
+        // Create or update shipment
+        $shipment = $this->createOrUpdateShipment($order, $shipmentData, $courierModel, $customer);
 
             // Create status history entries from tracking events
             $this->createStatusHistory($shipment, $shipmentData['tracking_events'] ?? []);
@@ -85,17 +86,28 @@ class ACSShipmentController extends Controller
         $phone = $orderData['customer_phone'] ?? null;
         $name = $orderData['customer_name'] ?? 'Unknown Customer';
         
-        // Check for existing customer by email OR phone
+        // Get tenant from request context
+        $tenant = app('tenant') ?? auth()->user()?->tenant;
+        if (!$tenant) {
+            throw new \Exception('Tenant not found in request context');
+        }
+        
+        // Find or create global customer
+        $globalCustomerService = app(GlobalCustomerService::class);
+        $globalCustomer = $globalCustomerService->findOrCreateGlobalCustomer($email, $phone);
+        
+        // Check for existing customer by email OR phone (within tenant scope)
         $customer = null;
         if ($email || $phone) {
-            $customer = Customer::where(function ($query) use ($email, $phone) {
-                if ($email) {
-                    $query->where('email', $email);
-                }
-                if ($phone) {
-                    $query->orWhere('phone', $phone);
-                }
-            })->first();
+            $customer = Customer::where('tenant_id', $tenant->id)
+                ->where(function ($query) use ($email, $phone) {
+                    if ($email) {
+                        $query->where('email', $email);
+                    }
+                    if ($phone) {
+                        $query->orWhere('phone', $phone);
+                    }
+                })->first();
         }
 
         if ($customer) {
@@ -110,6 +122,11 @@ class ACSShipmentController extends Controller
             if ($email && $email !== $customer->email) {
                 $updateData['email'] = $email;
             }
+            
+            // Ensure global customer is linked
+            if (!$customer->global_customer_id) {
+                $updateData['global_customer_id'] = $globalCustomer->id;
+            }
 
             if (!empty($updateData)) {
                 $customer->update($updateData);
@@ -119,6 +136,8 @@ class ACSShipmentController extends Controller
         }
 
         return Customer::create([
+            'tenant_id' => $tenant->id,
+            'global_customer_id' => $globalCustomer->id,
             'name' => $name,
             'email' => $email ?? 'no-email@example.com',
             'phone' => $phone,
@@ -208,7 +227,7 @@ class ACSShipmentController extends Controller
     /**
      * Create or update shipment
      */
-    private function createOrUpdateShipment($order, $shipmentData, $courier)
+    private function createOrUpdateShipment($order, $shipmentData, $courier, $customer)
     {
         $trackingNumber = $shipmentData['tracking_number'];
         
@@ -217,7 +236,7 @@ class ACSShipmentController extends Controller
         
         if ($existingShipment) {
             // Update existing shipment with ACS data
-            $existingShipment->update([
+            $updateData = [
                 'courier_id' => $courier->id,
                 'courier_tracking_id' => $shipmentData['courier_tracking_id'] ?? $trackingNumber,
                 'status' => $shipmentData['status'] ?? $existingShipment->status,
@@ -226,7 +245,14 @@ class ACSShipmentController extends Controller
                 'billing_address' => $shipmentData['billing_address'] ?? $existingShipment->billing_address,
                 'shipping_cost' => $shipmentData['shipping_cost'] ?? $existingShipment->shipping_cost,
                 'courier_response' => $shipmentData['courier_response'] ?? $existingShipment->courier_response,
-            ]);
+            ];
+            
+            // Ensure global_customer_id is set if not already
+            if ($customer && $customer->global_customer_id && !$existingShipment->global_customer_id) {
+                $updateData['global_customer_id'] = $customer->global_customer_id;
+            }
+            
+            $existingShipment->update($updateData);
             
             Log::info('ACS: Updated existing shipment', [
                 'shipment_id' => $existingShipment->id,
@@ -243,7 +269,7 @@ class ACSShipmentController extends Controller
         
         if ($primaryShipment) {
             // Update the primary shipment with ACS data
-            $primaryShipment->update([
+            $updateData = [
                 'courier_id' => $courier->id,
                 'tracking_number' => $trackingNumber,
                 'courier_tracking_id' => $shipmentData['courier_tracking_id'] ?? $trackingNumber,
@@ -253,7 +279,14 @@ class ACSShipmentController extends Controller
                 'billing_address' => $shipmentData['billing_address'] ?? $primaryShipment->billing_address,
                 'shipping_cost' => $shipmentData['shipping_cost'] ?? $primaryShipment->shipping_cost,
                 'courier_response' => $shipmentData['courier_response'] ?? $primaryShipment->courier_response,
-            ]);
+            ];
+            
+            // Ensure global_customer_id is set if not already
+            if ($customer && $customer->global_customer_id && !$primaryShipment->global_customer_id) {
+                $updateData['global_customer_id'] = $customer->global_customer_id;
+            }
+            
+            $primaryShipment->update($updateData);
             
             Log::info('ACS: Updated primary shipment with ACS data', [
                 'shipment_id' => $primaryShipment->id,
@@ -269,6 +302,7 @@ class ACSShipmentController extends Controller
             'tenant_id' => $order->tenant_id,
             'order_id' => $order->id,
             'customer_id' => $order->customer_id,
+            'global_customer_id' => $customer->global_customer_id ?? null,
             'courier_id' => $courier->id,
             'tracking_number' => $trackingNumber,
             'courier_tracking_id' => $shipmentData['courier_tracking_id'] ?? $trackingNumber,

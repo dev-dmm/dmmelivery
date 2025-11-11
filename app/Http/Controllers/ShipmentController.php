@@ -38,7 +38,7 @@ class ShipmentController extends Controller
     
         $shipments = QueryBuilder::for($base)
             ->with([
-                'customer:id,name,email,phone',
+                'customer:id,name,email,phone,delivery_score',
                 'courier:id,name,code,tracking_url_template',
                 'predictiveEta:id,shipment_id,predicted_eta,confidence_score,delay_risk_level,delay_factors,weather_impact,traffic_impact',
             ])
@@ -192,7 +192,7 @@ class ShipmentController extends Controller
                                 ->orWhere('email', 'like', "%{$searchQuery}%");
                           });
                 })
-                ->with(['customer:id,name,email', 'courier:id,name,code'])
+                ->with(['customer:id,name,email,delivery_score', 'courier:id,name,code'])
                 ->orderBy('created_at', 'desc')
                 ->limit(20)
                 ->get()

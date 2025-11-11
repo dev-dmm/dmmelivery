@@ -14,9 +14,18 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
         
-        // Set up test environment
-        $this->artisan('migrate', ['--database' => 'testing']);
-        $this->artisan('db:seed', ['--class' => 'DatabaseSeeder']);
+        // Disable WebSocket broadcasts and other side-effects in tests
+        app()->bind(
+            \App\Services\Contracts\WebSocketServiceInterface::class,
+            fn() => new class {
+                public function __call($method, $args) {
+                    // No-op: disable all WebSocket broadcasts in tests
+                }
+            }
+        );
+        
+        // Note: RefreshDatabase trait handles migrations automatically
+        // If seeding is needed, use: $this->seed(); or $this->seed(DatabaseSeeder::class);
     }
 
     protected function tearDown(): void
@@ -171,5 +180,49 @@ abstract class TestCase extends BaseTestCase
             'predictiveEta' => $predictiveEta,
             'alert' => $alert,
         ];
+    }
+
+    /**
+     * Assert that a unique index exists on a table
+     * Useful for verifying database constraints required for upsert operations
+     * 
+     * @param string $table Table name
+     * @param string $indexName Index name to check
+     * @param string|null $message Custom assertion message
+     */
+    protected function assertUniqueIndex(string $table, string $indexName, ?string $message = null): void
+    {
+        $driver = \DB::getDriverName();
+        $exists = false;
+        
+        if ($driver === 'mysql') {
+            $result = \DB::selectOne("
+                SELECT COUNT(*) as c FROM information_schema.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND INDEX_NAME = ?
+                  AND NON_UNIQUE = 0
+            ", [$table, $indexName]);
+            $exists = ($result->c ?? 0) > 0;
+        } elseif ($driver === 'pgsql') {
+            $result = \DB::selectOne("
+                SELECT COUNT(*) as c FROM pg_indexes
+                WHERE tablename = ?
+                  AND indexname = ?
+            ", [$table, $indexName]);
+            $exists = ($result->c ?? 0) > 0;
+        } elseif ($driver === 'sqlite') {
+            // SQLite: Check sqlite_master for unique indexes
+            $result = \DB::selectOne("
+                SELECT COUNT(*) as c FROM sqlite_master
+                WHERE type = 'index'
+                  AND tbl_name = ?
+                  AND name = ?
+            ", [$table, $indexName]);
+            $exists = ($result->c ?? 0) > 0;
+        }
+        
+        $defaultMessage = "Unique index '{$indexName}' must exist on table '{$table}'";
+        $this->assertTrue($exists, $message ?? $defaultMessage);
     }
 }
