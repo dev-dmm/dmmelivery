@@ -201,6 +201,14 @@ class DMM_Delivery_Bridge {
         // Add custom order meta box
         add_action('add_meta_boxes', [$this, 'add_order_meta_box']);
         
+        // Add custom column to orders list (legacy)
+        add_filter('manage_edit-shop_order_columns', [$this, 'add_courier_voucher_column'], 20);
+        add_action('manage_shop_order_posts_custom_column', [$this, 'render_courier_voucher_column'], 10, 2);
+        
+        // HPOS support for custom column (always add, WooCommerce will handle if HPOS is enabled)
+        add_filter('manage_woocommerce_page_wc-orders_columns', [$this, 'add_courier_voucher_column'], 20);
+        add_action('woocommerce_shop_order_list_table_custom_column', [$this, 'render_courier_voucher_column_hpos'], 10, 2);
+        
         // Action Scheduler handlers
         add_action('dmm_send_order', [$this->order_processor, 'process_order_async'], 10, 1);
         add_action('dmm_update_order', [$this, 'process_order_update'], 10, 1);
@@ -492,6 +500,116 @@ class DMM_Delivery_Bridge {
             <?php endif; ?>
         </div>
         <?php
+    }
+    
+    /**
+     * Add custom column to WooCommerce orders list
+     * 
+     * @param array $columns Existing columns
+     * @return array Modified columns
+     */
+    public function add_courier_voucher_column($columns) {
+        // Insert the column before the "Total" column
+        $new_columns = [];
+        foreach ($columns as $key => $column) {
+            if ($key === 'order_total') {
+                $new_columns['dmm_courier_voucher'] = __('Courier Voucher', 'dmm-delivery-bridge');
+            }
+            $new_columns[$key] = $column;
+        }
+        
+        // If "order_total" doesn't exist, append to the end
+        if (!isset($columns['order_total'])) {
+            $new_columns['dmm_courier_voucher'] = __('Courier Voucher', 'dmm-delivery-bridge');
+        }
+        
+        return $new_columns;
+    }
+    
+    /**
+     * Render custom column content for legacy WooCommerce orders
+     * 
+     * @param string $column Column name
+     * @param int $post_id Post/Order ID
+     */
+    public function render_courier_voucher_column($column, $post_id) {
+        if ($column !== 'dmm_courier_voucher') {
+            return;
+        }
+        
+        $order = wc_get_order($post_id);
+        if (!$order) {
+            return;
+        }
+        
+        echo $this->get_courier_voucher_display($order);
+    }
+    
+    /**
+     * Render custom column content for HPOS WooCommerce orders
+     * 
+     * @param string $column Column name
+     * @param \WC_Order|int $order Order object or order ID
+     */
+    public function render_courier_voucher_column_hpos($column, $order) {
+        if ($column !== 'dmm_courier_voucher') {
+            return;
+        }
+        
+        // Handle both order object and order ID
+        if (is_numeric($order)) {
+            $order = wc_get_order($order);
+        }
+        
+        if (!$order || !($order instanceof \WC_Order)) {
+            return;
+        }
+        
+        echo $this->get_courier_voucher_display($order);
+    }
+    
+    /**
+     * Get the courier voucher display text for an order
+     * 
+     * Checks the configured meta fields for each courier and returns
+     * the courier name if a voucher is found, or "No voucher yet" if none.
+     * 
+     * @param \WC_Order $order WooCommerce order object
+     * @return string Display text
+     */
+    private function get_courier_voucher_display($order) {
+        if (!$order) {
+            return '<span style="color: #999;">—</span>';
+        }
+        
+        $options = get_option('dmm_delivery_bridge_options', []);
+        
+        // Define courier meta fields to check (in priority order)
+        $courier_checks = [
+            'ELTA' => isset($options['elta_voucher_meta_field']) && !empty($options['elta_voucher_meta_field']) 
+                ? [$options['elta_voucher_meta_field']] 
+                : ['_elta_voucher', 'elta_voucher', 'elta_tracking', '_elta_tracking', 'elta_reference', '_elta_reference'],
+            'Geniki' => isset($options['geniki_voucher_meta_field']) && !empty($options['geniki_voucher_meta_field']) 
+                ? [$options['geniki_voucher_meta_field']] 
+                : ['_geniki_voucher', 'geniki_voucher', 'geniki_tracking', '_geniki_tracking', 'gtx_voucher', 'gtx_tracking'],
+            'ACS' => isset($options['acs_voucher_meta_field']) && !empty($options['acs_voucher_meta_field']) 
+                ? [$options['acs_voucher_meta_field']] 
+                : ['_acs_voucher', 'acs_voucher', 'acs_tracking', '_appsbyb_acs_courier_gr_no_pod'],
+        ];
+        
+        // Check each courier's meta fields
+        foreach ($courier_checks as $courier_name => $meta_fields) {
+            foreach ($meta_fields as $meta_field) {
+                $value = $order->get_meta($meta_field);
+                if (!empty($value) && trim($value) !== '') {
+                    // Found a voucher for this courier
+                    return '<span style="color: #2271b1; font-weight: 500;">' . esc_html($courier_name) . '</span>';
+                }
+            }
+        }
+        
+        // No voucher found
+        return '<span style="color: #999;">' . __('No voucher yet', 'dmm-delivery-bridge') . '</span>';
     }
     
     /**
