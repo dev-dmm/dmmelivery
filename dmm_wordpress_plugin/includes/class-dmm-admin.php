@@ -699,18 +699,21 @@ class DMM_Admin {
             'acs_company_password' => '',
             'acs_user_id' => '',
             'acs_user_password' => '',
+            'acs_voucher_meta_field' => '',
             // Geniki Taxidromiki settings
             'geniki_enabled' => 'no',
             'geniki_soap_endpoint' => 'https://testvoucher.taxydromiki.gr/JobServicesV2.asmx?WSDL',
             'geniki_username' => '',
             'geniki_password' => '',
             'geniki_application_key' => '',
+            'geniki_voucher_meta_field' => '',
             // ELTA Hellenic Post settings
             'elta_enabled' => 'no',
             'elta_api_endpoint' => 'https://customers.elta-courier.gr',
             'elta_user_code' => '',
             'elta_user_pass' => '',
             'elta_apost_code' => '',
+            'elta_voucher_meta_field' => '',
             // Log management settings
             'log_retention_days' => 7,
             'max_log_file_size_mb' => 10,
@@ -859,9 +862,22 @@ class DMM_Admin {
             $sanitized['max_log_file_size_mb'] = max(1, min(100, absint($input['max_log_file_size_mb'])));
         }
         
-        // Sanitize meta field name
+        // Sanitize meta field names
         if (isset($input['acs_courier_meta_field'])) {
-            $sanitized['acs_courier_meta_field'] = sanitize_key($input['acs_courier_meta_field']);
+            $sanitized['acs_courier_meta_field'] = sanitize_text_field($input['acs_courier_meta_field']);
+        }
+        
+        // Sanitize voucher meta field names for each courier
+        if (isset($input['acs_voucher_meta_field'])) {
+            $sanitized['acs_voucher_meta_field'] = sanitize_text_field($input['acs_voucher_meta_field']);
+        }
+        
+        if (isset($input['geniki_voucher_meta_field'])) {
+            $sanitized['geniki_voucher_meta_field'] = sanitize_text_field($input['geniki_voucher_meta_field']);
+        }
+        
+        if (isset($input['elta_voucher_meta_field'])) {
+            $sanitized['elta_voucher_meta_field'] = sanitize_text_field($input['elta_voucher_meta_field']);
         }
         
         // Sanitize rate limit settings
