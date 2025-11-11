@@ -472,23 +472,6 @@ class DMM_Order_Processor {
     }
     
     /**
-     * Schedule retry (deprecated - use scheduler->schedule_retry instead)
-     * Kept for backward compatibility but now delegates to scheduler
-     *
-     * @param int $order_id Order ID
-     * @param int $retry_count Retry count
-     * @deprecated Use $this->scheduler->schedule_retry() instead
-     */
-    private function schedule_retry($order_id, $retry_count) {
-        // Delegate to centralized scheduler
-        $this->scheduler->schedule_retry(
-            'dmm_send_order',
-            ['order_id' => $order_id],
-            $retry_count
-        );
-    }
-    
-    /**
      * Prepare WooCommerce order data for DMM Delivery API
      * 
      * Transforms a WooCommerce order object into the format expected by the DMM Delivery API.
@@ -499,8 +482,8 @@ class DMM_Order_Processor {
      * - 'order': Order details (ID, status, totals, items, etc.)
      * - 'customer': Customer billing information
      * - 'shipping': Shipping address and weight
-     * - 'create_shipment': Whether to create shipment (from settings)
-     * - 'preferred_courier': Courier preference from order meta
+     * - 'voucher_number': Voucher/tracking number if found in order meta
+     * - 'courier_company': Courier company name if voucher found
      * 
      * Special handling:
      * - Falls back to billing address if shipping address is missing
@@ -643,9 +626,17 @@ class DMM_Order_Processor {
                     ],
                     'weight' => $this->calculate_order_weight($order),
                 ],
-                'create_shipment' => isset($this->options['create_shipment']) && $this->options['create_shipment'] === 'yes',
-                'preferred_courier' => $this->get_courier_from_order($order),
             ];
+            
+            // Get comprehensive courier and voucher information
+            $courier_voucher_info = $this->get_courier_voucher_from_order($order);
+            if (!empty($courier_voucher_info['courier'])) {
+                $order_data['preferred_courier'] = $courier_voucher_info['courier'];
+            }
+            if (!empty($courier_voucher_info['voucher_number'])) {
+                $order_data['voucher_number'] = $courier_voucher_info['voucher_number'];
+                $order_data['courier_company'] = $courier_voucher_info['courier']; // Also include company name
+            }
             
         } catch (Exception $e) {
             $this->logger->debug_log('Fatal error in prepare_order_data: ' . $e->getMessage());
@@ -688,7 +679,6 @@ class DMM_Order_Processor {
                     ],
                     'weight' => 0,
                 ],
-                'create_shipment' => false,
             ];
         }
     }
@@ -711,32 +701,64 @@ class DMM_Order_Processor {
     }
     
     /**
-     * Get courier from order meta
+     * Get courier and voucher information from order meta
+     * 
+     * Determines courier based on user-configured meta fields only.
+     * If a configured meta field has a value, that courier is selected.
      *
      * @param WC_Order $order Order object
-     * @return string Courier name or empty
+     * @return array Array with 'courier' (lowercase name) and 'voucher_number' (or empty strings)
      */
-    private function get_courier_from_order($order) {
-        // Check for various courier meta fields
-        $courier_meta_keys = [
-            '_acs_voucher',
-            'acs_voucher',
-            'courier',
-            'shipping_courier',
+    private function get_courier_voucher_from_order($order) {
+        $result = [
+            'courier' => '',
+            'voucher_number' => ''
         ];
         
-        foreach ($courier_meta_keys as $key) {
-            $value = $order->get_meta($key);
-            if ($value) {
-                // Try to determine courier from meta key or value
-                if (strpos($key, 'acs') !== false) {
-                    return 'acs';
-                }
-                return strtolower($value);
+        if (!$order) {
+            return $result;
+        }
+        
+        $options = get_option('dmm_delivery_bridge_options', []);
+        
+        // Check each courier's configured meta field (in priority order)
+        // Only check the user-configured field - if it has a value, that's the courier
+        $courier_checks = [
+            'elta' => isset($options['elta_voucher_meta_field']) && !empty($options['elta_voucher_meta_field']) 
+                ? $options['elta_voucher_meta_field'] 
+                : null,
+            'geniki' => isset($options['geniki_voucher_meta_field']) && !empty($options['geniki_voucher_meta_field']) 
+                ? $options['geniki_voucher_meta_field'] 
+                : null,
+            'acs' => isset($options['acs_voucher_meta_field']) && !empty($options['acs_voucher_meta_field']) 
+                ? $options['acs_voucher_meta_field'] 
+                : null,
+            'speedex' => isset($options['speedex_voucher_meta_field']) && !empty($options['speedex_voucher_meta_field']) 
+                ? $options['speedex_voucher_meta_field'] 
+                : null,
+        ];
+        
+        // Check each courier's configured meta field
+        foreach ($courier_checks as $courier_name => $meta_field) {
+            // Skip if no meta field configured for this courier
+            if (empty($meta_field)) {
+                continue;
+            }
+            
+            // Check if the configured meta field has a value
+            $value = $order->get_meta($meta_field);
+            if (!empty($value) && trim($value) !== '') {
+                // Found a voucher for this courier
+                $result['courier'] = strtolower($courier_name);
+                $result['voucher_number'] = trim($value);
+                return $result; // Return first match (priority order)
             }
         }
         
-        return '';
+        // No configured courier fields matched - return empty result
+        // Order will be sent without courier information
+        return $result;
     }
+    
 }
 

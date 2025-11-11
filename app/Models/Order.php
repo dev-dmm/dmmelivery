@@ -133,6 +133,7 @@ class Order extends Model
     }
 
 
+
     // Status Methods
     public function isPending(): bool
     {
@@ -424,5 +425,109 @@ class Order extends Model
     public function scopeUnpaid($query)
     {
         return $query->where('payment_status', 'pending');
+    }
+
+    // Courier Methods
+    /**
+     * Get courier for this order
+     * 
+     * Priority:
+     * 1. Courier from shipment (if shipment exists)
+     * 2. Courier from voucher (stored in additional_data.courier_company)
+     * 3. Preferred courier field (legacy)
+     * 
+     * @return Courier|null
+     */
+    public function getCourier(): ?Courier
+    {
+        // First priority: Get courier from shipment
+        $shipment = $this->primaryShipment ?? $this->shipments()->first();
+        if ($shipment && $shipment->courier_id) {
+            return $shipment->courier;
+        }
+
+        // Second priority: Get courier from voucher (additional_data)
+        $courierCompany = $this->additional_data['courier_company'] ?? null;
+        if ($courierCompany) {
+            $courier = Courier::where('tenant_id', $this->tenant_id)
+                ->where(function($query) use ($courierCompany) {
+                    $query->whereRaw('LOWER(name) = ?', [strtolower($courierCompany)])
+                          ->orWhereRaw('LOWER(code) = ?', [strtolower($courierCompany)]);
+                })
+                ->first();
+            
+            if ($courier) {
+                return $courier;
+            }
+        }
+
+        // Third priority: Get courier from preferred_courier field (legacy)
+        if ($this->preferred_courier) {
+            $courier = Courier::where('tenant_id', $this->tenant_id)
+                ->where(function($query) {
+                    $query->whereRaw('LOWER(name) = ?', [strtolower($this->preferred_courier)])
+                          ->orWhereRaw('LOWER(code) = ?', [strtolower($this->preferred_courier)]);
+                })
+                ->first();
+            
+            if ($courier) {
+                return $courier;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get courier name for display
+     * 
+     * @return string
+     */
+    public function getCourierName(): string
+    {
+        $courier = $this->getCourier();
+        if ($courier) {
+            return $courier->name;
+        }
+
+        // Fallback to stored courier company name
+        $courierCompany = $this->additional_data['courier_company'] ?? $this->preferred_courier;
+        if ($courierCompany) {
+            return ucfirst($courierCompany);
+        }
+
+        return 'Not assigned';
+    }
+
+    /**
+     * Get voucher number for this order
+     * 
+     * @return string|null
+     */
+    public function getVoucherNumber(): ?string
+    {
+        // First check shipment tracking number (if it's a voucher)
+        $shipment = $this->primaryShipment ?? $this->shipments()->first();
+        if ($shipment && $shipment->tracking_number) {
+            // If tracking number looks like a voucher (not generated), return it
+            // Generated tracking numbers are 12 chars uppercase random
+            // Vouchers are usually different format
+            if (strlen($shipment->tracking_number) !== 12 || !preg_match('/^[A-Z0-9]{12}$/', $shipment->tracking_number)) {
+                return $shipment->tracking_number;
+            }
+        }
+
+        // Check additional_data
+        return $this->additional_data['voucher_number'] ?? null;
+    }
+
+    /**
+     * Check if order has a voucher
+     * 
+     * @return bool
+     */
+    public function hasVoucher(): bool
+    {
+        return !empty($this->getVoucherNumber());
     }
 }

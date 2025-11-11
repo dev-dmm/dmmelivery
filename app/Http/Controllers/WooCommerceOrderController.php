@@ -192,8 +192,8 @@ class WooCommerceOrderController extends Controller
                 data_get($request, 'customer.first_name'),
                 data_get($request, 'customer.last_name'),
             ]))),
-            'create_shipment' => data_get($request, 'create_shipment', false),
-            'preferred_courier' => data_get($request, 'preferred_courier')
+            'voucher_number' => data_get($request, 'voucher_number'),
+            'courier_company' => data_get($request, 'courier_company')
         ]);
         
         // Set READ COMMITTED isolation level before transaction starts (MySQL-specific)
@@ -407,6 +407,12 @@ class WooCommerceOrderController extends Controller
                     'shipping_city'        => data_get($request, 'shipping.address.city'),
                     'shipping_postal_code' => data_get($request, 'shipping.address.postcode'),
                     'shipping_country'     => data_get($request, 'shipping.address.country', 'GR'),
+                    
+                    // Voucher and courier information (stored in additional_data)
+                    'additional_data'      => array_filter([
+                        'voucher_number' => data_get($request, 'voucher_number'),
+                        'courier_company' => data_get($request, 'courier_company'),
+                    ]),
                 ];
 
                 \Log::info('Creating order with data', [
@@ -426,120 +432,114 @@ class WooCommerceOrderController extends Controller
                 // Create order items if provided
                 $this->createOrderItems($order, $request);
                 
-                // Create shipment (default true)
+                // Create shipment ONLY if order has a voucher
+                // If no voucher, order is created but shipment waits for voucher to be added
                 $shipment = null;
                 $shipmentWarning = null;
-                if ($request->boolean('create_shipment', true)) {
-                    \Log::info('Looking for courier', [
+                $courier = null;
+                
+                $courierCompany = data_get($request, 'courier_company');
+                $voucherNumber = data_get($request, 'voucher_number');
+                
+                // Only create shipment if voucher exists
+                if (!empty($voucherNumber) && !empty($courierCompany)) {
+                    \Log::info('Order has voucher - creating shipment', [
                         'tenant_id' => $tenant->id,
                         'order_id' => $order->id,
-                        'order_external_id' => $externalId
+                        'order_external_id' => $externalId,
+                        'voucher_number' => $voucherNumber,
+                        'courier_company' => $courierCompany
                     ]);
                     
-                    // First try to find default courier
-                    $defaultCourier = Courier::where('tenant_id', $tenant->id)
-                        ->where('is_default', true)
+                    // Find courier by name (case-insensitive) or code
+                    $courier = Courier::where('tenant_id', $tenant->id)
+                        ->where(function($query) use ($courierCompany) {
+                            $query->whereRaw('LOWER(name) = ?', [strtolower($courierCompany)])
+                                  ->orWhereRaw('LOWER(code) = ?', [strtolower($courierCompany)]);
+                        })
                         ->first();
-                        
-                    \Log::info('Default courier lookup', [
+                    
+                    if ($courier) {
+                        \Log::info('Found courier from voucher', [
+                            'courier_company' => $courierCompany,
+                            'courier_id' => $courier->id,
+                            'courier_name' => $courier->name,
+                            'courier_code' => $courier->code,
+                            'voucher_number' => $voucherNumber
+                        ]);
+                    } else {
+                        \Log::error('Courier from voucher not found in database - shipment will be skipped', [
+                            'courier_company' => $courierCompany,
+                            'tenant_id' => $tenant->id,
+                            'voucher_number' => $voucherNumber,
+                            'available_couriers' => Courier::where('tenant_id', $tenant->id)->get(['id', 'name', 'code'])
+                        ]);
+                        // Don't create shipment if voucher courier not found - this is a configuration error
+                        $shipmentWarning = "Order has voucher for '{$courierCompany}' but this courier is not configured in the system. Please configure the courier and create shipment manually.";
+                    }
+                } else {
+                    // No voucher - order created but shipment waits for voucher
+                    \Log::info('Order created without voucher - shipment will be created when voucher is added', [
                         'tenant_id' => $tenant->id,
-                        'default_courier_found' => $defaultCourier ? 'YES' : 'NO',
-                        'default_courier_id' => $defaultCourier?->id,
-                        'default_courier_name' => $defaultCourier?->name
+                        'order_id' => $order->id,
+                        'order_external_id' => $externalId,
+                        'has_voucher_number' => !empty($voucherNumber),
+                        'has_courier_company' => !empty($courierCompany)
+                    ]);
+                    // No shipment created - this is expected behavior
+                }
+                
+                // Only create shipment if voucher exists AND courier was found
+                if (!empty($voucherNumber) && !empty($courierCompany) && $courier) {
+                    $addr = $request->input('shipping.address');
+                
+                    \Log::info('Preparing shipment creation', [
+                        'tenant_id' => $tenant->id,
+                        'order_id' => $order->id,
+                        'customer_id' => $customer->id,
+                        'courier_id' => $courier->id,
+                        'courier_name' => $courier->name,
+                        'voucher_number' => $voucherNumber,
+                        'shipping_address' => $this->formatAddress($addr),
+                        'shipping_city' => $addr['city'] ?? '',
+                        'weight' => (float) data_get($request, 'shipping.weight', 0.5),
+                        'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0)
+                    ]);
+
+                    // Use voucher number as tracking number
+                    $tracking = trim($voucherNumber);
+                    
+                    \Log::info('Using voucher number as tracking number', [
+                        'voucher_number' => $tracking,
+                        'courier_company' => $courierCompany
+                    ]);
+
+                    $shipment = Shipment::create([
+                        'tenant_id'         => $tenant->id,
+                        'order_id'          => $order->id,
+                        'customer_id'       => $customer->id,
+                        'global_customer_id' => $customer->global_customer_id ?? null,
+                        'courier_id'        => $courier->id,
+                        'tracking_number'   => $tracking,
+                        'courier_tracking_id' => $tracking, // Voucher number is the tracking number
+                        'status'            => 'pending',
+                        'shipping_address'  => $this->formatAddress($addr),
+                        'shipping_city'     => $addr['city'] ?? '',
+                        'billing_address'   => $this->formatAddress($addr),
+                        'weight'            => (float) data_get($request, 'shipping.weight', 0.5),
+                        'shipping_cost'     => (float) data_get($request, 'order.shipping_cost', 0),
+                        'dimensions'        => null,
+                        'created_at'        => now(),
+                        'updated_at'        => now(),
                     ]);
                     
-                    // If no default, try any courier for this tenant
-                    if (!$defaultCourier) {
-                        $anyCourier = Courier::where('tenant_id', $tenant->id)->first();
-                        \Log::info('Any courier lookup', [
-                            'tenant_id' => $tenant->id,
-                            'any_courier_found' => $anyCourier ? 'YES' : 'NO',
-                            'any_courier_id' => $anyCourier?->id,
-                            'any_courier_name' => $anyCourier?->name
-                        ]);
-                    }
-                    
-                    $courier = $defaultCourier ?? Courier::where('tenant_id', $tenant->id)->first();
-
-                    if (!$courier) {
-                        \Log::warning('No courier configured for tenant - order created but shipment skipped', [
-                            'tenant_id' => $tenant->id,
-                            'order_id' => $order->id,
-                            'available_couriers' => Courier::where('tenant_id', $tenant->id)->get(['id', 'name', 'is_default'])
-                        ]);
-                        // Don't throw exception - create order without shipment
-                        // Shipment can be created later when courier is configured
-                        $shipmentWarning = 'Order created successfully, but shipment was not created because no courier is configured for this tenant. Please configure a courier and create the shipment manually.';
-                    }
-                    
-                    // Only create shipment if courier was found
-                    if ($courier) {
-                        \Log::info('Found courier', [
-                            'courier_id' => $courier->id,
-                            'courier_name' => $courier->name
-                        ]);
-
-                        $addr = $request->input('shipping.address');
-                    
-                        \Log::info('Preparing shipment creation', [
-                            'tenant_id' => $tenant->id,
-                            'order_id' => $order->id,
-                            'customer_id' => $customer->id,
-                            'courier_id' => $courier->id,
-                            'shipping_address' => $this->formatAddress($addr),
-                            'shipping_city' => $addr['city'] ?? '',
-                            'weight' => (float) data_get($request, 'shipping.weight', 0.5),
-                            'shipping_cost' => (float) data_get($request, 'order.shipping_cost', 0)
-                        ]);
-
-                        // collision-safe tracking number generation
-                        $tracking = null;
-                        $attempts = 0;
-                        do {
-                            $tracking = strtoupper(Str::random(12));
-                            $attempts++;
-                            \Log::info('Generating tracking number', [
-                                'attempt' => $attempts,
-                                'tracking_number' => $tracking,
-                                'exists' => Shipment::where('tenant_id', $tenant->id)
-                                    ->where('tracking_number', $tracking)
-                                    ->exists()
-                            ]);
-                        } while (
-                            Shipment::where('tenant_id', $tenant->id)
-                                ->where('tracking_number', $tracking)
-                                ->exists()
-                        );
-                        
-                        \Log::info('Generated unique tracking number', [
-                            'tracking_number' => $tracking,
-                            'attempts' => $attempts
-                        ]);
-
-                        $shipment = Shipment::create([
-                            'tenant_id'         => $tenant->id,
-                            'order_id'          => $order->id,
-                            'customer_id'       => $customer->id,
-                            'global_customer_id' => $customer->global_customer_id ?? null,
-                            'courier_id'        => $courier->id,
-                            'tracking_number'   => $tracking,
-                            'courier_tracking_id' => $tracking, // Set same as tracking_number
-                            'status'            => 'pending',
-                            'shipping_address'  => $this->formatAddress($addr),
-                            'shipping_city'     => $addr['city'] ?? '',
-                            'billing_address'   => $this->formatAddress($addr),
-                            'weight'            => (float) data_get($request, 'shipping.weight', 0.5),
-                            'shipping_cost'     => (float) data_get($request, 'order.shipping_cost', 0),
-                            'dimensions'        => null,
-                            'created_at'        => now(),
-                            'updated_at'        => now(),
-                        ]);
-                        
-                        \Log::info('Shipment created successfully', [
-                            'shipment_id' => $shipment->id,
-                            'tracking_number' => $tracking
-                        ]);
-                    }
+                    \Log::info('Shipment created successfully with voucher', [
+                        'shipment_id' => $shipment->id,
+                        'tracking_number' => $tracking,
+                        'voucher_number' => $voucherNumber,
+                        'courier_company' => $courierCompany,
+                        'courier_id' => $courier->id
+                    ]);
                 }
                 
                 \Log::info('Transaction completed successfully', [
