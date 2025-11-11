@@ -172,19 +172,40 @@ jQuery(document).ready(function($) {
                     $select.empty();
                     $select.append('<option value=""><?php echo esc_js(__('-- Select Meta Field --', 'dmm-delivery-bridge')); ?></option>');
                     
+                    var foundSavedValue = false;
+                    
+                    // Add all meta fields from the response
                     $.each(response.data.meta_fields, function(index, metaField) {
-                        var selected = (metaField === savedValue) ? 'selected' : '';
-                        $select.append('<option value="' + escapeHtml(metaField) + '" ' + selected + '>' + escapeHtml(metaField) + '</option>');
+                        var isSelected = (metaField === savedValue);
+                        if (isSelected) {
+                            foundSavedValue = true;
+                        }
+                        $select.append('<option value="' + escapeHtml(metaField) + '" ' + (isSelected ? 'selected' : '') + '>' + escapeHtml(metaField) + '</option>');
                     });
+                    
+                    // If saved value is not in the list, add it anyway (in case it was deleted from orders)
+                    if (savedValue && !foundSavedValue) {
+                        $select.append('<option value="' + escapeHtml(savedValue) + '" selected>' + escapeHtml(savedValue) + '</option>');
+                    }
+                    
+                    // Ensure the saved value is selected
+                    if (savedValue) {
+                        $select.val(savedValue);
+                    }
                 }
             },
             error: function() {
                 console.error('Failed to load meta fields');
+                // If AJAX fails, try to set the saved value if it exists
+                if (savedValue) {
+                    $select.append('<option value="' + escapeHtml(savedValue) + '" selected>' + escapeHtml(savedValue) + '</option>');
+                }
             }
         });
     }
     
     function escapeHtml(text) {
+        if (!text) return '';
         var map = {
             '&': '&amp;',
             '<': '&lt;',
@@ -192,7 +213,7 @@ jQuery(document).ready(function($) {
             '"': '&quot;',
             "'": '&#039;'
         };
-        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
     }
     
     loadMetaFields();
