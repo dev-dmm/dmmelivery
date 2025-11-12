@@ -742,5 +742,161 @@ class DMM_API_Client {
         
         return $count;
     }
+    
+    /**
+     * Get recent errors for diagnostic purposes
+     * 
+     * Retrieves recent error logs to help diagnose why the circuit breaker opened.
+     * This is useful for administrators to understand error patterns.
+     *
+     * @param int $minutes Number of minutes to look back (default: 5)
+     * @param int $limit Maximum number of errors to return (default: 50)
+     * @return array Array of error log entries with keys:
+     *               - 'id': Log entry ID
+     *               - 'order_id': WooCommerce order ID
+     *               - 'error_message': Error message
+     *               - 'context': Context (usually 'api')
+     *               - 'created_at': Timestamp
+     *               - 'response_data': Parsed response data (if available)
+     * @since 1.0.0
+     */
+    public function get_recent_errors($minutes = 5, $limit = 50) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'dmm_delivery_logs';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare(
+            "SHOW TABLES LIKE %s",
+            $table_name
+        )) === $table_name;
+        
+        if (!$table_exists) {
+            return [];
+        }
+        
+        $since = date('Y-m-d H:i:s', time() - ($minutes * 60));
+        
+        $errors = $wpdb->get_results($wpdb->prepare("
+            SELECT id, order_id, error_message, context, created_at, response_data
+            FROM {$table_name}
+            WHERE status = 'error' 
+            AND created_at >= %s
+            ORDER BY created_at DESC
+            LIMIT %d
+        ", $since, $limit), ARRAY_A);
+        
+        // Parse response data for each error
+        $formatted_errors = [];
+        foreach ($errors as $error) {
+            $response_data = null;
+            if (!empty($error['response_data'])) {
+                $decoded = json_decode($error['response_data'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $response_data = $decoded;
+                }
+            }
+            
+            $formatted_errors[] = [
+                'id' => (int) $error['id'],
+                'order_id' => (int) $error['order_id'],
+                'error_message' => $error['error_message'],
+                'context' => $error['context'] ?? 'api',
+                'created_at' => $error['created_at'],
+                'response_data' => $response_data
+            ];
+        }
+        
+        return $formatted_errors;
+    }
+    
+    /**
+     * Analyze error patterns from recent errors
+     * 
+     * Analyzes recent errors to identify common patterns and root causes.
+     * This helps administrators understand what's causing the high error rate.
+     *
+     * @param int $minutes Number of minutes to analyze (default: 5)
+     * @return array Analysis with keys:
+     *               - 'total_errors': Total number of errors
+     *               - 'error_patterns': Array of error message patterns and counts
+     *               - 'http_codes': Array of HTTP status codes and counts
+     *               - 'common_messages': Most common error messages
+     *               - 'time_range': Time range analyzed
+     * @since 1.0.0
+     */
+    public function analyze_error_patterns($minutes = 5) {
+        $errors = $this->get_recent_errors($minutes, 200);
+        
+        $analysis = [
+            'total_errors' => count($errors),
+            'error_patterns' => [],
+            'http_codes' => [],
+            'common_messages' => [],
+            'time_range' => [
+                'minutes' => $minutes,
+                'since' => date('Y-m-d H:i:s', time() - ($minutes * 60)),
+                'until' => date('Y-m-d H:i:s')
+            ]
+        ];
+        
+        $message_counts = [];
+        $http_code_counts = [];
+        
+        foreach ($errors as $error) {
+            // Count error messages
+            $message = $error['error_message'] ?? 'Unknown error';
+            if (!isset($message_counts[$message])) {
+                $message_counts[$message] = 0;
+            }
+            $message_counts[$message]++;
+            
+            // Extract HTTP codes from response data
+            if (isset($error['response_data']['http_code'])) {
+                $code = (int) $error['response_data']['http_code'];
+                if (!isset($http_code_counts[$code])) {
+                    $http_code_counts[$code] = 0;
+                }
+                $http_code_counts[$code]++;
+            }
+            
+            // Check for common error patterns
+            $lower_message = strtolower($message);
+            $patterns = [
+                'circuit breaker' => 'Circuit breaker open',
+                'rate limit' => 'Rate limiting',
+                '429' => 'Rate limiting (HTTP 429)',
+                '500' => 'Server error (HTTP 500)',
+                '502' => 'Bad gateway (HTTP 502)',
+                '503' => 'Service unavailable (HTTP 503)',
+                'timeout' => 'Request timeout',
+                'connection' => 'Connection error',
+                'dns' => 'DNS resolution error',
+                'ssl' => 'SSL/TLS error',
+                'authentication' => 'Authentication error',
+                'validation' => 'Validation error',
+                'configuration' => 'Configuration error'
+            ];
+            
+            foreach ($patterns as $pattern => $label) {
+                if (strpos($lower_message, $pattern) !== false) {
+                    if (!isset($analysis['error_patterns'][$label])) {
+                        $analysis['error_patterns'][$label] = 0;
+                    }
+                    $analysis['error_patterns'][$label]++;
+                    break; // Only count once per error
+                }
+            }
+        }
+        
+        // Sort by frequency
+        arsort($message_counts);
+        $analysis['common_messages'] = array_slice($message_counts, 0, 10, true);
+        
+        arsort($http_code_counts);
+        $analysis['http_codes'] = $http_code_counts;
+        
+        return $analysis;
+    }
 }
 
