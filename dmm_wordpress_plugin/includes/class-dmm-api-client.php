@@ -381,6 +381,31 @@ class DMM_API_Client {
                         $error_message = $response_data['error'];
                     } elseif (isset($response_data['message'])) {
                         $error_message = $response_data['message'];
+                        
+                        // Detect database schema errors and provide helpful guidance
+                        if (is_string($error_message)) {
+                            $lower_message = strtolower($error_message);
+                            if (strpos($lower_message, "table") !== false && 
+                                (strpos($lower_message, "doesn't exist") !== false || 
+                                 strpos($lower_message, "not found") !== false ||
+                                 strpos($lower_message, "base table or view not found") !== false)) {
+                                
+                                // Extract table name if possible
+                                if (preg_match("/table\s+['`]?(\w+)['`]?\s+(?:doesn't exist|not found)/i", $error_message, $matches)) {
+                                    $table_name = $matches[1];
+                                    $error_message = sprintf(
+                                        __('Database Schema Error: Table "%s" does not exist. Please run Laravel migrations: php artisan migrate', 'dmm-delivery-bridge'),
+                                        $table_name
+                                    );
+                                } else {
+                                    $error_message = __('Database Schema Error: A required database table is missing. Please run Laravel migrations: php artisan migrate', 'dmm-delivery-bridge');
+                                }
+                            } elseif (strpos($lower_message, "sqlstate") !== false && 
+                                     (strpos($lower_message, "42s02") !== false || strpos($lower_message, "base table") !== false)) {
+                                // SQLSTATE[42S02] = Base table or view not found
+                                $error_message = __('Database Schema Error: A required database table is missing. Please run Laravel migrations: php artisan migrate', 'dmm-delivery-bridge');
+                            }
+                        }
                     } elseif (isset($response_data['errors'])) {
                         // Laravel-style validation errors
                         if (is_array($response_data['errors'])) {
@@ -390,8 +415,18 @@ class DMM_API_Client {
                         }
                     }
                 } elseif (!empty($response_body) && !is_array($response_data)) {
-                    // If response body is not JSON, include it in the error
-                    $error_message = sprintf(__('HTTP Error: %d - %s', 'dmm-delivery-bridge'), $response_code, substr(strip_tags($response_body), 0, 200));
+                    // If response body is not JSON, check for database errors in plain text
+                    $lower_body = strtolower($response_body);
+                    if (strpos($lower_body, "table") !== false && 
+                        (strpos($lower_body, "doesn't exist") !== false || 
+                         strpos($lower_body, "not found") !== false ||
+                         strpos($lower_body, "base table or view not found") !== false ||
+                         strpos($lower_body, "sqlstate[42s02]") !== false)) {
+                        $error_message = __('Database Schema Error: A required database table is missing. Please run Laravel migrations: php artisan migrate', 'dmm-delivery-bridge');
+                    } else {
+                        // If response body is not JSON, include it in the error
+                        $error_message = sprintf(__('HTTP Error: %d - %s', 'dmm-delivery-bridge'), $response_code, substr(strip_tags($response_body), 0, 200));
+                    }
                 }
                 
                 // Log full response for debugging
@@ -866,6 +901,11 @@ class DMM_API_Client {
                 'circuit breaker' => 'Circuit breaker open',
                 'rate limit' => 'Rate limiting',
                 '429' => 'Rate limiting (HTTP 429)',
+                'database schema error' => 'Database schema error (missing table)',
+                'table' => 'Database table error',
+                'sqlstate[42s02]' => 'Database table not found',
+                'doesn\'t exist' => 'Database table missing',
+                'migration' => 'Database migration needed',
                 '500' => 'Server error (HTTP 500)',
                 '502' => 'Bad gateway (HTTP 502)',
                 '503' => 'Service unavailable (HTTP 503)',
