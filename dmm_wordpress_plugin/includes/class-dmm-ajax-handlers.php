@@ -273,6 +273,34 @@ class DMM_AJAX_Handlers {
         $this->verify_ajax_request('dmm_bulk_send_orders');
         
         try {
+            // Check circuit breaker status before starting bulk send
+            $api_client = $this->plugin ? $this->plugin->api_client : null;
+            if ($api_client && method_exists($api_client, 'get_circuit_breaker_status')) {
+                $circuit_breaker_status = $api_client->get_circuit_breaker_status();
+                if ($circuit_breaker_status['is_open']) {
+                    $time_remaining = $circuit_breaker_status['time_remaining'];
+                    $minutes = floor($time_remaining / 60);
+                    $seconds = $time_remaining % 60;
+                    $time_str = $minutes > 0 
+                        ? sprintf(__('%d minute(s) and %d second(s)', 'dmm-delivery-bridge'), $minutes, $seconds)
+                        : sprintf(__('%d second(s)', 'dmm-delivery-bridge'), $seconds);
+                    
+                    $monitoring_url = admin_url('admin.php?page=dmm-delivery-bridge-monitoring');
+                    $reset_url = add_query_arg(['action' => 'reset_circuit_breaker'], $monitoring_url);
+                    
+                    wp_send_json_error([
+                        'message' => sprintf(
+                            __('⚠️ Cannot start bulk send: API calls are temporarily disabled due to high error rate. The circuit breaker will auto-reset in %s. Please check the <a href="%s" target="_blank">Monitoring page</a> to analyze errors and resolve the issue before retrying.', 'dmm-delivery-bridge'),
+                            $time_str,
+                            esc_url($monitoring_url)
+                        ),
+                        'circuit_breaker_open' => true,
+                        'time_remaining' => $time_remaining,
+                        'monitoring_url' => $monitoring_url
+                    ]);
+                }
+            }
+            
             // Get parameters
             $params = isset($_POST['params']) ? json_decode(stripslashes($_POST['params']), true) : [];
             
@@ -381,6 +409,33 @@ class DMM_AJAX_Handlers {
         $this->verify_ajax_request('dmm_bulk_sync_orders');
         
         try {
+            // Check circuit breaker status before starting bulk sync
+            $api_client = $this->plugin ? $this->plugin->api_client : null;
+            if ($api_client && method_exists($api_client, 'get_circuit_breaker_status')) {
+                $circuit_breaker_status = $api_client->get_circuit_breaker_status();
+                if ($circuit_breaker_status['is_open']) {
+                    $time_remaining = $circuit_breaker_status['time_remaining'];
+                    $minutes = floor($time_remaining / 60);
+                    $seconds = $time_remaining % 60;
+                    $time_str = $minutes > 0 
+                        ? sprintf(__('%d minute(s) and %d second(s)', 'dmm-delivery-bridge'), $minutes, $seconds)
+                        : sprintf(__('%d second(s)', 'dmm-delivery-bridge'), $seconds);
+                    
+                    $monitoring_url = admin_url('admin.php?page=dmm-delivery-bridge-monitoring');
+                    
+                    wp_send_json_error([
+                        'message' => sprintf(
+                            __('⚠️ Cannot start bulk sync: API calls are temporarily disabled due to high error rate. The circuit breaker will auto-reset in %s. Please check the <a href="%s" target="_blank">Monitoring page</a> to analyze errors and resolve the issue before retrying.', 'dmm-delivery-bridge'),
+                            $time_str,
+                            esc_url($monitoring_url)
+                        ),
+                        'circuit_breaker_open' => true,
+                        'time_remaining' => $time_remaining,
+                        'monitoring_url' => $monitoring_url
+                    ]);
+                }
+            }
+            
             $params = isset($_POST['params']) ? json_decode(stripslashes($_POST['params']), true) : [];
             
             // Get orders that have been sent - exclude refunds
