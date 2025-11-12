@@ -240,11 +240,32 @@ class DMM_Order_Processor {
                 'message' => 'Exception during processing: ' . $e->getMessage(),
                 'data' => null
             ];
+            
+            // If order_data wasn't prepared due to exception, create minimal data for logging
+            if (!$order_data) {
+                $order_data = [
+                    'source' => 'woocommerce',
+                    'order' => [
+                        'external_order_id' => (string) $order_id,
+                        'order_number' => $order->get_order_number(),
+                        'status' => $order->get_status()
+                    ]
+                ];
+            }
         }
         
         // Always log the result, even if there was an exception
-        if ($order_data && $response) {
-            $this->logger->log_request($order_id, $order_data, $response);
+        if ($response) {
+            // Use order_data if available, otherwise create minimal data
+            $data_to_log = $order_data ?: [
+                'source' => 'woocommerce',
+                'order' => [
+                    'external_order_id' => (string) $order_id,
+                    'order_number' => $order->get_order_number(),
+                    'status' => $order->get_status()
+                ]
+            ];
+            $this->logger->log_request($order_id, $data_to_log, $response);
         }
         
         // Handle response
