@@ -213,6 +213,7 @@ class DMM_Delivery_Bridge {
         add_action('dmm_send_order', [$this->order_processor, 'process_order_async'], 10, 1);
         add_action('dmm_update_order', [$this, 'process_order_update'], 10, 1);
         add_action('dmm_bulk_process_orders', [$this, 'process_bulk_orders'], 10, 2);
+        add_action('dmm_retry_rate_limited_order', [$this->ajax_handlers, 'retry_rate_limited_order'], 10, 1);
         
         // Database table creation
         add_action('init', [$this->database, 'create_dedupe_table']);

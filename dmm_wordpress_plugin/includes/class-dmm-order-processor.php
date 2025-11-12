@@ -253,7 +253,7 @@ class DMM_Order_Processor {
      * and return the existing order data instead of creating a duplicate.
      *
      * @param \WC_Order $order WooCommerce order object
-     * @return void
+     * @return array|null Response array with 'success', 'rate_limited', 'wait_seconds' (if rate limited), or null if already sent/max retries
      * @since 1.0.0
      */
     public function process_order_robust($order) {
@@ -262,7 +262,7 @@ class DMM_Order_Processor {
         // Check if already sent successfully
         if ($order->get_meta('_dmm_delivery_sent') === 'yes') {
             $this->logger->debug_log('Order ' . $order_id . ' already sent, skipping');
-            return;
+            return null;
         }
         
         // Generate idempotency key
@@ -274,7 +274,7 @@ class DMM_Order_Processor {
         
         if ($retry_count >= $max_retries) {
             $this->handle_max_retries_reached($order);
-            return;
+            return null;
         }
         
         $order_data = null;
@@ -331,8 +331,26 @@ class DMM_Order_Processor {
                 $cache_service = new DMM_Cache_Service($this->options, $this->logger);
                 $cache_service->invalidate_order_cache($order_id);
             }
+            
+            // Return success response
+            return [
+                'success' => true,
+                'rate_limited' => false
+            ];
         } else {
+            // Check if rate limited
+            $is_rate_limited = isset($response['rate_limited']) && $response['rate_limited'] === true;
+            $wait_seconds = isset($response['wait_seconds']) ? (int) $response['wait_seconds'] : (isset($response['retry_after']) ? (int) $response['retry_after'] : 0);
+            
             $this->handle_failed_send($order, $response, $retry_count);
+            
+            // Return failure response with rate limit info
+            return [
+                'success' => false,
+                'rate_limited' => $is_rate_limited,
+                'wait_seconds' => $wait_seconds,
+                'message' => $response['message'] ?? __('Unknown error', 'dmm-delivery-bridge')
+            ];
         }
     }
     
