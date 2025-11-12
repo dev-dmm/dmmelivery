@@ -73,6 +73,54 @@ return new class extends Migration
         
         // Add FK with explicit name for easier monitoring/dropping
         if (!$fkExists) {
+            // First, make customer_id nullable if it isn't already (required for onDelete('set null'))
+            $columnNullable = false;
+            if ($driver === 'mysql') {
+                $columnInfo = DB::selectOne("
+                    SELECT IS_NULLABLE 
+                    FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'shipments'
+                      AND COLUMN_NAME = 'customer_id'
+                ");
+                $columnNullable = ($columnInfo->IS_NULLABLE ?? 'NO') === 'YES';
+            } elseif ($driver === 'pgsql') {
+                $columnInfo = DB::selectOne("
+                    SELECT is_nullable 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'shipments'
+                      AND column_name = 'customer_id'
+                      AND table_schema = current_schema()
+                ");
+                $columnNullable = ($columnInfo->is_nullable ?? 'NO') === 'YES';
+            }
+            
+            if (!$columnNullable) {
+                // Make column nullable using raw SQL (avoids requiring doctrine/dbal)
+                if ($driver === 'mysql') {
+                    DB::statement("ALTER TABLE shipments MODIFY COLUMN customer_id CHAR(36) NULL");
+                } elseif ($driver === 'pgsql') {
+                    DB::statement("ALTER TABLE shipments ALTER COLUMN customer_id DROP NOT NULL");
+                }
+            }
+            
+            // Clean up any orphaned customer_id values that don't exist in customers table
+            if ($driver === 'mysql') {
+                DB::statement("
+                    UPDATE shipments 
+                    SET customer_id = NULL 
+                    WHERE customer_id IS NOT NULL 
+                    AND customer_id NOT IN (SELECT id FROM customers)
+                ");
+            } elseif ($driver === 'pgsql') {
+                DB::statement("
+                    UPDATE shipments 
+                    SET customer_id = NULL 
+                    WHERE customer_id IS NOT NULL 
+                    AND customer_id NOT IN (SELECT id::text FROM customers)
+                ");
+            }
+            
             Schema::table('shipments', function (Blueprint $table) {
                 try {
                     $table->foreign('customer_id', 'shipments_customer_id_fk')
@@ -81,6 +129,14 @@ return new class extends Migration
                         ->onDelete('set null');
                 } catch (\Throwable $e) {
                     // FK might have been created concurrently, skip
+                    // Log the error for debugging
+                    if (app()->environment('local', 'staging')) {
+                        \Log::warning('Failed to create foreign key constraint', [
+                            'error' => $e->getMessage(),
+                            'table' => 'shipments',
+                            'column' => 'customer_id'
+                        ]);
+                    }
                 }
             });
         }
