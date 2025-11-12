@@ -69,6 +69,7 @@ require_once __DIR__ . '/includes/class-dmm-performance-monitor.php';
 require_once __DIR__ . '/includes/class-dmm-api-client.php';
 require_once __DIR__ . '/includes/class-dmm-order-processor.php';
 require_once __DIR__ . '/includes/class-dmm-scheduler.php';
+require_once __DIR__ . '/includes/class-dmm-elta-courier-service.php';
 require_once __DIR__ . '/includes/class-dmm-admin.php'; // Required for default options during activation
 require_once __DIR__ . '/includes/class-dmm-delivery-bridge.php';
 

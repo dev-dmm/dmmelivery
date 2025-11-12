@@ -645,7 +645,6 @@ class DMM_Admin {
                    name="dmm_delivery_bridge_options[create_shipment]" 
                    value="yes" 
                    <?php checked($value, 'yes'); ?> />
-            <?php _e('Create shipment in DMM Delivery system', 'dmm-delivery-bridge'); ?>
         </label>
         <p class="description">
             <?php _e('If enabled, a shipment will be created in the DMM Delivery system when sending orders.', 'dmm-delivery-bridge'); ?>

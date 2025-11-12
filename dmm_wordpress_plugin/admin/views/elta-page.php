@@ -121,6 +121,127 @@ if (!defined('ABSPATH')) {
         
         <?php submit_button(__('Save Changes', 'dmm-delivery-bridge')); ?>
     </form>
+    
+    <!-- Test Voucher Section -->
+    <div class="card" style="margin-top: 20px;">
+        <h2><?php _e('Test Voucher Creation', 'dmm-delivery-bridge'); ?></h2>
+        <p class="description">
+            <?php _e('Test the ELTA API connection by creating a test voucher. This will verify your credentials and API endpoint configuration.', 'dmm-delivery-bridge'); ?>
+        </p>
+        
+        <table class="form-table">
+            <tr>
+                <th scope="row">
+                    <label for="test_sender_name"><?php _e('Sender Name', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_sender_name"
+                           value="Test Sender" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_sender_address"><?php _e('Sender Address', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_sender_address"
+                           value="Test Address 123" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_sender_city"><?php _e('Sender City', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_sender_city"
+                           value="Athens" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_sender_postcode"><?php _e('Sender Postcode', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_sender_postcode"
+                           value="10431" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_recipient_name"><?php _e('Recipient Name', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_recipient_name"
+                           value="Test Recipient" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_recipient_address"><?php _e('Recipient Address', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_recipient_address"
+                           value="Test Address 456" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_recipient_city"><?php _e('Recipient City', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_recipient_city"
+                           value="Thessaloniki" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_recipient_postcode"><?php _e('Recipient Postcode', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_recipient_postcode"
+                           value="54625" 
+                           class="regular-text" />
+                </td>
+            </tr>
+            <tr>
+                <th scope="row">
+                    <label for="test_recipient_phone"><?php _e('Recipient Phone', 'dmm-delivery-bridge'); ?></label>
+                </th>
+                <td>
+                    <input type="text" 
+                           id="test_recipient_phone"
+                           value="2101234567" 
+                           class="regular-text" />
+                </td>
+            </tr>
+        </table>
+        
+        <p class="submit">
+            <button type="button" 
+                    id="elta_test_voucher_btn" 
+                    class="button button-primary">
+                <?php _e('Create Test Voucher', 'dmm-delivery-bridge'); ?>
+            </button>
+            <span class="spinner" id="elta_test_voucher_spinner" style="float: none; margin-left: 10px;"></span>
+        </p>
+        
+        <div id="elta_test_voucher_result" style="margin-top: 15px;"></div>
+    </div>
 </div>
 
 <script>
@@ -187,6 +308,84 @@ jQuery(document).ready(function($) {
     }
     
     loadMetaFields();
+    
+    // Test Voucher functionality
+    $('#elta_test_voucher_btn').on('click', function() {
+        var $btn = $(this);
+        var $spinner = $('#elta_test_voucher_spinner');
+        var $result = $('#elta_test_voucher_result');
+        
+        // Disable button and show spinner
+        $btn.prop('disabled', true);
+        $spinner.addClass('is-active');
+        $result.html('');
+        
+        // Collect form data
+        var testData = {
+            sender_name: $('#test_sender_name').val(),
+            sender_address: $('#test_sender_address').val(),
+            sender_city: $('#test_sender_city').val(),
+            sender_postcode: $('#test_sender_postcode').val(),
+            recipient_name: $('#test_recipient_name').val(),
+            recipient_address: $('#test_recipient_address').val(),
+            recipient_city: $('#test_recipient_city').val(),
+            recipient_postcode: $('#test_recipient_postcode').val(),
+            recipient_phone: $('#test_recipient_phone').val()
+        };
+        
+        // Make AJAX request
+        $.ajax({
+            url: dmmAdminData.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'dmm_elta_create_test_voucher',
+                nonce: dmmAdminData.nonce,
+                test_data: testData
+            },
+            success: function(response) {
+                $spinner.removeClass('is-active');
+                $btn.prop('disabled', false);
+                
+                if (response.success) {
+                    var html = '<div class="notice notice-success"><p><strong>' + 
+                               escapeHtml('<?php echo esc_js(__('Success!', 'dmm-delivery-bridge')); ?>') + '</strong><br>';
+                    
+                    if (response.data.voucher_number) {
+                        html += escapeHtml('<?php echo esc_js(__('Voucher Number:', 'dmm-delivery-bridge')); ?>') + ' <strong>' + 
+                                escapeHtml(response.data.voucher_number) + '</strong><br>';
+                    }
+                    
+                    if (response.data.message) {
+                        html += escapeHtml(response.data.message);
+                    }
+                    
+                    if (response.data.details) {
+                        html += '<pre style="margin-top: 10px; background: #f5f5f5; padding: 10px; overflow-x: auto;">' + 
+                                escapeHtml(JSON.stringify(response.data.details, null, 2)) + '</pre>';
+                    }
+                    
+                    html += '</p></div>';
+                    $result.html(html);
+                } else {
+                    var errorMsg = response.data && response.data.message 
+                        ? response.data.message 
+                        : '<?php echo esc_js(__('An error occurred while creating the test voucher.', 'dmm-delivery-bridge')); ?>';
+                    
+                    $result.html('<div class="notice notice-error"><p><strong>' + 
+                                escapeHtml('<?php echo esc_js(__('Error:', 'dmm-delivery-bridge')); ?>') + '</strong> ' + 
+                                escapeHtml(errorMsg) + '</p></div>');
+                }
+            },
+            error: function(xhr, status, error) {
+                $spinner.removeClass('is-active');
+                $btn.prop('disabled', false);
+                
+                $result.html('<div class="notice notice-error"><p><strong>' + 
+                            escapeHtml('<?php echo esc_js(__('Error:', 'dmm-delivery-bridge')); ?>') + '</strong> ' + 
+                            escapeHtml('<?php echo esc_js(__('AJAX request failed. Please check your connection and try again.', 'dmm-delivery-bridge')); ?>') + '</p></div>');
+            }
+        });
+    });
 });
 </script>
 

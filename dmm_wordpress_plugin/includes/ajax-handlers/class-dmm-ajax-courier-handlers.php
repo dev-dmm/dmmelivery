@@ -60,6 +60,7 @@ class DMM_AJAX_Courier_Handlers {
         add_action('wp_ajax_dmm_elta_create_tracking', [$this, 'ajax_elta_create_tracking']);
         add_action('wp_ajax_dmm_elta_update_tracking', [$this, 'ajax_elta_update_tracking']);
         add_action('wp_ajax_dmm_elta_delete_tracking', [$this, 'ajax_elta_delete_tracking']);
+        add_action('wp_ajax_dmm_elta_create_test_voucher', [$this, 'ajax_elta_create_test_voucher']);
     }
     
     // ACS Courier methods
@@ -165,6 +166,104 @@ class DMM_AJAX_Courier_Handlers {
         $this->verify_ajax_request('dmm_elta_delete');
         // TODO: Extract implementation from original file
         wp_send_json_error(['message' => 'Method not yet extracted from original file']);
+    }
+    
+    /**
+     * Create a test voucher for ELTA
+     */
+    public function ajax_elta_create_test_voucher() {
+        $this->verify_ajax_request('dmm_elta_test');
+        
+        $options = get_option('dmm_delivery_bridge_options', []);
+        
+        // Check if ELTA is enabled and credentials are set
+        if (empty($options['elta_enabled']) || $options['elta_enabled'] !== 'yes') {
+            wp_send_json_error([
+                'message' => __('ELTA integration is not enabled. Please enable it in the settings above.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        $user_code = $options['elta_user_code'] ?? '';
+        $user_pass = $options['elta_user_pass'] ?? '';
+        $apost_code = $options['elta_apost_code'] ?? '';
+        $api_endpoint = $options['elta_api_endpoint'] ?? 'https://customers.elta-courier.gr';
+        
+        if (empty($user_code) || empty($user_pass) || empty($apost_code)) {
+            wp_send_json_error([
+                'message' => __('ELTA credentials are not configured. Please fill in User Code, User Password, and Apost Code.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Get test data from request
+        $test_data = isset($_POST['test_data']) ? $_POST['test_data'] : [];
+        
+        if (empty($test_data)) {
+            wp_send_json_error([
+                'message' => __('Test data is missing.', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        // Sanitize test data
+        $sender_name = sanitize_text_field($test_data['sender_name'] ?? '');
+        $sender_address = sanitize_text_field($test_data['sender_address'] ?? '');
+        $sender_city = sanitize_text_field($test_data['sender_city'] ?? '');
+        $sender_postcode = sanitize_text_field($test_data['sender_postcode'] ?? '');
+        $recipient_name = sanitize_text_field($test_data['recipient_name'] ?? '');
+        $recipient_address = sanitize_text_field($test_data['recipient_address'] ?? '');
+        $recipient_city = sanitize_text_field($test_data['recipient_city'] ?? '');
+        $recipient_postcode = sanitize_text_field($test_data['recipient_postcode'] ?? '');
+        $recipient_phone = sanitize_text_field($test_data['recipient_phone'] ?? '');
+        
+        // Validate required fields
+        if (empty($sender_name) || empty($sender_address) || empty($sender_city) || 
+            empty($recipient_name) || empty($recipient_address) || empty($recipient_city)) {
+            wp_send_json_error([
+                'message' => __('Please fill in all required fields (Sender and Recipient name, address, and city).', 'dmm-delivery-bridge')
+            ]);
+        }
+        
+        try {
+            // Create ELTA API service instance
+            $elta_service = new DMM_ELTA_Courier_Service($options);
+            
+            // Prepare voucher data
+            $voucher_data = [
+                'sender' => [
+                    'name' => $sender_name,
+                    'address' => $sender_address,
+                    'city' => $sender_city,
+                    'postcode' => $sender_postcode,
+                ],
+                'recipient' => [
+                    'name' => $recipient_name,
+                    'address' => $recipient_address,
+                    'city' => $recipient_city,
+                    'postcode' => $recipient_postcode,
+                    'phone' => $recipient_phone,
+                ],
+            ];
+            
+            // Create test voucher
+            $result = $elta_service->create_test_voucher($voucher_data);
+            
+            if ($result['success']) {
+                wp_send_json_success([
+                    'message' => __('Test voucher created successfully!', 'dmm-delivery-bridge'),
+                    'voucher_number' => $result['voucher_number'] ?? '',
+                    'details' => $result['details'] ?? []
+                ]);
+            } else {
+                wp_send_json_error([
+                    'message' => $result['message'] ?? __('Failed to create test voucher.', 'dmm-delivery-bridge'),
+                    'details' => $result['details'] ?? []
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            wp_send_json_error([
+                'message' => sprintf(__('Error creating test voucher: %s', 'dmm-delivery-bridge'), $e->getMessage())
+            ]);
+        }
     }
 }
 
